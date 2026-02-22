@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenType {
     // Speacial Words
     If,
@@ -9,9 +9,9 @@ pub enum TokenType {
     False,
 
     // Identificadores y literales
-    Identifier(String),
-    Number(f64),
-    String(String),
+    Identifier,
+    Float,
+    Integer,
 
     // Operadores
     Plus,         // +
@@ -30,16 +30,16 @@ pub enum TokenType {
     Not,          // !
 
     // Delimitadores
-    LParen,    // (
-    RParen,    // )
-    LBrace,    // {
-    RBrace,    // }
-    LBracket,  // [
-    RBracket,  // ]
-    Semicolon, // ;
-    Colon,     // :
-    Comma,     // ,
-    Dot,       // .
+    LeftParen,    // (
+    RightParen,   // )
+    LeftBrace,    // {
+    RightBrace,   // }
+    LeftBracket,  // [
+    RightBracket, // ]
+    Semicolon,    // ;
+    Colon,        // :
+    Comma,        // ,
+    Dot,          // .
 
     // Especiales
     Whitespace,
@@ -58,6 +58,14 @@ impl Token {
     }
 
     pub fn to_string(&self) -> String {
-        format!("Token({:?}) '{}'", self.token_type, self.value)
+        format!("Token({:?}) {}", self.token_type, self.value)
+    }
+
+    pub fn get_token_type(&self) -> TokenType {
+        self.token_type
+    }
+
+    pub fn get_value(&self) -> String {
+        self.value.clone()
     }
 }
