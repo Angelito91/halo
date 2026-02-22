@@ -1,5 +1,8 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenType {
+    // Variables' types
+    Int,
+
     // Speacial Words
     If,
     Else,
@@ -10,8 +13,7 @@ pub enum TokenType {
 
     // Identificadores y literales
     Identifier,
-    Float,
-    Integer,
+    Number,
 
     // Operadores
     Plus,         // +

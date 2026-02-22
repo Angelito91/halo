@@ -1,12 +1,6 @@
-use crate::token::{Token, TokenType};
+use crate::token::{self, Token, TokenType};
 
 // Easy way to create tokens for operators
-macro_rules! token_op {
-    ($self:ident, $c:expr, $token:expr) => {{
-        $self.next_char();
-        Token::new($token, $c.to_string())
-    }};
-}
 
 pub struct Lexer {
     input: String,
@@ -44,6 +38,12 @@ impl Lexer {
         }
     }
 
+    // A way to create simple tokens
+    pub fn simple_token(&mut self, token_type: TokenType, c: char) -> Token {
+        self.next_char();
+        Token::new(token_type, c.to_string())
+    }
+
     // Create next token
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
@@ -76,23 +76,23 @@ impl Lexer {
                     }
                 }
 
-                Token::new(TokenType::Integer, num_str.parse().unwrap())
+                Token::new(TokenType::Number, num_str.parse().unwrap())
             }
 
             // Operators and delimiters
-            Some('+') => token_op!(self, '+', TokenType::Plus),
-            Some('-') => token_op!(self, '-', TokenType::Minus),
-            Some('*') => token_op!(self, '*', TokenType::Star),
-            Some('/') => token_op!(self, '/', TokenType::Slash),
-            Some('=') => token_op!(self, '=', TokenType::Equal),
-            Some('(') => token_op!(self, '(', TokenType::LeftParen),
-            Some(')') => token_op!(self, ')', TokenType::RightParen),
-            Some('{') => token_op!(self, '{', TokenType::LeftBrace),
-            Some('}') => token_op!(self, '}', TokenType::RightBrace),
-            Some('[') => token_op!(self, '[', TokenType::LeftBracket),
-            Some(']') => token_op!(self, ']', TokenType::RightBracket),
-            Some(';') => token_op!(self, ';', TokenType::Semicolon),
-            Some(',') => token_op!(self, ',', TokenType::Comma),
+            Some('+') => self.simple_token(TokenType::Plus, '+'),
+            Some('-') => self.simple_token(TokenType::Minus, '-'),
+            Some('*') => self.simple_token(TokenType::Star, '*'),
+            Some('/') => self.simple_token(TokenType::Slash, '/'),
+            Some('=') => self.simple_token(TokenType::Equal, '='),
+            Some('(') => self.simple_token(TokenType::LeftParen, '('),
+            Some(')') => self.simple_token(TokenType::RightParen, ')'),
+            Some('{') => self.simple_token(TokenType::LeftBrace, '{'),
+            Some('}') => self.simple_token(TokenType::RightBrace, '}'),
+            Some('[') => self.simple_token(TokenType::LeftBracket, '['),
+            Some(']') => self.simple_token(TokenType::RightBracket, ']'),
+            Some(';') => self.simple_token(TokenType::Semicolon, ';'),
+            Some(',') => self.simple_token(TokenType::Comma, ','),
 
             Some(c) => {
                 self.next_char();
