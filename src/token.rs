@@ -1,7 +1,16 @@
+// The Halo Programming Language
+// Version: 0.1.0
+// Author: Angel A. Portuondo H.
+// License: MPL 2.0
+// SPDX-License-Identifier: MPL-2.0
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenType {
     // Variables' types
     Int,
+    Float,
+    Bool,
+    String,
 
     // Speacial Words
     If,
@@ -27,9 +36,11 @@ pub enum TokenType {
     Greater,      // >
     LessEqual,    // <=
     GreaterEqual, // >=
-    And,          // &&
-    Or,           // ||
-    Not,          // !
+
+    // Comperative
+    And, // &&
+    Or,  // ||
+    Not, // !
 
     // Delimitadores
     LeftParen,    // (

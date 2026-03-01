@@ -1,6 +1,10 @@
-use crate::token::{self, Token, TokenType};
+// The Halo Programming Language
+// Version: 0.1.0
+// Author: Angel A. Portuondo H.
+// License: MPL 2.0
+// SPDX-License-Identifier: MPL-2.0
 
-// Easy way to create tokens for operators
+use crate::token::{Token, TokenType};
 
 pub struct Lexer {
     input: String,
@@ -48,21 +52,48 @@ impl Lexer {
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
+        let mut token_type = TokenType::Identifier;
+
         match self.current_char() {
             None => Token::new(TokenType::EOF, String::from("NONE")),
 
             Some(c) if c.is_alphabetic() => {
                 let mut ident = String::new();
                 while let Some(c) = self.current_char() {
-                    if c.is_alphanumeric() {
+                    if c.is_alphanumeric() || c == '_' {
                         ident.push(c);
                         self.next_char();
+
+                        token_type = match ident.as_str() {
+                            "int" => TokenType::Int,
+                            "bool" => TokenType::Bool,
+                            "string" => TokenType::String,
+                            "float" => TokenType::Float,
+                            "if" => TokenType::If,
+                            "else" => TokenType::Else,
+                            "while" => TokenType::While,
+                            "fn" => TokenType::Fn,
+                            "and" => TokenType::And,
+                            "or" => TokenType::Or,
+                            "not" => TokenType::Not,
+                            "true" => TokenType::True,
+                            "false" => TokenType::False,
+                            "==" => TokenType::Equal,
+                            "!=" => TokenType::NotEqual,
+                            ">=" => TokenType::GreaterEqual,
+                            "<=" => TokenType::LessEqual,
+                            _ => TokenType::Identifier,
+                        };
+
+                        if token_type != TokenType::Identifier {
+                            break;
+                        }
                     } else {
                         break;
                     }
                 }
 
-                Token::new(TokenType::Identifier, ident)
+                Token::new(token_type, ident)
             }
 
             Some(c) if c.is_numeric() => {
@@ -84,16 +115,21 @@ impl Lexer {
             Some('-') => self.simple_token(TokenType::Minus, '-'),
             Some('*') => self.simple_token(TokenType::Star, '*'),
             Some('/') => self.simple_token(TokenType::Slash, '/'),
-            Some('=') => self.simple_token(TokenType::Equal, '='),
+            Some('=') => self.simple_token(TokenType::Assign, '='),
             Some('(') => self.simple_token(TokenType::LeftParen, '('),
             Some(')') => self.simple_token(TokenType::RightParen, ')'),
             Some('{') => self.simple_token(TokenType::LeftBrace, '{'),
             Some('}') => self.simple_token(TokenType::RightBrace, '}'),
             Some('[') => self.simple_token(TokenType::LeftBracket, '['),
             Some(']') => self.simple_token(TokenType::RightBracket, ']'),
+            Some(':') => self.simple_token(TokenType::Colon, ':'),
             Some(';') => self.simple_token(TokenType::Semicolon, ';'),
             Some(',') => self.simple_token(TokenType::Comma, ','),
+            Some('>') => self.simple_token(TokenType::Greater, '>'),
+            Some('<') => self.simple_token(TokenType::Less, '<'),
+            Some('.') => self.simple_token(TokenType::Dot, '.'),
 
+            // For Unknown characters
             Some(c) => {
                 self.next_char();
                 Token::new(TokenType::Identifier, format!("{} UNKNOWN", c))
