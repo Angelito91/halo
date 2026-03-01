@@ -1,169 +1,218 @@
-# Halo — Compilador simple
-
-Halo es un proyecto educativo: un compilador/interprete minimalista diseñado para aprender e experimentar con las fases típicas de un compilador (lexing, parsing, AST, chequeo de tipos y backend/interprete). El lenguaje objetivo es intencionalmente pequeño y fácil de analizar; su especificación inicial está en `init.txt`.
-
-Este README explica la sintaxis básica, muestra ejemplos, describe el estado actual y sugiere una hoja de ruta para seguir desarrollando el proyecto.
-
----
-
-## Tabla de contenido
-
-- [Motivación](#motivación)
-- [Características principales](#características-principales)
-- [Sintaxis (resumen)](#sintaxis-resumen)
-- [Ejemplos](#ejemplos)
-- [Estructura del repositorio](#estructura-del-repositorio)
-- [Cómo contribuir](#cómo-contribuir)
-- [Roadmap / Próximos pasos](#roadmap--próximos-pasos)
-- [Licencia](#licencia)
-
----
-
-## Motivación
-
-El objetivo de `Halo` es servir como un proyecto de aprendizaje para comprender cómo construir un compilador/interprete desde cero. Está pensado para:
-
-- Practicar técnicas de análisis léxico y sintáctico.
-- Diseñar un AST simple y realizar chequeo de tipos.
-- Explorar estrategias de backend (interprete directo, bytecode, generación a C/LLVM).
-- Proveer un playground para experimentar con nuevas características de lenguaje.
+<div align="center">
+    <img src="halo.png" alt="Halo Compiler Banner">
+  
+  # 🌟 Halo — Compilador simple
+  
+  <p align="center">
+    <strong>✨ Un viaje educativo al corazón de los compiladores ✨</strong>
+  </p>
+  
+  <p align="center">
+    <img src="https://img.shields.io/badge/estado-en_desarrollo-blue?style=flat-square" alt="Estado: en desarrollo">
+    <img src="https://img.shields.io/badge/versión-0.1.0--alpha-orange?style=flat-square" alt="Versión: 0.1.0-alpha">
+    <img src="https://img.shields.io/badge/licencia-MIT-green?style=flat-square" alt="Licencia: MIT">
+    <img src="https://img.shields.io/badge/contribuciones-bienvenidas-brightgreen?style=flat-square" alt="Contribuciones: bienvenidas">
+  </p>
+  
+  <p align="center">
+    <a href="#-motivación">Motivación</a> •
+    <a href="#-características">Características</a> •
+    <a href="#-sintaxis">Sintaxis</a> •
+    <a href="#-ejemplos">Ejemplos</a> •
+    <a href="#-estructura">Estructura</a> •
+    <a href="#-roadmap">Roadmap</a> •
+    <a href="#-contribuir">Contribuir</a>
+  </p>
+</div>
 
 ---
 
-## Características principales
+## 🎯 Motivación
 
-- Tipos básicos: `int`, `float`, `bool`.
-- Declaración e inicialización de variables.
-- Expresiones aritméticas y operadores básicos.
-- Condicionales `if/else`.
-- Bucles `while`.
-- Definición de funciones con `fn`.
-- Sintaxis simple pensada para facilitar el parsing.
+> *"Lo que no se crea, no se entiende"*
 
----
+Halo nace como un proyecto de aprendizaje práctico para desmitificar el proceso de construcción de compiladores e intérpretes. Lejos de la complejidad de lenguajes industriales, Halo ofrece un playground minimalista donde:
 
-## Sintaxis (resumen)
+- 🔍 **Exploras** las fases clásicas: lexing, parsing, AST, chequeo de tipos y backend
+- 🧪 **Experimentas** con nuevas características de lenguaje sin miedo
+- 📚 **Aprendes** haciendo, con código simple y extensible
+- 🎮 **Juegas** con diferentes estrategias de implementación (intérprete, bytecode, transpilación)
 
-La especificación inicial se encuentra en `init.txt`. Aquí está el contenido original de referencia:
+## ⚡ Características principales
 
-```halo/init.txt#L1-27
-Sintaxis
+<div align="center">
+  
+| | | |
+|---|---|---|
+| ✅ Tipos básicos | ✅ Variables | ✅ Expresiones aritméticas |
+| ✅ Condicionales `if/else` | ✅ Bucles `while` | ✅ Funciones con `fn` |
+| 🚧 Sistema de tipos | 🚧 Parámetros | 🚧 Retorno de funciones |
+| 📅 I/O básico | 📅 Backend alternativo | 📅 CLI tool |
 
-1 - Tipos
-int -> Enteros
-float -> Flotantes
-bool -> Booleanos
+</div>
 
-1 - Variable
-Declaracion -> <tipo> <name>
-Inicializacion -> <tipo> <name> = <valor>
+## 📝 Sintaxis
 
-2 - Condicionales
+La especificación inicial (ver [`init.txt`](init.txt)) define una sintaxis limpia y fácil de parsear:
 
-if <condicion> {..} else {}
+### 📦 Tipos y variables
+```
+int           // Números enteros
+float         // Números decimales  
+bool          // Booleanos (true/false)
 
-3 - Bucles
-
-while <condicion> {}
-
-4 - Funciones
-fn <name>(){
-
-}
-
-5 -Operadores
-
-+ - * / < > = ==
+int x                 // Declaración
+int contador = 10     // Inicialización
+float precio = 99.99
+bool activo = true
 ```
 
-Notas sobre la sintaxis:
-- Las declaraciones se escriben como `int x` o `int x = 5`.
-- No hay aún una sintaxis estándar para comentarios o entrada/salida; se puede definir según convenga.
-- Las funciones se declaran con `fn <name>() { ... }`. El soporte de parámetros y retorno puede implementarse en siguientes iteraciones.
+### 🔀 Condicionales
+```rust
+if edad >= 18 {
+    // Código para adultos
+} else {
+    // Código para menores
+}
+```
 
----
+### 🔁 Bucles
+```rust
+while intentos < 3 {
+    intentos = intentos + 1
+}
+```
 
-## Ejemplos
+### 🧩 Funciones
+```rust
+fn saludar() {
+    // Cuerpo de la función
+}
+```
 
-Ejemplo: cálculo factorial (pseudocódigo en la sintaxis del lenguaje):
+### ➗ Operadores
+| Aritméticos | Comparación |
+|------------|-------------|
+| `+` `-` `*` `/` | `<` `>` `=` `==` |
 
-```/dev/null/example.halo#L1-20
+## 💡 Ejemplos
+
+### Factorial
+```rust
 fn main() {
-int n = 5
-int result = 1
-
-while n > 1 {
-result = result * n
-n = n - 1
-}
-
-# Si existiese, aquí iría la llamada a print o return
+    int n = 5
+    int resultado = 1
+    
+    while n > 1 {
+        resultado = resultado * n
+        n = n - 1
+    }
+    
+    // Aquí iría print cuando lo implementemos
+    // print(resultado) -> 120
 }
 ```
 
-Este ejemplo muestra la estructura general: declaración de variables, bucle `while` y operaciones aritméticas. A medida que el proyecto evolucione se añadirán utilidades de I/O y retornos.
+### Números pares
+```rust
+fn main() {
+    int numero = 1
+    
+    while numero <= 10 {
+        bool esPar = (numero % 2) == 0
+        
+        if esPar == true {
+            // print(numero) -> 2, 4, 6, 8, 10
+        }
+        
+        numero = numero + 1
+    }
+}
+```
+
+## 📁 Estructura del proyecto
+
+```
+halo/
+├── 📦 src/                    # Código fuente
+│   ├── 🎯 lexer/              # Análisis léxico
+│   ├── 🌳 parser/             # Análisis sintáctico y AST
+│   ├── 🏗️  ast/               # Definiciones de nodos
+│   ├── ✅ semantics/          # Chequeo de tipos
+│   └── ⚙️  backend/           # Intérprete / generación de código
+│
+├── 📚 examples/               # Programas de ejemplo
+│   ├── factorial.halo
+│   ├── fibonacci.halo
+│   └── ...
+│
+├── 🧪 tests/                   # Pruebas
+│   ├── unit/
+│   └── integration/
+│
+├── 📖 docs/                    # Documentación
+├── 📄 init.txt                 # Semilla de la sintaxis
+└── 🖼️  halo.png                # Banner del proyecto
+```
+
+## 🗺️ Roadmap
+
+### 🚀 Prioridad alta (Q1 2024)
+- [x] Definición inicial de sintaxis
+- [ ] Lexer completo con tokens
+- [ ] Parser recursivo descendente
+- [ ] AST funcional
+- [ ] Intérprete básico
+
+### 📈 Prioridad media (Q2 2024)
+- [ ] Sistema de tipos robusto
+- [ ] Mensajes de error legibles
+- [ ] Parámetros en funciones
+- [ ] Valores de retorno
+- [ ] Operadores lógicos (&&, ||, !)
+
+### 🌟 Prioridad baja (Q3 2024)
+- [ ] Backend a C/LLVM
+- [ ] CLI (`halo run`, `halo build`)
+- [ ] Standard library mínima
+- [ ] CI/CD automatizado
+
+## 🤝 Contribuir
+
+¡Toda ayuda es bienvenida! Halo es el proyecto perfecto para:
+
+- 🎓 Estudiantes aprendiendo compiladores
+- 👨‍💻 Desarrolladores curiosos
+- 🧙‍♂️ Expertos que quieran compartir conocimiento
+
+### Formas de contribuir
+
+| Área | Ideas |
+|------|-------|
+| 📝 **Documentación** | Mejorar ejemplos, escribir tutoriales |
+| 🎯 **Lexer/Parser** | Implementar desde cero o con herramientas |
+| ✅ **Semántica** | Añadir chequeo de tipos, optimizaciones |
+| ⚡ **Backend** | Crear intérprete, bytecode VM, transpilador |
+| 🧪 **Testing** | Añadir casos de prueba, encontrar bugs |
+| 💡 **Ideas** | Proponer nuevas características |
+
+### Buenas prácticas para PRs
+
+✅ Una característica por PR  
+✅ Incluir pruebas  
+✅ Documentar cambios  
+✅ Mantener el estilo de código  
+
+## 📜 Licencia
+
+MLP 2.0 © Angel A. Portuondo H.
 
 ---
 
-## Estructura recomendada del repositorio
+<div align="center">
+  
+**[⭐ Star](https://github.com/Angelito91/halo)** • **[🐛 Reportar bug](https://github.com/Angelito91/halo/issues)** • **[📬 Contacto](mailto:portuondoangel@gmail.com)**
+  
+**Hecho con 💙 para la educación y el aprendizaje**
 
-Sugerencia de organización para mantener el proyecto claro y extensible:
-
-- `halo/` — raíz del proyecto
-  - `src/` — código fuente del compilador
-    - `lexer/` — análisis léxico
-    - `parser/` — parser y construcción del AST
-    - `ast/` — definiciones de nodos del AST
-    - `semantics/` — chequeo de tipos y validaciones
-    - `backend/` — generación de código / intérprete
-  - `examples/` — ejemplos en el lenguaje Halo
-  - `tests/` — pruebas unitarias y de integración
-  - `docs/` — documentación adicional y especificación extendida
-  - `init.txt` — bosquejo inicial de la sintaxis (referencia)
-
-Si prefieres otra estructura (por ejemplo monorepo con múltiples backends), podemos adaptarla.
-
----
-
-## Cómo contribuir
-
-Algunas formas útiles de contribuir:
-
-- Añadir ejemplos en `examples/` que prueben construcciones del lenguaje.
-- Implementar el lexer y el parser (con tests).
-- Añadir chequeo de tipos y errores con mensajes claros.
-- Crear un intérprete sencillo que ejecute el AST.
-- Abrir issues para nuevas características o bugs.
-- Enviar pull requests con cambios pequeños y pruebas asociadas.
-
-Buenas prácticas para PRs:
-- Una tarea por PR.
-- Incluir pruebas que demuestren la corrección.
-- Documentar cambios en `docs/` o en `init.txt` según sea necesario.
-
----
-
-## Roadmap / Próximos pasos (sugeridos)
-
-Prioridad alta:
-- [ ] Lexer que genere tokens para palabras clave, identificadores, números y operadores.
-- [ ] Parser que produzca un AST para declaraciones, expresiones, condicionales, bucles y funciones.
-- [ ] Interprete básico que ejecute programas sencillos.
-
-Prioridad media:
-- [ ] Sistema de tipos y mensajes de error legibles.
-- [ ] Manejo de parámetros y valores de retorno en funciones.
-- [ ] Soporte de expresiones booleanas y operadores lógicos.
-
-Prioridad baja:
-- [ ] Backend que genere código C/LLVM o bytecode.
-- [ ] Herramienta CLI `halo build/run <archivo>`.
-- [ ] Integración con CI y tests automáticos.
-
----
-
-## Notas sobre implementación
-
-- Lenguajes recomendados para comenzar: Rust (por seguridad y performance), Go o Python (rápido para prototipado).
-- Para un parser sencillo se puede empezar con una implementación recursiva descendente.
-- Mantener el AST simple y testable facilita añadir passes posteriores (optimización, generación de código).
+</div>
