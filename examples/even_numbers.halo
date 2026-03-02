@@ -1,0 +1,18 @@
+// The Halo Programming Language
+// Example: Even Numbers
+// Version: 0.1.0
+// License: MPL 2.0
+
+main() {
+    numero = 1
+
+    while numero <= 10 {
+        esPar = (numero % 2) == 0
+
+        if esPar == true {
+            // print(numero)  -> 2, 4, 6, 8, 10
+        }
+
+        numero = numero + 1
+    }
+}

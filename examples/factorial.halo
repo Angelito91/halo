@@ -1,0 +1,16 @@
+// The Halo Programming Language
+// Example: Factorial
+// Version: 0.1.0
+// License: MPL 2.0
+
+factorial(n) {
+    if n == 1 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+
+main() {
+    result = factorial(5)
+    return result
+}
