@@ -61,16 +61,40 @@ impl Parser {
         }
 
         if self.check(TokenType::Identifier) {
-            // Peek to see if it's a function or variable
+            // Peek to see if it's a function declaration, variable, or function call
             let saved_current = self.current;
             self.advance();
-            let is_function = self.check(TokenType::LeftParen);
-            self.current = saved_current;
 
-            if is_function {
-                self.parse_function()
-            } else {
+            if self.check(TokenType::LeftParen) {
+                // Could be a function declaration or function call
+                // Peek further to see if there's a { after )
+                // Skip over parameters
+                while !self.check(TokenType::RightParen) && !self.is_at_end() {
+                    self.advance();
+                }
+
+                if !self.is_at_end() {
+                    self.advance(); // consume )
+                }
+
+                let is_function_decl = self.check(TokenType::LeftBrace);
+                self.current = saved_current;
+
+                if is_function_decl {
+                    self.parse_function()
+                } else {
+                    // It's a function call, parse as expression at top level
+                    self.current = saved_current;
+                    self.parse_toplevel_expression()
+                }
+            } else if self.check(TokenType::Assign) {
+                // Variable declaration
+                self.current = saved_current;
                 self.parse_global_var()
+            } else {
+                // Could be a standalone expression (like a function call)
+                self.current = saved_current;
+                self.parse_toplevel_expression()
             }
         } else {
             self.error("Expected function or global variable declaration");
@@ -111,16 +135,22 @@ impl Parser {
         let name = name_token.lexeme.clone();
         let pos = name_token.position;
 
-        if !self.check(TokenType::Assign) {
-            self.error("Expected '=' in global variable");
-            return None;
-        }
-        self.advance(); // consume '='
-
+        self.consume(TokenType::Assign, "Expected '=' in global variable")?;
         let init = self.parse_expression()?;
         Some(TopLevel::GlobalVar {
             name,
             init: Some(init),
+            pos,
+        })
+    }
+
+    fn parse_toplevel_expression(&mut self) -> Option<TopLevel> {
+        let expr = self.parse_expression()?;
+        let pos = expr.pos();
+        // Wrap expression as a global variable with synthetic name
+        Some(TopLevel::GlobalVar {
+            name: "__expr".to_string(),
+            init: Some(expr),
             pos,
         })
     }
@@ -154,6 +184,8 @@ impl Parser {
 
         if self.match_token(TokenType::If) {
             self.parse_if_statement()
+        } else if self.match_token(TokenType::Return) {
+            self.parse_return_statement()
         } else if self.match_token(TokenType::While) {
             self.parse_while_statement()
         } else if self.check(TokenType::Identifier) {
@@ -203,6 +235,22 @@ impl Parser {
         Some(Statement::While { cond, body, pos })
     }
 
+
+    fn parse_return_statement(&mut self) -> Option<Statement> {
+        let pos = self.previous().position;
+        
+        // Check if there's an expression after return
+        let value = if self.check(TokenType::Newline) 
+            || self.check(TokenType::RightBrace) 
+            || self.is_at_end() 
+        {
+            None
+        } else {
+            self.parse_expression()
+        };
+        
+        Some(Statement::Return { value, pos })
+    }
     fn parse_var_decl(&mut self) -> Option<Statement> {
         let name_token = self.consume(TokenType::Identifier, "Expected variable name")?;
         let name = name_token.lexeme.clone();
@@ -223,7 +271,35 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Option<Expression> {
-        self.parse_equality()
+        self.parse_logical_or()
+    }
+
+    fn parse_logical_or(&mut self) -> Option<Expression> {
+        let mut expr = self.parse_logical_and()?;
+        while self.match_token(TokenType::Or) {
+            let right = self.parse_logical_and()?;
+            expr = Expression::Binary {
+                left: Box::new(expr),
+                op: BinOp::Or,
+                right: Box::new(right),
+                pos: self.previous().position,
+            };
+        }
+        Some(expr)
+    }
+
+    fn parse_logical_and(&mut self) -> Option<Expression> {
+        let mut expr = self.parse_equality()?;
+        while self.match_token(TokenType::And) {
+            let right = self.parse_equality()?;
+            expr = Expression::Binary {
+                left: Box::new(expr),
+                op: BinOp::And,
+                right: Box::new(right),
+                pos: self.previous().position,
+            };
+        }
+        Some(expr)
     }
 
     fn parse_equality(&mut self) -> Option<Expression> {
@@ -291,10 +367,14 @@ impl Parser {
 
     fn parse_factor(&mut self) -> Option<Expression> {
         let mut expr = self.parse_unary()?;
-        while self.match_token(TokenType::Star) || self.match_token(TokenType::Slash) {
+        while self.match_token(TokenType::Star)
+            || self.match_token(TokenType::Slash)
+            || self.match_token(TokenType::Modulo)
+        {
             let op = match self.previous().token_type {
                 TokenType::Star => BinOp::Mul,
                 TokenType::Slash => BinOp::Div,
+                TokenType::Modulo => BinOp::Mod,
                 _ => unreachable!(),
             };
             let right = self.parse_unary()?;
@@ -394,14 +474,6 @@ impl Parser {
 
     fn peek(&self) -> &Token {
         &self.tokens[self.current]
-    }
-
-    fn peek_next(&self) -> &Token {
-        if self.current + 1 >= self.tokens.len() {
-            &self.tokens[self.tokens.len() - 1]
-        } else {
-            &self.tokens[self.current + 1]
-        }
     }
 
     fn previous(&self) -> &Token {

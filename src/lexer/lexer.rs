@@ -92,6 +92,7 @@ impl Lexer {
             "if" => Some(TokenType::If),
             "else" => Some(TokenType::Else),
             "while" => Some(TokenType::While),
+            "return" => Some(TokenType::Return),
             "true" => Some(TokenType::True),
             "false" => Some(TokenType::False),
             "and" => Some(TokenType::And),
@@ -101,9 +102,32 @@ impl Lexer {
         }
     }
 
+    // Skip single-line comments (// ... end of line)
+    fn skip_comment(&mut self) {
+        if self.current_char() == Some('/') && self.peek_char() == Some('/') {
+            self.next_char(); // consume first /
+            self.next_char(); // consume second /
+
+            // Read until we find newline or EOF
+            while let Some(c) = self.current_char() {
+                if c == '\n' {
+                    // Don't consume the newline, let next_token handle it
+                    break;
+                }
+                self.next_char();
+            }
+        }
+    }
+
     // Create next token
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
+
+        // Skip comments
+        while self.current_char() == Some('/') && self.peek_char() == Some('/') {
+            self.skip_comment();
+            self.skip_whitespace();
+        }
 
         let pos = self.get_position();
 
@@ -206,7 +230,19 @@ impl Lexer {
             Some('+') => self.simple_token(TokenType::Plus, '+'),
             Some('-') => self.simple_token(TokenType::Minus, '-'),
             Some('*') => self.simple_token(TokenType::Star, '*'),
-            Some('/') => self.simple_token(TokenType::Slash, '/'),
+            Some('/') => {
+                // Check if this is a comment (// requires peeking ahead)
+                if self.peek_char() == Some('/') {
+                    // This is a comment, skip it
+                    self.skip_comment();
+                    // Return next token after comment
+                    return self.next_token();
+                } else {
+                    // This is division operator
+                    self.simple_token(TokenType::Slash, '/')
+                }
+            }
+            Some('%') => self.simple_token(TokenType::Modulo, '%'),
             Some('(') => self.simple_token(TokenType::LeftParen, '('),
             Some(')') => self.simple_token(TokenType::RightParen, ')'),
             Some('{') => self.simple_token(TokenType::LeftBrace, '{'),

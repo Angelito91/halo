@@ -14,12 +14,6 @@ pub struct Position {
     pub column: u32,
 }
 
-impl Position {
-    pub fn new(line: u32, column: u32) -> Self {
-        Position { line, column }
-    }
-}
-
 // ===== Block =====
 // Represents a block of statements with position information
 #[derive(Debug, Clone)]
@@ -44,12 +38,15 @@ pub enum BinOp {
     Sub,
     Mul,
     Div,
+    Mod,
     Eq,
     Neq,
     Lt,
     Gt,
     Le,
     Ge,
+    And,
+    Or,
 }
 
 impl fmt::Display for BinOp {
@@ -60,12 +57,15 @@ impl fmt::Display for BinOp {
             Sub => "-",
             Mul => "*",
             Div => "/",
+            Mod => "%",
             Eq => "==",
             Neq => "!=",
             Lt => "<",
             Gt => ">",
             Le => "<=",
             Ge => ">=",
+            And => "&&",
+            Or => "||",
         };
         write!(f, "{}", s)
     }
@@ -140,20 +140,6 @@ impl Expression {
             Expression::Assign { pos, .. } => *pos,
             Expression::Call { pos, .. } => *pos,
         }
-    }
-
-    // Helper constructors
-    pub fn number(n: i64, pos: Position) -> Self {
-        Expression::Number(n, pos)
-    }
-    pub fn float(n: f64, pos: Position) -> Self {
-        Expression::Float(n, pos)
-    }
-    pub fn boolean(b: bool, pos: Position) -> Self {
-        Expression::Bool(b, pos)
-    }
-    pub fn var(name: impl Into<String>, pos: Position) -> Self {
-        Expression::Var(name.into(), pos)
     }
 }
 

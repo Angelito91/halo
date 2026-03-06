@@ -13,6 +13,7 @@ pub enum TokenType {
     Else,
     While,
     True,
+    Return,
     False,
 
     // Identifiers and literals
@@ -24,6 +25,7 @@ pub enum TokenType {
     Minus,        // -
     Star,         // *
     Slash,        // /
+    Modulo,       // %
     Assign,       // =
     Equal,        // ==
     NotEqual,     // !=
@@ -69,20 +71,5 @@ impl Token {
             lexeme,
             position,
         }
-    }
-
-    pub fn to_string(&self) -> String {
-        format!(
-            "Token({:?}, '{}', {:?})",
-            self.token_type, self.lexeme, self.position
-        )
-    }
-
-    pub fn get_token_type(&self) -> TokenType {
-        self.token_type
-    }
-
-    pub fn get_value(&self) -> String {
-        self.lexeme.clone()
     }
 }
