@@ -1,0 +1,22 @@
+// Test function calls at top level
+add(a, b) {
+    return a + b
+}
+
+multiply(a, b) {
+    return a * b
+}
+
+test_add() {
+    x = add(5, 3)
+    print(x)
+}
+
+test_multiply() {
+    y = multiply(4, 7)
+    print(y)
+}
+
+// Call functions
+test_add()
+test_multiply()

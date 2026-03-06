@@ -1,0 +1,85 @@
+// Test file for return statements
+
+// Simple function with return
+add(a, b) {
+    return a + b
+}
+
+// Function with multiple returns
+is_positive(n) {
+    if n > 0 {
+        return 1
+    }
+    return 0
+}
+
+// Factorial with return
+factorial(n) {
+    if n <= 1 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+
+// Fibonacci with return
+fibonacci(n) {
+    if n <= 1 {
+        return n
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+// Function with early returns
+validate_age(age) {
+    if age < 0 {
+        return 0
+    }
+    if age < 18 {
+        return 1
+    }
+    if age < 65 {
+        return 2
+    }
+    return 3
+}
+
+// Test all functions
+test_add() {
+    result = add(5, 3)
+    print(result)
+}
+
+test_positive() {
+    r1 = is_positive(10)
+    print(r1)
+    r2 = is_positive(-5)
+    print(r2)
+}
+
+test_factorial() {
+    fact5 = factorial(5)
+    print(fact5)
+}
+
+test_fibonacci() {
+    fib10 = fibonacci(10)
+    print(fib10)
+}
+
+test_validate() {
+    v1 = validate_age(-1)
+    print(v1)
+    v2 = validate_age(15)
+    print(v2)
+    v3 = validate_age(30)
+    print(v3)
+    v4 = validate_age(70)
+    print(v4)
+}
+
+// Execute tests
+test_add()
+test_positive()
+test_factorial()
+test_fibonacci()
+test_validate()

@@ -10,12 +10,9 @@ fibonacci(n) {
     return fibonacci(n - 1) + fibonacci(n - 2)
 }
 
-main() {
-    i = 0
-
-    while i < 10 {
-        fib = fibonacci(i)
-        // print(fib)
-        i = i + 1
-    }
+i = 0
+while i < 10 {
+    fib = fibonacci(i)
+    print(fib)
+    i = i + 1
 }

@@ -1,0 +1,266 @@
+// Halo Programming Language - Feature Demonstration
+// This program showcases all implemented features:
+// - Functions with parameters and return values
+// - Variables and assignments
+// - Arithmetic operators (+, -, *, /, %)
+// - Logical operators (&&, ||, !)
+// - Comparison operators (==, !=, <, >, <=, >=)
+// - Control flow (if/else, while)
+// - Built-in functions (print, len, abs, type, etc.)
+
+// ===== SECTION 1: Basic Arithmetic =====
+add(a, b) {
+    return a + b
+}
+
+subtract(a, b) {
+    return a - b
+}
+
+multiply(a, b) {
+    return a * b
+}
+
+divide(a, b) {
+    return a / b
+}
+
+modulo(a, b) {
+    return a % b
+}
+
+test_arithmetic() {
+    print("===== ARITHMETIC OPERATIONS =====")
+    print("5 + 3 = ")
+    print(add(5, 3))
+
+    print("10 - 4 = ")
+    print(subtract(10, 4))
+
+    print("6 * 7 = ")
+    print(multiply(6, 7))
+
+    print("20 / 4 = ")
+    print(divide(20, 4))
+
+    print("17 % 5 = ")
+    print(modulo(17, 5))
+}
+
+// ===== SECTION 2: Logical Operators =====
+check_range(n) {
+    if n > 0 && n < 100 {
+        print("In range [1, 99]")
+        return 1
+    }
+    print("Out of range")
+    return 0
+}
+
+is_weekend(day) {
+    if day == 0 || day == 6 {
+        print("Weekend day")
+        return 1
+    }
+    print("Weekday")
+    return 0
+}
+
+test_logical() {
+    print("===== LOGICAL OPERATORS =====")
+
+    print("Check 50 in range [1, 99]:")
+    check_range(50)
+
+    print("Check 150 in range [1, 99]:")
+    check_range(150)
+
+    print("Is day 0 weekend:")
+    is_weekend(0)
+
+    print("Is day 3 weekend:")
+    is_weekend(3)
+}
+
+// ===== SECTION 3: Even/Odd with Modulo =====
+is_even(n) {
+    if n % 2 == 0 {
+        print("Even")
+        return 1
+    }
+    print("Odd")
+    return 0
+}
+
+test_even_odd() {
+    print("===== EVEN/ODD CHECK =====")
+
+    print("Is 4 even: ")
+    is_even(4)
+
+    print("Is 7 even: ")
+    is_even(7)
+
+    print("Is 100 even: ")
+    is_even(100)
+}
+
+// ===== SECTION 4: FizzBuzz Algorithm =====
+fizzbuzz(n) {
+    if n % 15 == 0 {
+        print("FizzBuzz")
+    }
+    else if n % 3 == 0 {
+        print("Fizz")
+    }
+    else if n % 5 == 0 {
+        print("Buzz")
+    }
+    else {
+        print(n)
+    }
+}
+
+test_fizzbuzz() {
+    print("===== FIZZBUZZ (1-20) =====")
+    fizzbuzz(1)
+    fizzbuzz(2)
+    fizzbuzz(3)
+    fizzbuzz(4)
+    fizzbuzz(5)
+    fizzbuzz(6)
+    fizzbuzz(9)
+    fizzbuzz(10)
+    fizzbuzz(15)
+    fizzbuzz(20)
+}
+
+// ===== SECTION 5: Recursion =====
+factorial(n) {
+    if n <= 1 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+
+fibonacci(n) {
+    if n <= 1 {
+        return n
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+test_recursion() {
+    print("===== RECURSION =====")
+
+    print("5! = ")
+    print(factorial(5))
+
+    print("Fib(10) = ")
+    print(fibonacci(10))
+}
+
+// ===== SECTION 6: Loops =====
+sum_to(n) {
+    sum = 0
+    i = 1
+
+    while i <= n {
+        sum = sum + i
+        i = i + 1
+    }
+
+    return sum
+}
+
+test_loops() {
+    print("===== LOOPS =====")
+
+    print("Sum of 1 to 10: ")
+    print(sum_to(10))
+
+    print("Sum of 1 to 100: ")
+    print(sum_to(100))
+}
+
+// ===== SECTION 7: Complex Conditions =====
+grade_student(score) {
+    if score >= 90 && score <= 100 {
+        print("A")
+        return 1
+    }
+
+    if score >= 80 && score < 90 {
+        print("B")
+        return 1
+    }
+
+    if score >= 70 && score < 80 {
+        print("C")
+        return 1
+    }
+
+    if score >= 60 && score < 70 {
+        print("D")
+        return 1
+    }
+
+    if score >= 0 && score < 60 {
+        print("F")
+        return 1
+    }
+
+    print("Invalid")
+    return 0
+}
+
+test_grades() {
+    print("===== GRADING SYSTEM =====")
+
+    print("Score 95 -> Grade: ")
+    grade_student(95)
+
+    print("Score 85 -> Grade: ")
+    grade_student(85)
+
+    print("Score 75 -> Grade: ")
+    grade_student(75)
+
+    print("Score 55 -> Grade: ")
+    grade_student(55)
+}
+
+// ===== MAIN PROGRAM =====
+main() {
+    print("╔════════════════════════════════════════╗")
+    print("║   Halo Programming Language Demo 🌟   ║")
+    print("╚════════════════════════════════════════╝")
+    print("")
+
+    test_arithmetic()
+    print("")
+
+    test_logical()
+    print("")
+
+    test_even_odd()
+    print("")
+
+    test_fizzbuzz()
+    print("")
+
+    test_recursion()
+    print("")
+
+    test_loops()
+    print("")
+
+    test_grades()
+    print("")
+
+    print("╔════════════════════════════════════════╗")
+    print("║       Demo completed successfully      ║")
+    print("╚════════════════════════════════════════╝")
+}
+
+main()
