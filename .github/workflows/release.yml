@@ -8,21 +8,25 @@
 # Supported targets:
 #   Linux   x86_64   (ubuntu-24.04,     native)
 #   Linux   aarch64  (ubuntu-24.04-arm, native ARM runner)
-#   macOS   x86_64   (macos-14,         cross from Apple Silicon — Apple SDK covers both arches)
+#   macOS   x86_64   (macos-13,         native Intel runner)
 #   macOS   aarch64  (macos-14,         native Apple Silicon)
 #   Windows x86_64   (windows-2022,     native)
 #
-# Why native runners instead of cross-rs / cargo cross-compile?
-#   inkwell/llvm-sys links against libLLVM.so at BUILD time. That library must
-#   match the HOST architecture of the compiler process — you cannot simply
-#   point LLVM_SYS_211_PREFIX at an aarch64 libLLVM while running an x86_64
-#   build script. Native runners sidestep the problem entirely.
+# Why one native runner per architecture instead of cross-compilation?
+#   inkwell/llvm-sys compiles C++ glue code via a build.rs and links against
+#   libLLVM at BUILD time. Both the compiled objects and the linked library
+#   must match the HOST architecture of the runner process. Attempting to
+#   cross-compile from arm64→x86_64 on macos-14 produces:
+#     "found architecture 'arm64', required architecture 'x86_64'"
+#   because llvm-sys built its .rlib for arm64. There is no workaround short
+#   of providing a full x86_64 sysroot + x86_64 libLLVM, which is equivalent
+#   to running a native x86_64 runner. Same reasoning applies to Linux aarch64
+#   (ubuntu-24.04-arm) and Windows (windows-2022).
 #
-# macOS note:
-#   Apple Silicon runners (macos-14) ship the full Xcode SDK which includes
-#   support for both arm64 and x86_64. Adding the x86_64-apple-darwin Rust
-#   target and passing --target to cargo is enough; LLVM itself runs natively
-#   on arm64 and emits x86_64 code via the target triple.
+# macos-13 note:
+#   macos-13 is the last GitHub-hosted Intel runner. It may occasionally be
+#   slow to provision; continue-on-error: true is set so a transient runner
+#   shortage does not block the rest of the release.
 
 name: Release
 
@@ -41,6 +45,7 @@ jobs:
   build:
     name: Build · ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.continue-on-error == true }}
 
     strategy:
       fail-fast: false
@@ -65,11 +70,14 @@ jobs:
             runner: macos-14
             archive_ext: tar.gz
 
-          # ── macOS x86_64 (cross from Apple Silicon) ───────────────────────────
-          # macos-14 runners have the full Xcode SDK which supports both arches.
-          # LLVM runs natively on arm64 and emits x86_64 via the target triple.
+          # ── macOS x86_64 (Intel, native) ──────────────────────────────────────
+          # Must use a native x86_64 runner — llvm-sys compiles C++ objects for
+          # the host arch; cross-compiling from arm64 produces an arch mismatch
+          # at link time. continue-on-error guards against transient runner
+          # provisioning failures on the aging macos-13 pool.
           - target: x86_64-apple-darwin
-            runner: macos-14
+            runner: macos-13
+            continue-on-error: true
             archive_ext: tar.gz
 
           # ── Windows x86_64 ────────────────────────────────────────────────────
@@ -115,29 +123,34 @@ jobs:
           echo "CPPFLAGS=-I${LLVM_PREFIX}/include"   >> "$GITHUB_ENV"
 
       # ── LLVM setup — Windows ─────────────────────────────────────────────────
-      # choco's LLVM package is unreliable for specific patch versions.
-      # We download the official LLVM 21.1.0 installer directly from the
-      # llvm/llvm-project GitHub releases and install it silently.
+      # Use winget to install LLVM 21 — it is pre-installed on windows-2022
+      # runners and handles PATH registration reliably.
       - name: Install LLVM 21 (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $url       = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.0/LLVM-21.1.0-win64.exe"
-          $installer = "$env:TEMP\LLVM-21.1.0-win64.exe"
-          Write-Host "Downloading LLVM 21.1.0 installer..."
-          (New-Object Net.WebClient).DownloadFile($url, $installer)
-          Write-Host "Running installer..."
-          Start-Process -FilePath $installer -ArgumentList "/S" -Wait
-          Write-Host "Done."
+          Write-Host "Installing LLVM 21.1.0 via winget..."
+          winget install --id LLVM.LLVM --version 21.1.0 `
+            --exact --accept-source-agreements --accept-package-agreements `
+            --silent --override "/S /D=C:\LLVM"
+          Write-Host "Verifying installation..."
+          if (-not (Test-Path "C:\LLVM\bin\llvm-config.exe")) {
+            Write-Error "llvm-config.exe not found — install failed."
+            exit 1
+          }
+          $ver = & "C:\LLVM\bin\llvm-config.exe" --version
+          Write-Host "LLVM version: $ver"
 
       - name: Set LLVM env (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $llvm = "C:\Program Files\LLVM"
-          echo "LLVM_SYS_211_PREFIX=$llvm" >> $env:GITHUB_ENV
-          echo "PATH=$llvm\bin;$env:PATH"  >> $env:GITHUB_ENV
-          echo "LIBCLANG_PATH=$llvm\lib"   >> $env:GITHUB_ENV
+          $llvm = "C:\LLVM"
+          # Use Add-Content so multi-line writes to GITHUB_ENV are reliable
+          Add-Content $env:GITHUB_ENV "LLVM_SYS_211_PREFIX=$llvm"
+          Add-Content $env:GITHUB_ENV "LIBCLANG_PATH=$llvm\lib"
+          # Prepend to PATH so llvm-config is found by llvm-sys build script
+          Add-Content $env:GITHUB_PATH "$llvm\bin"
 
       # ── Rust toolchain ───────────────────────────────────────────────────────
       - name: Install Rust stable + target
