@@ -2,15 +2,15 @@
 # Release — triggers when a vX.Y.Z tag is pushed.
 #
 # Jobs:
-#   build   — cross-compile for each target platform (matrix)
+#   build   — compile for each target platform (matrix)
 #   release — create a GitHub Release and upload all artifacts
 #
 # Supported targets:
-#   Linux   x86_64   (ubuntu-24.04, native)
-#   Linux   aarch64  (ubuntu-24.04, cross via cross-rs)
-#   macOS   x86_64   (macos-13,     native)
-#   macOS   aarch64  (macos-14,     native Apple Silicon)
-#   Windows x86_64   (windows-2022, native)
+#   Linux   x86_64   (ubuntu-24.04,     native)
+#   Linux   aarch64  (ubuntu-24.04-arm, native ARM runner)
+#   macOS   x86_64   (macos-13,         native Intel — still available via macos-13 label)
+#   macOS   aarch64  (macos-14,         native Apple Silicon)
+#   Windows x86_64   (windows-2022,     native)
 
 name: Release
 
@@ -37,15 +37,14 @@ jobs:
           # ── Linux x86_64 ──────────────────────────────────────────────────────
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-24.04
-            cross: false
             llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
             llvm_prefix: /usr/lib/llvm-21
             archive_ext: tar.gz
 
-          # ── Linux aarch64 ─────────────────────────────────────────────────────
+          # ── Linux aarch64 — native ARM runner ────────────────────────────────
+          # GitHub-hosted ubuntu-24.04-arm runner: no cross-compilation needed.
           - target: aarch64-unknown-linux-gnu
-            runner: ubuntu-24.04
-            cross: true
+            runner: ubuntu-24.04-arm
             llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
             llvm_prefix: /usr/lib/llvm-21
             archive_ext: tar.gz
@@ -53,19 +52,16 @@ jobs:
           # ── macOS x86_64 ──────────────────────────────────────────────────────
           - target: x86_64-apple-darwin
             runner: macos-13
-            cross: false
             archive_ext: tar.gz
 
           # ── macOS aarch64 (Apple Silicon) ─────────────────────────────────────
           - target: aarch64-apple-darwin
             runner: macos-14
-            cross: false
             archive_ext: tar.gz
 
           # ── Windows x86_64 ────────────────────────────────────────────────────
           - target: x86_64-pc-windows-msvc
             runner: windows-2022
-            cross: false
             archive_ext: zip
 
     steps:
@@ -100,24 +96,24 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           LLVM_PREFIX="$(brew --prefix llvm@21)"
-          echo "LLVM_SYS_211_PREFIX=${LLVM_PREFIX}"  >> "$GITHUB_ENV"
-          echo "PATH=${LLVM_PREFIX}/bin:$PATH"        >> "$GITHUB_ENV"
-          echo "LDFLAGS=-L${LLVM_PREFIX}/lib"         >> "$GITHUB_ENV"
-          echo "CPPFLAGS=-I${LLVM_PREFIX}/include"    >> "$GITHUB_ENV"
+          echo "LLVM_SYS_211_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          echo "PATH=${LLVM_PREFIX}/bin:$PATH"       >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L${LLVM_PREFIX}/lib"        >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I${LLVM_PREFIX}/include"   >> "$GITHUB_ENV"
 
       # ── LLVM setup — Windows ─────────────────────────────────────────────────
       # choco's LLVM package is unreliable for specific patch versions.
-      # We download the official LLVM 21.1.0 installer directly from GitHub
-      # releases and install it silently instead.
+      # We download the official LLVM 21.1.0 installer directly from the
+      # llvm/llvm-project GitHub releases and install it silently.
       - name: Install LLVM 21 (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $url      = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.0/LLVM-21.1.0-win64.exe"
+          $url       = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.0/LLVM-21.1.0-win64.exe"
           $installer = "$env:TEMP\LLVM-21.1.0-win64.exe"
-          Write-Host "Downloading LLVM 21.1.0 installer…"
+          Write-Host "Downloading LLVM 21.1.0 installer..."
           (New-Object Net.WebClient).DownloadFile($url, $installer)
-          Write-Host "Running installer…"
+          Write-Host "Running installer..."
           Start-Process -FilePath $installer -ArgumentList "/S" -Wait
           Write-Host "Done."
 
@@ -125,22 +121,16 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # The silent installer places LLVM under C:\Program Files\LLVM
           $llvm = "C:\Program Files\LLVM"
-          echo "LLVM_SYS_211_PREFIX=$llvm"       >> $env:GITHUB_ENV
-          echo "PATH=$llvm\bin;$env:PATH"         >> $env:GITHUB_ENV
-          echo "LIBCLANG_PATH=$llvm\lib"          >> $env:GITHUB_ENV
+          echo "LLVM_SYS_211_PREFIX=$llvm"  >> $env:GITHUB_ENV
+          echo "PATH=$llvm\bin;$env:PATH"   >> $env:GITHUB_ENV
+          echo "LIBCLANG_PATH=$llvm\lib"    >> $env:GITHUB_ENV
 
       # ── Rust toolchain ───────────────────────────────────────────────────────
       - name: Install Rust stable + target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
-      # ── cross-rs (Linux aarch64 only) ────────────────────────────────────────
-      - name: Install cross-rs
-        if: matrix.cross == true
-        run: cargo install cross --git https://github.com/cross-rs/cross
 
       # ── Cargo cache ──────────────────────────────────────────────────────────
       - name: Cache Cargo registry & build
@@ -154,13 +144,8 @@ jobs:
           restore-keys: release-${{ matrix.target }}-
 
       # ── Compile ──────────────────────────────────────────────────────────────
-      - name: Build (native)
-        if: matrix.cross == false
+      - name: Build
         run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Build (cross)
-        if: matrix.cross == true
-        run: cross build --release --target ${{ matrix.target }}
 
       # ── Package — Linux / macOS (tar.gz) ─────────────────────────────────────
       - name: Package (tar.gz)
@@ -183,10 +168,16 @@ jobs:
           echo "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       # ── Compute SHA-256 checksum ─────────────────────────────────────────────
+      # macOS ships 'shasum' instead of 'sha256sum' — use a portable one-liner.
       - name: Checksum (Linux / macOS)
         if: runner.os != 'Windows'
+        shell: bash
         run: |
-          sha256sum "${{ env.ASSET }}" > "${{ env.ASSET }}.sha256"
+          if command -v sha256sum &>/dev/null; then
+            sha256sum "${{ env.ASSET }}" > "${{ env.ASSET }}.sha256"
+          else
+            shasum -a 256 "${{ env.ASSET }}" > "${{ env.ASSET }}.sha256"
+          fi
 
       - name: Checksum (Windows)
         if: runner.os == 'Windows'
@@ -230,7 +221,6 @@ jobs:
       # Derive a human-readable changelog from the annotated tag message.
       # Falls back to a generic message when the tag has no annotation.
       - name: Extract tag notes
-        id: tag_notes
         run: |
           NOTES=$(git tag -l --format='%(contents)' "${{ github.ref_name }}" 2>/dev/null || true)
           if [ -z "$NOTES" ]; then
