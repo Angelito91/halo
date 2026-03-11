@@ -1,5 +1,5 @@
-// Halo example: Factorial calculation
-// =====================================
+// Halo Programming Language
+// Example 03: Factorial (Recursion)
 
 factorial(n) {
     if n <= 1 {
@@ -8,5 +8,6 @@ factorial(n) {
     return n * factorial(n - 1)
 }
 
+print(factorial(1))
 print(factorial(5))
 print(factorial(10))

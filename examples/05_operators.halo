@@ -1,0 +1,43 @@
+// Halo Programming Language
+// Example 05: Variables & Logical Operators
+
+is_even(n) {
+    if n % 2 == 0 {
+        return 1
+    }
+    return 0
+}
+
+in_range(n, low, high) {
+    if n >= low && n <= high {
+        return 1
+    }
+    return 0
+}
+
+abs_val(n) {
+    if n < 0 {
+        return 0 - n
+    }
+    return n
+}
+
+// Test is_even
+print(is_even(4))
+print(is_even(7))
+print(is_even(0))
+
+// Test in_range
+print(in_range(5, 1, 10))
+print(in_range(15, 1, 10))
+
+// Test abs_val
+print(abs_val(9))
+print(abs_val(0 - 9))
+
+// Inline expressions
+x = 3
+y = 7
+print(x + y)
+print(x * y)
+print(y - x)

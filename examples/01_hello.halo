@@ -1,0 +1,26 @@
+// Halo Programming Language
+// Example 01: Hello & Basic Arithmetic
+
+add(a, b) {
+    return a + b
+}
+
+sub(a, b) {
+    return a - b
+}
+
+mul(a, b) {
+    return a * b
+}
+
+// 10 + 5 = 15
+print(add(10, 5))
+
+// 20 - 8 = 12
+print(sub(20, 8))
+
+// 6 * 7 = 42
+print(mul(6, 7))
+
+// chained calls: (2 + 3) * 4 = 20
+print(mul(add(2, 3), 4))
