@@ -14,10 +14,11 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 
 /// Optimisation level passed to LLVM passes and clang.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OptLevel {
     O0,
     O1,
+    #[default]
     O2,
     O3,
 }
@@ -39,12 +40,6 @@ impl OptLevel {
             OptLevel::O2 => "-O2",
             OptLevel::O3 => "-O3",
         }
-    }
-}
-
-impl Default for OptLevel {
-    fn default() -> Self {
-        OptLevel::O2
     }
 }
 
@@ -116,6 +111,7 @@ impl Compilation {
     }
 
     /// Emit a native object file directly (no clang needed for this step).
+    #[allow(dead_code)]
     pub fn emit_object(&mut self, filename: &str) -> Result<(), String> {
         self.codegen().emit_object(filename)
     }

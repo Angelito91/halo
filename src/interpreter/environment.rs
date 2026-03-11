@@ -149,6 +149,12 @@ impl Environment {
         self.entries.len()
     }
 
+    /// Return `true` when no variable bindings are live.
+    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
     /// Current scope depth (0 = global only).
     #[allow(dead_code)]
     pub fn depth(&self) -> usize {

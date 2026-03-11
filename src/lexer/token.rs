@@ -1,15 +1,18 @@
 // The Halo Programming Language
-// Token definitions
-// Version: 0.2.0
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
+use std::fmt;
+
 use crate::parser::ast::Position;
 
+/// Every distinct kind of token the lexer can produce.
+///
+/// Variants are grouped by category to make the match arms in the parser
+/// easier to scan visually.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[allow(dead_code)]
-pub enum TokenType {
-    // Keywords
+pub enum TokenKind {
+    // ── Keywords ─────────────────────────────────────────────────────────────
     If,
     Else,
     While,
@@ -19,22 +22,25 @@ pub enum TokenType {
     Break,
     Continue,
 
-    // Identifiers and literals
+    // ── Literals & identifiers ────────────────────────────────────────────────
+    /// An unquoted name: `foo`, `_bar`, `my_var2`.
     Identifier,
+    /// An integer or floating-point numeric literal: `42`, `3.14`.
     Number,
-    StringLit, // "hello world"
+    /// A double-quoted string literal: `"hello world"`.
+    StringLit,
 
-    // Arithmetic operators
+    // ── Arithmetic operators ──────────────────────────────────────────────────
     Plus,   // +
     Minus,  // -
     Star,   // *
     Slash,  // /
     Modulo, // %
 
-    // Assignment
+    // ── Assignment ────────────────────────────────────────────────────────────
     Assign, // =
 
-    // Comparison operators
+    // ── Comparison operators ──────────────────────────────────────────────────
     Equal,        // ==
     NotEqual,     // !=
     Less,         // <
@@ -42,12 +48,12 @@ pub enum TokenType {
     LessEqual,    // <=
     GreaterEqual, // >=
 
-    // Logical operators
+    // ── Logical operators ─────────────────────────────────────────────────────
     And, // &&
     Or,  // ||
     Not, // !
 
-    // Delimiters
+    // ── Delimiters ────────────────────────────────────────────────────────────
     LeftParen,    // (
     RightParen,   // )
     LeftBrace,    // {
@@ -58,29 +64,98 @@ pub enum TokenType {
     Comma,        // ,
     Dot,          // .
 
-    // Special
+    // ── Special ───────────────────────────────────────────────────────────────
+    /// Horizontal whitespace (currently not emitted into the token stream).
     #[allow(dead_code)]
     Whitespace,
+    /// A `//` line comment (currently not emitted into the token stream).
     #[allow(dead_code)]
     Comment,
-    Newline, // Statement terminator (no semicolons)
-    Unknown, // Invalid / unrecognised character
-    EOF,
+    /// A `\n` newline, which acts as the statement terminator (no semicolons).
+    Newline,
+    /// An unrecognised character; the parser will surface a meaningful error.
+    Unknown,
+    /// Signals the end of the token stream.
+    Eof,
 }
 
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let text = match self {
+            TokenKind::If => "if",
+            TokenKind::Else => "else",
+            TokenKind::While => "while",
+            TokenKind::Return => "return",
+            TokenKind::True => "true",
+            TokenKind::False => "false",
+            TokenKind::Break => "break",
+            TokenKind::Continue => "continue",
+            TokenKind::Identifier => "<identifier>",
+            TokenKind::Number => "<number>",
+            TokenKind::StringLit => "<string>",
+            TokenKind::Plus => "+",
+            TokenKind::Minus => "-",
+            TokenKind::Star => "*",
+            TokenKind::Slash => "/",
+            TokenKind::Modulo => "%",
+            TokenKind::Assign => "=",
+            TokenKind::Equal => "==",
+            TokenKind::NotEqual => "!=",
+            TokenKind::Less => "<",
+            TokenKind::Greater => ">",
+            TokenKind::LessEqual => "<=",
+            TokenKind::GreaterEqual => ">=",
+            TokenKind::And => "&&",
+            TokenKind::Or => "||",
+            TokenKind::Not => "!",
+            TokenKind::LeftParen => "(",
+            TokenKind::RightParen => ")",
+            TokenKind::LeftBrace => "{",
+            TokenKind::RightBrace => "}",
+            TokenKind::LeftBracket => "[",
+            TokenKind::RightBracket => "]",
+            TokenKind::Colon => ":",
+            TokenKind::Comma => ",",
+            TokenKind::Dot => ".",
+            TokenKind::Whitespace => "<whitespace>",
+            TokenKind::Comment => "<comment>",
+            TokenKind::Newline => "<newline>",
+            TokenKind::Unknown => "<unknown>",
+            TokenKind::Eof => "<eof>",
+        };
+        f.write_str(text)
+    }
+}
+
+/// A single token produced by the lexer, carrying its kind, raw text, and
+/// source location.
 #[derive(Debug, Clone)]
 pub struct Token {
-    pub token_type: TokenType,
+    /// The syntactic category of this token.
+    pub kind: TokenKind,
+    /// The exact slice of source text that was matched.
     pub lexeme: String,
+    /// Where in the source file this token begins.
     pub position: Position,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, lexeme: String, position: Position) -> Self {
-        Token {
-            token_type,
+    /// Construct a new `Token`.
+    pub fn new(kind: TokenKind, lexeme: String, position: Position) -> Self {
+        Self {
+            kind,
             lexeme,
             position,
         }
+    }
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "'{}' ({}:{})",
+            self.lexeme, self.position.line, self.position.column
+        )
     }
 }

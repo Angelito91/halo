@@ -1,290 +1,274 @@
 // The Halo Programming Language
-// Compiler: converts .halo files to executable binaries
-// Version: 0.2.0
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
+//
+// `haloc` — standalone compiler front-end.
+//
+// Reads a `.halo` source file, produces LLVM IR, and then links a native
+// binary using the system `llc` + `cc` toolchain.  For most use-cases the
+// `halo --compile` sub-command (which uses clang directly) is simpler; this
+// binary is kept for environments where only `llc` and a plain C compiler are
+// available.
 
 use std::env;
 use std::fs;
 use std::process::{exit, Command};
 
 use halo::compiler::Compilation;
-use halo::lexer::Lexer;
+use halo::lexer::{Lexer, TokenKind};
 use halo::parser::Parser;
 
-struct CompilerConfig {
-    input_file: String,
-    output_file: String,
+// ── Configuration ─────────────────────────────────────────────────────────────
+
+struct Config {
+    /// Path to the `.halo` source file.
+    input_path: String,
+    /// Path for the final linked executable (default: `a.out`).
+    output_path: String,
+    /// When `true`, keep the intermediate `.ll` file on disk.
     emit_llvm: bool,
+    /// When `true`, print progress messages to stdout.
     verbose: bool,
+    /// When `true`, pass `-O2` to `llc`.
     optimize: bool,
 }
 
-fn parse_args() -> Result<CompilerConfig, String> {
-    let args: Vec<String> = env::args().collect();
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            input_path: String::new(),
+            output_path: "a.out".to_string(),
+            emit_llvm: false,
+            verbose: false,
+            optimize: false,
+        }
+    }
+}
 
-    if args.len() < 2 {
+// ── Argument parsing ──────────────────────────────────────────────────────────
+
+fn parse_args() -> Result<Config, String> {
+    let raw: Vec<String> = env::args().collect();
+
+    if raw.len() < 2 {
         return Err("Usage: haloc <input.halo> [options]".to_string());
     }
 
-    let mut config = CompilerConfig {
-        input_file: String::new(),
-        output_file: "a.out".to_string(),
-        emit_llvm: false,
-        verbose: false,
-        optimize: false,
-    };
-
+    let mut cfg = Config::default();
     let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
+
+    while i < raw.len() {
+        match raw[i].as_str() {
             "-o" => {
-                if i + 1 < args.len() {
-                    config.output_file = args[i + 1].clone();
-                    i += 2;
-                } else {
-                    return Err("Expected output filename after -o".to_string());
+                i += 1;
+                if i >= raw.len() {
+                    return Err("Expected an output filename after '-o'.".to_string());
                 }
+                cfg.output_path = raw[i].clone();
             }
-            "-emit-llvm" => {
-                config.emit_llvm = true;
-                i += 1;
-            }
-            "-v" | "--verbose" => {
-                config.verbose = true;
-                i += 1;
-            }
-            "-O" => {
-                config.optimize = true;
-                i += 1;
-            }
+            "-emit-llvm" => cfg.emit_llvm = true,
+            "-v" | "--verbose" => cfg.verbose = true,
+            "-O" | "-O2" => cfg.optimize = true,
             "-h" | "--help" => {
                 print_help();
                 exit(0);
             }
-            arg if !arg.starts_with('-') => {
-                config.input_file = arg.to_string();
-                i += 1;
-            }
-            arg => {
-                return Err(format!("Unknown option: {}", arg));
-            }
+            arg if !arg.starts_with('-') => cfg.input_path = arg.to_string(),
+            arg => return Err(format!("Unknown option: '{arg}'. Run 'haloc --help'.")),
         }
+        i += 1;
     }
 
-    if config.input_file.is_empty() {
-        return Err("No input file specified".to_string());
+    if cfg.input_path.is_empty() {
+        return Err("No input file specified. Run 'haloc --help'.".to_string());
     }
 
-    Ok(config)
+    Ok(cfg)
 }
 
 fn print_help() {
     println!("╔════════════════════════════════════════════════╗");
-    println!("║    🌟 Halo Compiler v0.2.0 🌟                ║");
+    println!("║    🌟 Halo Compiler (haloc) v0.2.0            ║");
     println!("╚════════════════════════════════════════════════╝\n");
-
     println!("USAGE:");
     println!("    haloc [OPTIONS] <INPUT.halo>\n");
-
     println!("OPTIONS:");
     println!("    -o <output>      Output filename (default: a.out)");
-    println!("    -emit-llvm       Emit LLVM IR (.ll file)");
-    println!("    -O               Enable optimizations");
-    println!("    -v, --verbose    Verbose output");
+    println!("    -emit-llvm       Keep the intermediate LLVM IR (.ll) file");
+    println!("    -O               Enable optimisations (passes -O2 to llc)");
+    println!("    -v, --verbose    Print progress messages");
     println!("    -h, --help       Print this help message\n");
-
     println!("EXAMPLES:");
-    println!("    haloc program.halo              Compile to a.out");
-    println!("    haloc program.halo -o program   Compile to 'program'");
-    println!("    haloc program.halo -emit-llvm   Emit LLVM IR\n");
+    println!("    haloc program.halo              Compile to ./a.out");
+    println!("    haloc program.halo -o program   Compile to ./program");
+    println!("    haloc program.halo -emit-llvm   Keep program.ll on disk\n");
+    println!("NOTE:");
+    println!("    For most use-cases, prefer: halo --compile <file.halo>");
 }
 
-fn main() {
-    let config = match parse_args() {
-        Ok(cfg) => cfg,
-        Err(e) => {
-            eprintln!("❌ Error: {}", e);
-            eprintln!("Run 'haloc --help' for usage information");
-            exit(1);
-        }
-    };
+// ── Pipeline helpers ──────────────────────────────────────────────────────────
 
-    if config.verbose {
-        println!("╔════════════════════════════════════════╗");
-        println!("║    🌟 Halo Compiler v0.2.0 🌟        ║");
-        println!("╚════════════════════════════════════════╝\n");
-    }
-
-    // Step 1: Read source file
-    if config.verbose {
-        println!("📂 Reading file: {}", config.input_file);
-    }
-
-    let source = match fs::read_to_string(&config.input_file) {
-        Ok(content) => content,
-        Err(e) => {
-            eprintln!("❌ Cannot read file '{}': {}", config.input_file, e);
-            exit(1);
-        }
-    };
-
-    if config.verbose {
-        println!("✅ File read successfully ({} bytes)\n", source.len());
-    }
-
-    // Step 2: Tokenize
-    if config.verbose {
-        println!("🔍 Tokenizing...");
-    }
-
-    let mut lexer = Lexer::new(source);
-    let mut tokens = Vec::new();
-    loop {
-        let token = lexer.next_token();
-        let is_eof = token.token_type == halo::lexer::TokenType::EOF;
-        tokens.push(token);
-        if is_eof {
-            break;
-        }
-    }
-
-    if config.verbose {
-        println!("✅ Tokenization successful ({} tokens)\n", tokens.len());
-    }
-
-    // Step 3: Parse
-    if config.verbose {
-        println!("📝 Parsing...");
-    }
-
-    let mut parser = Parser::new(tokens);
-    let program = match parser.parse() {
-        Ok(prog) => prog,
-        Err(errors) => {
-            eprintln!("❌ Parsing errors:");
-            for error in errors {
-                eprintln!("   {}", error);
-            }
-            exit(1);
-        }
-    };
-
-    if config.verbose {
-        println!("✅ Parsing successful\n");
-    }
-
-    // Step 4: Generate LLVM IR
-    if config.verbose {
-        println!("⚙️  Generating LLVM IR...");
-    }
-
-    let mut comp = Compilation::new("halo_program");
-    if let Err(e) = comp.codegen().compile(&program) {
-        eprintln!("❌ Compilation error: {}", e);
+/// Die with an error message and exit code 1.
+macro_rules! fatal {
+    ($($arg:tt)*) => {{
+        eprintln!("❌ {}", format!($($arg)*));
         exit(1);
-    }
+    }};
+}
 
-    if config.verbose {
-        println!("✅ LLVM IR generation successful\n");
-    }
-
-    // Step 5: Emit LLVM IR if requested
-    let ll_file = format!("{}.ll", config.output_file);
-    if config.verbose || config.emit_llvm {
-        if config.verbose {
-            println!("💾 Emitting LLVM IR to: {}", ll_file);
-        }
-
-        if let Err(e) = comp.emit_llvm(&ll_file) {
-            eprintln!("❌ Failed to emit LLVM IR: {}", e);
+/// Run an external command, printing stderr and exiting on failure.
+fn run_command(mut cmd: Command, step_name: &str) {
+    match cmd.output() {
+        Ok(out) if out.status.success() => {}
+        Ok(out) => {
+            eprintln!("❌ {step_name} failed:");
+            eprintln!("{}", String::from_utf8_lossy(&out.stderr));
             exit(1);
         }
+        Err(e) => fatal!("Could not launch '{step_name}': {e}"),
+    }
+}
 
-        if config.verbose {
-            println!("✅ LLVM IR saved\n");
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+fn main() {
+    let cfg = parse_args().unwrap_or_else(|e| fatal!("{e}"));
+
+    // ── Step 1: Read source ───────────────────────────────────────────────────
+
+    if cfg.verbose {
+        println!("📂 Reading: {}", cfg.input_path);
+    }
+
+    let source = fs::read_to_string(&cfg.input_path)
+        .unwrap_or_else(|e| fatal!("Cannot read '{}': {e}", cfg.input_path));
+
+    if cfg.verbose {
+        println!("✅ {} bytes\n", source.len());
+    }
+
+    // ── Step 2: Lex ───────────────────────────────────────────────────────────
+
+    if cfg.verbose {
+        println!("🔍 Tokenising…");
+    }
+
+    // The lexer is infallible; collect tokens until (and including) Eof.
+    let mut lexer = Lexer::new(source);
+    let tokens: Vec<_> = std::iter::from_fn(|| {
+        let tok = lexer.next_token();
+        let done = tok.kind == TokenKind::Eof;
+        Some((tok, done))
+    })
+    .scan(false, |finished, (tok, is_eof)| {
+        if *finished {
+            return None;
         }
+        *finished = is_eof;
+        Some(tok)
+    })
+    .collect();
+
+    if cfg.verbose {
+        println!("✅ {} tokens\n", tokens.len());
     }
 
-    // Step 5b: Always write the .ll so llc has something to compile.
-    if !config.emit_llvm && !config.verbose {
-        if let Err(e) = comp.emit_llvm(&ll_file) {
-            eprintln!("❌ Failed to write temporary IR: {}", e);
-            exit(1);
+    // ── Step 3: Parse ─────────────────────────────────────────────────────────
+
+    if cfg.verbose {
+        println!("📝 Parsing…");
+    }
+
+    let program = Parser::new(tokens).parse().unwrap_or_else(|errors| {
+        eprintln!("❌ Parse error(s):");
+        for err in &errors {
+            eprintln!("   {err}");
         }
+        exit(1);
+    });
+
+    if cfg.verbose {
+        println!("✅ {} top-level item(s)\n", program.items.len());
     }
 
-    // Step 6: Compile LLVM IR to assembly
-    if config.verbose {
-        println!("🔨 Compiling LLVM IR to assembly...");
+    // ── Step 4: Generate LLVM IR ──────────────────────────────────────────────
+
+    if cfg.verbose {
+        println!("⚙️  Generating LLVM IR…");
     }
 
-    let asm_file = format!("{}.s", config.output_file);
-    let mut llc_cmd = Command::new("llc");
-    llc_cmd.arg(&ll_file).arg("-o").arg(&asm_file);
+    let mut compilation = Compilation::new("halo_program");
+    compilation
+        .codegen()
+        .compile(&program)
+        .unwrap_or_else(|e| fatal!("Code generation error: {e}"));
 
-    if config.optimize {
-        llc_cmd.arg("-O2");
+    if cfg.verbose {
+        println!("✅ LLVM IR ready\n");
     }
 
-    match llc_cmd.output() {
-        Ok(output) => {
-            if !output.status.success() {
-                eprintln!("❌ LLC compilation failed");
-                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-                exit(1);
-            }
-        }
-        Err(e) => {
-            eprintln!("❌ Failed to run llc: {}", e);
-            eprintln!("Make sure LLVM is installed and llc is in PATH");
-            exit(1);
-        }
+    // ── Step 5: Emit .ll file ─────────────────────────────────────────────────
+
+    let ll_path = format!("{}.ll", cfg.output_path);
+
+    // Always write the .ll so that `llc` has something to compile.  The file
+    // is removed at the end unless --emit-llvm was requested.
+    compilation
+        .emit_llvm(&ll_path)
+        .unwrap_or_else(|e| fatal!("Failed to write LLVM IR: {e}"));
+
+    if cfg.verbose && cfg.emit_llvm {
+        println!("💾 LLVM IR saved to: {ll_path}\n");
     }
 
-    if config.verbose {
-        println!("✅ Assembly generated: {}\n", asm_file);
+    // ── Step 6: llc — IR → assembly ──────────────────────────────────────────
+
+    if cfg.verbose {
+        println!("🔨 Compiling IR to assembly (llc)…");
     }
 
-    // Step 7: Link assembly to executable
-    if config.verbose {
-        println!("🔗 Linking executable...");
+    let asm_path = format!("{}.s", cfg.output_path);
+    let mut llc = Command::new("llc");
+    llc.arg(&ll_path).arg("-o").arg(&asm_path);
+    if cfg.optimize {
+        llc.arg("-O2");
+    }
+    run_command(llc, "llc");
+
+    if cfg.verbose {
+        println!("✅ Assembly: {asm_path}\n");
     }
 
-    let mut cc_cmd = Command::new("cc");
-    cc_cmd.arg(&asm_file).arg("-o").arg(&config.output_file);
+    // ── Step 7: cc — assembly → executable ───────────────────────────────────
 
-    match cc_cmd.output() {
-        Ok(output) => {
-            if !output.status.success() {
-                eprintln!("❌ Linking failed");
-                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-                exit(1);
-            }
-        }
-        Err(e) => {
-            eprintln!("❌ Failed to run cc: {}", e);
-            eprintln!("Make sure a C compiler is installed (gcc, clang, etc)");
-            exit(1);
-        }
+    if cfg.verbose {
+        println!("🔗 Linking executable (cc)…");
     }
 
-    if config.verbose {
-        println!("✅ Executable created: {}\n", config.output_file);
+    let mut cc = Command::new("cc");
+    cc.arg(&asm_path).arg("-o").arg(&cfg.output_path);
+    run_command(cc, "cc");
+
+    if cfg.verbose {
+        println!("✅ Executable: {}\n", cfg.output_path);
     }
 
-    // Step 8: Cleanup (optional - keep .ll and .s files for debugging)
-    if !config.emit_llvm && !config.verbose {
-        let _ = fs::remove_file(&ll_file);
-        let _ = fs::remove_file(&asm_file);
-    }
+    // ── Step 8: Clean up intermediates ───────────────────────────────────────
 
-    if config.verbose {
+    if !cfg.emit_llvm {
+        let _ = fs::remove_file(&ll_path);
+    }
+    // Always remove the assembly file; it is an internal artefact.
+    let _ = fs::remove_file(&asm_path);
+
+    // ── Done ──────────────────────────────────────────────────────────────────
+
+    if cfg.verbose {
         println!("╔════════════════════════════════════════╗");
         println!("║      ✅ Compilation successful!        ║");
         println!("╚════════════════════════════════════════╝");
-        println!("\n🚀 Run your program with: ./{}", config.output_file);
+        println!("\n🚀 Run with: ./{}", cfg.output_path);
     } else {
-        println!("✅ Compiled to: {}", config.output_file);
+        println!("✅ Compiled → {}", cfg.output_path);
     }
 }

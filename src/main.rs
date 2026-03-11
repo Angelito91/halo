@@ -1,7 +1,4 @@
 // The Halo Programming Language
-// Command-line interface for executing .halo files
-// Version: 0.2.0
-// Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
@@ -17,34 +14,41 @@ mod parser;
 
 use compiler::{Compilation, OptLevel};
 use interpreter::Evaluator;
-use lexer::Lexer;
-use lexer::TokenType;
+use lexer::{Lexer, TokenKind};
 use parser::Parser;
 
-/// Represents the CLI arguments
+// ── CLI argument types ────────────────────────────────────────────────────────
+
+/// Parsed command-line arguments.
 struct Args {
+    /// Path to the `.halo` source file.
     file_path: String,
+    /// `--ast` / `-a`: print the AST before running.
     show_ast: bool,
+    /// `--tokens` / `-t`: print the token stream before running.
     show_tokens: bool,
+    /// `--verbose` / `-v`: enable detailed progress output.
     verbose: bool,
-    /// --compile  : compile to native binary via clang
+    /// `--compile` / `-c`: compile to a native binary via clang.
     compile: bool,
-    /// --emit-llvm: write .ll IR file next to the source
+    /// `--emit-llvm`: write LLVM IR next to the source file.
     emit_llvm: bool,
-    /// --run      : compile to a temp binary and execute it immediately
+    /// `--run` / `-r`: compile to a temp binary and execute immediately.
     run: bool,
-    /// -o <path>  : output path for --compile / --run
+    /// `-o <path>`: output path for `--compile` / `--run`.
     output: Option<String>,
-    /// --opt-level <0-3> : LLVM optimisation level (default: 2)
+    /// `-O<N>` / `--opt-level <N>`: LLVM optimisation level (default: 2).
     opt_level: OptLevel,
 }
 
-/// Parses command-line arguments
+/// Parse `std::env::args()` into an [`Args`] struct.
+///
+/// Returns `Err` with a human-readable message on any invalid input.
 fn parse_args() -> Result<Args, String> {
-    let args: Vec<String> = env::args().collect();
+    let raw: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
-        return Err("No file specified".to_string());
+    if raw.len() < 2 {
+        return Err("No source file specified. Run 'halo --help' for usage.".to_string());
     }
 
     let mut file_path = String::new();
@@ -58,8 +62,8 @@ fn parse_args() -> Result<Args, String> {
     let mut opt_level = OptLevel::O2;
 
     let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
+    while i < raw.len() {
+        match raw[i].as_str() {
             "--ast" | "-a" => show_ast = true,
             "--tokens" | "-t" => show_tokens = true,
             "--verbose" | "-v" => verbose = true,
@@ -68,23 +72,17 @@ fn parse_args() -> Result<Args, String> {
             "--run" | "-r" => run = true,
             "-o" => {
                 i += 1;
-                if i >= args.len() {
-                    return Err("Expected path after -o".to_string());
+                if i >= raw.len() {
+                    return Err("Expected an output path after '-o'.".to_string());
                 }
-                output = Some(args[i].clone());
+                output = Some(raw[i].clone());
             }
             "--opt-level" | "-O" => {
                 i += 1;
-                if i >= args.len() {
-                    return Err("Expected level (0-3) after --opt-level".to_string());
+                if i >= raw.len() {
+                    return Err("Expected a level (0-3) after '--opt-level'.".to_string());
                 }
-                opt_level = match args[i].as_str() {
-                    "0" => OptLevel::O0,
-                    "1" => OptLevel::O1,
-                    "2" => OptLevel::O2,
-                    "3" => OptLevel::O3,
-                    other => return Err(format!("Invalid opt-level '{}', expected 0-3", other)),
-                };
+                opt_level = parse_opt_level(&raw[i])?;
             }
             // Compact forms: -O0  -O1  -O2  -O3
             "-O0" => opt_level = OptLevel::O0,
@@ -103,14 +101,16 @@ fn parse_args() -> Result<Args, String> {
                 file_path = arg.to_string();
             }
             arg => {
-                return Err(format!("Unknown option: {}", arg));
+                return Err(format!(
+                    "Unknown option: '{arg}'. Run 'halo --help' for usage."
+                ));
             }
         }
         i += 1;
     }
 
     if file_path.is_empty() {
-        return Err("No file specified".to_string());
+        return Err("No source file specified. Run 'halo --help' for usage.".to_string());
     }
 
     Ok(Args {
@@ -124,6 +124,19 @@ fn parse_args() -> Result<Args, String> {
         output,
         opt_level,
     })
+}
+
+/// Convert a `"0"`–`"3"` string to an [`OptLevel`].
+fn parse_opt_level(s: &str) -> Result<OptLevel, String> {
+    match s {
+        "0" => Ok(OptLevel::O0),
+        "1" => Ok(OptLevel::O1),
+        "2" => Ok(OptLevel::O2),
+        "3" => Ok(OptLevel::O3),
+        other => Err(format!(
+            "Invalid optimisation level '{other}'. Expected 0, 1, 2, or 3."
+        )),
+    }
 }
 
 /// Prints help message
@@ -163,48 +176,50 @@ fn print_help() {
     println!("    For language documentation, see SYNTAX.md");
 }
 
-/// Reads a file from disk
-fn read_file(path: &str) -> Result<String, String> {
-    fs::read_to_string(path).map_err(|e| format!("Cannot read file '{}': {}", path, e))
+// ── Pipeline helpers ──────────────────────────────────────────────────────────
+
+/// Read the entire contents of `path` into a `String`.
+fn read_source_file(path: &str) -> Result<String, String> {
+    fs::read_to_string(path).map_err(|e| format!("Cannot read '{path}': {e}"))
 }
 
-/// Reads from stdin
+/// Read all of stdin into a `String`.
 #[allow(dead_code)]
 fn read_stdin() -> Result<String, String> {
-    let mut buffer = String::new();
+    let mut buf = String::new();
     io::stdin()
-        .read_to_string(&mut buffer)
-        .map_err(|e| format!("Error reading from stdin: {}", e))?;
-    Ok(buffer)
+        .read_to_string(&mut buf)
+        .map_err(|e| format!("Error reading stdin: {e}"))?;
+    Ok(buf)
 }
 
-/// Tokenizes the source code
-fn tokenize(code: &str) -> Result<Vec<lexer::Token>, String> {
-    let mut lexer = Lexer::new(code.to_string());
-    let mut tokens = Vec::new();
-
-    loop {
-        let token = lexer.next_token();
-        let is_eof = token.token_type == lexer::TokenType::EOF;
-        tokens.push(token);
-        if is_eof {
-            break;
+/// Lex `source` into a token stream, including the terminal [`TokenKind::Eof`].
+fn tokenize(source: &str) -> Vec<lexer::Token> {
+    let mut lexer = Lexer::new(source.to_string());
+    // Collect tokens until (and including) Eof, then stop.
+    std::iter::from_fn(move || {
+        let tok = lexer.next_token();
+        let done = tok.kind == TokenKind::Eof;
+        Some((tok, done))
+    })
+    .scan(false, |finished, (tok, is_eof)| {
+        if *finished {
+            return None;
         }
-    }
-
-    Ok(tokens)
+        *finished = is_eof;
+        Some(tok)
+    })
+    .collect()
 }
 
-/// Parses tokens into an AST
+/// Parse a token stream into a [`Program`] AST.
 fn parse(tokens: Vec<lexer::Token>) -> Result<parser::ast::Program, Vec<String>> {
-    let mut parser = Parser::new(tokens);
-    parser.parse()
+    Parser::new(tokens).parse()
 }
 
-/// Evaluates the AST using the tree-walking interpreter
+/// Evaluate a [`Program`] with the tree-walking interpreter.
 fn evaluate(program: &parser::ast::Program) -> Result<interpreter::Value, String> {
-    let mut evaluator = Evaluator::new();
-    evaluator.eval_program(program)
+    Evaluator::new().eval_program(program)
 }
 
 /// Compile the program to LLVM IR, then to a native binary via clang.
@@ -307,31 +322,31 @@ fn compile_program(
     Ok(bin_path)
 }
 
-/// Displays tokens in a formatted way
+// ── Display helpers ───────────────────────────────────────────────────────────
+
+/// Print the token stream produced by the lexer.
 fn display_tokens(tokens: &[lexer::Token]) {
     println!("╔════════════════════════════════════════╗");
     println!("║         📋 TOKENS (Lexer Output)       ║");
     println!("╚════════════════════════════════════════╝\n");
 
-    for (i, token) in tokens.iter().enumerate() {
-        if token.token_type == TokenType::EOF {
-            println!("{:3}. [EOF]", i);
-        } else if token.token_type == TokenType::Newline {
-            println!(
-                "{:3}. [NEWLINE] at {}:{}",
-                i, token.position.line, token.position.column
-            );
-        } else {
-            println!(
-                "{:3}. {:?} '{}' at {}:{}",
-                i, token.token_type, token.lexeme, token.position.line, token.position.column
-            );
+    for (i, tok) in tokens.iter().enumerate() {
+        match tok.kind {
+            TokenKind::Eof => println!("{i:3}. [EOF]"),
+            TokenKind::Newline => println!(
+                "{i:3}. [NEWLINE] at {}:{}",
+                tok.position.line, tok.position.column
+            ),
+            _ => println!(
+                "{i:3}. {:?} '{}' at {}:{}",
+                tok.kind, tok.lexeme, tok.position.line, tok.position.column
+            ),
         }
     }
     println!();
 }
 
-/// Displays the AST in a formatted way
+/// Print the top-level items of a parsed [`Program`].
 fn display_ast(program: &parser::ast::Program) {
     println!("╔════════════════════════════════════════╗");
     println!("║      🌳 AST (Abstract Syntax Tree)     ║");
@@ -366,13 +381,11 @@ fn display_ast(program: &parser::ast::Program) {
     }
 }
 
-/// Main entry point
 fn main() {
     let args = match parse_args() {
         Ok(args) => args,
         Err(e) => {
-            eprintln!("❌ Error: {}", e);
-            eprintln!("Run 'halo --help' for usage information");
+            eprintln!("❌ {e}");
             process::exit(1);
         }
     };
@@ -384,72 +397,61 @@ fn main() {
         println!("╚════════════════════════════════════════╝\n");
     }
 
-    // Read file
     if args.verbose {
         println!("📂 Reading file: {}", args.file_path);
     }
 
-    let code = match read_file(&args.file_path) {
-        Ok(code) => code,
+    let source = match read_source_file(&args.file_path) {
+        Ok(src) => src,
         Err(e) => {
-            eprintln!("❌ {}", e);
+            eprintln!("❌ {e}");
             process::exit(1);
         }
     };
 
     if args.verbose {
-        println!("✅ File read successfully ({} bytes)\n", code.len());
+        println!("✅ Read {} bytes\n", source.len());
+        println!("🔍 Tokenising…");
     }
 
-    // Tokenize
-    if args.verbose {
-        println!("🔍 Tokenizing...");
-    }
-
-    let tokens = match tokenize(&code) {
-        Ok(tokens) => tokens,
-        Err(e) => {
-            eprintln!("❌ Tokenization error: {}", e);
-            process::exit(1);
-        }
-    };
+    // Lexing is infallible — the lexer never returns an error.
+    let tokens = tokenize(&source);
 
     if args.verbose {
-        println!("✅ Tokenization successful ({} tokens)\n", tokens.len());
+        println!("✅ {} tokens\n", tokens.len());
     }
 
     if args.show_tokens {
         display_tokens(&tokens);
     }
 
-    // Parse
     if args.verbose {
-        println!("📝 Parsing...");
+        println!("📝 Parsing…");
     }
 
     let program = match parse(tokens) {
-        Ok(program) => program,
+        Ok(prog) => prog,
         Err(errors) => {
-            eprintln!("❌ Parsing error:");
-            for error in errors {
-                eprintln!("   {}", error);
+            eprintln!("❌ Parse error(s):");
+            for err in &errors {
+                eprintln!("   {err}");
             }
             process::exit(1);
         }
     };
 
     if args.verbose {
-        println!("✅ Parsing successful\n");
+        println!("✅ Parsed {} top-level item(s)\n", program.items.len());
     }
 
     if args.show_ast {
         display_ast(&program);
     }
 
-    // ── Compile mode ──────────────────────────────────────────────────────────
+    // ── Compile / emit-LLVM / run mode ───────────────────────────────────────
     if args.compile || args.emit_llvm || args.run {
         if args.verbose {
-            println!("🏗️  Compiling via LLVM...");
+            println!("🏗️  Compiling via LLVM…");
             println!("─────────────────────────────────────────\n");
         }
 
@@ -463,40 +465,39 @@ fn main() {
         ) {
             Ok(path) => path,
             Err(e) => {
-                eprintln!("❌ Compilation error: {}", e);
+                eprintln!("❌ Compilation error: {e}");
                 process::exit(1);
             }
         };
 
         if args.run {
-            // Execute the compiled binary
             if args.verbose {
-                println!("🚀 Running: ./{}", bin_path);
+                println!("🚀 Running: ./{bin_path}");
                 println!("─────────────────────────────────────────\n");
             }
 
-            let status = std::process::Command::new(format!("./{}", bin_path))
+            let exit_status = std::process::Command::new(format!("./{bin_path}"))
                 .status()
                 .unwrap_or_else(|e| {
-                    eprintln!("❌ Failed to run '{}': {}", bin_path, e);
+                    eprintln!("❌ Failed to execute '{bin_path}': {e}");
                     process::exit(1);
                 });
 
-            // Clean up temp binary when using --run without explicit -o
+            // Remove the temporary binary when no explicit output path was given.
             if args.output.is_none() {
                 let _ = fs::remove_file(&bin_path);
             }
 
             if args.verbose {
                 println!("\n─────────────────────────────────────────");
-                println!("✅ Process exited with code {}", status.code().unwrap_or(0));
+                println!("✅ Exited with code {}", exit_status.code().unwrap_or(0));
             }
 
-            process::exit(status.code().unwrap_or(0));
+            process::exit(exit_status.code().unwrap_or(0));
         }
 
         if !args.verbose {
-            println!("✅ Compiled successfully → {}", bin_path);
+            println!("✅ Compiled successfully → {bin_path}");
         }
 
         return;
@@ -504,7 +505,7 @@ fn main() {
 
     // ── Interpreter mode (default) ────────────────────────────────────────────
     if args.verbose {
-        println!("▶️  Evaluating...");
+        println!("▶️  Interpreting…");
         println!("─────────────────────────────────────────\n");
     }
 
@@ -512,11 +513,11 @@ fn main() {
         Ok(_) => {
             if args.verbose {
                 println!("\n─────────────────────────────────────────");
-                println!("✅ Execution completed successfully");
+                println!("✅ Finished successfully");
             }
         }
         Err(e) => {
-            eprintln!("\n❌ Runtime error: {}", e);
+            eprintln!("\n❌ Runtime error: {e}");
             process::exit(1);
         }
     }

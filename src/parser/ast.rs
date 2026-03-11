@@ -151,6 +151,10 @@ impl Expression {
 pub struct ElseIfBranch {
     pub cond: Expression,
     pub body: Block,
+    /// Source position of the `else if` keyword.
+    /// Currently unused by the evaluator but retained for future
+    /// tooling (linters, error reporting, source maps).
+    #[allow(dead_code)]
     pub pos: Position,
 }
 

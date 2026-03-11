@@ -50,6 +50,7 @@ impl Value {
     // ── Fast scalar extractors (no clone) ────────────────────────────────────
 
     /// Extract the inner i64 if this is a `Number`, otherwise `None`.
+    #[allow(dead_code)]
     #[inline]
     pub fn as_number(&self) -> Option<i64> {
         if let Value::Number(n) = self {
@@ -60,6 +61,7 @@ impl Value {
     }
 
     /// Extract the inner f64 if this is a `Float`, otherwise `None`.
+    #[allow(dead_code)]
     #[inline]
     pub fn as_float(&self) -> Option<f64> {
         if let Value::Float(f) = self {
@@ -70,6 +72,7 @@ impl Value {
     }
 
     /// Extract the inner bool if this is a `Bool`, otherwise `None`.
+    #[allow(dead_code)]
     #[inline]
     pub fn as_bool(&self) -> Option<bool> {
         if let Value::Bool(b) = self {

@@ -1,68 +1,110 @@
 // The Halo Programming Language
-// AST Evaluator and Interpreter
-// Version: 0.2.0
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 //
-// This module implements the tree-walking interpreter for the Halo language.
-// It maintains proper recursion depth tracking and loop iteration counting
-// to prevent resource exhaustion attacks.
+// Tree-walking interpreter for Halo.
+//
+// # Execution model
+//
+// Programs are executed in two passes:
+//   1. All `Function` items are registered in `self.functions`.
+//   2. All other top-level items are executed in order.
+//
+// Function calls create a new environment scope and set `self.return_value`
+// when a `return` statement is reached.  `break` and `continue` inside loops
+// propagate via `self.loop_signal`.
+//
+// # Safety limits
+//
+// Two counters prevent runaway programs from exhausting resources:
+//   - `recursion_depth`  – capped at `MAX_RECURSION_DEPTH`.
+//   - `loop_iterations`  – capped at `MAX_LOOP_ITERATIONS`.
 
 use super::environment::Environment;
 use super::value::Value;
-use crate::parser::ast::{Block, Expression, Program, Statement, TopLevel};
+use crate::parser::ast::{BinOp, Block, Expression, Program, Statement, TopLevel};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-// Safety limits to prevent resource exhaustion
-const MAX_RECURSION_DEPTH: usize = 1000;
+// ── Safety limits ─────────────────────────────────────────────────────────────
+
+// In debug/test builds each Rust call frame is much larger (no inlining,
+// debug info, etc.), so we use a lower limit to prevent a native stack
+// overflow before the interpreter's own guard fires.  Release builds have
+// far deeper native stacks and the higher limit is safe there.
+#[cfg(not(test))]
+const MAX_RECURSION_DEPTH: usize = 500;
+#[cfg(test)]
+const MAX_RECURSION_DEPTH: usize = 50;
 const MAX_LOOP_ITERATIONS: u64 = 1_000_000;
 
-/// Control-flow signals that can propagate up through the call stack.
+// ── Control-flow signals ──────────────────────────────────────────────────────
+
+/// Signals that short-circuit normal statement sequencing inside a loop body.
+/// They are stored on the `Evaluator` rather than being carried in the `Result`
+/// return type so that the existing `Result<Value, String>` signature is kept.
 #[derive(Debug, Clone, PartialEq)]
-enum Signal {
+enum LoopSignal {
     Break,
     Continue,
 }
 
-/// Shared, reference-counted function definition.
-/// Using `Rc` means `eval_call` can hold a reference to the function body
-/// without cloning the entire `Block` AST on every call.
+// ── Function definition cache ─────────────────────────────────────────────────
+
+/// A reference-counted, immutable snapshot of a user-defined function.
+///
+/// Storing definitions behind an `Rc` lets `eval_call` clone the handle
+/// cheaply (a single atomic increment) instead of deep-cloning the entire
+/// `Block` AST on every call.
 type FnDef = Rc<(Vec<String>, Block)>;
 
+// ── Evaluator ─────────────────────────────────────────────────────────────────
+
 pub struct Evaluator {
+    /// Variable bindings, organised in a stack of scopes.
     env: Environment,
-    /// User-defined functions. Wrapped in `Rc` so we can borrow the
-    /// definition and call `eval_block` at the same time without a full clone.
+    /// All user-defined functions discovered during the first pass.
     functions: HashMap<String, FnDef>,
+    /// Holds the value produced by the most recent `return` statement until it
+    /// is collected by `eval_call`.  `None` means no return is pending.
     return_value: Option<Value>,
-    /// Pending break / continue signal (cleared when consumed by a loop).
-    loop_signal: Option<Signal>,
+    /// Pending `break` or `continue` signal, cleared by the enclosing loop.
+    loop_signal: Option<LoopSignal>,
+    /// How many user-function frames are currently on the call stack.
     recursion_depth: usize,
+    /// Total loop iterations executed in the current program run.
     loop_iterations: u64,
 }
 
 impl Evaluator {
+    /// Create a fresh evaluator with empty state.
     pub fn new() -> Self {
-        Evaluator {
-            loop_signal: None,
+        Self {
             env: Environment::new(),
             functions: HashMap::new(),
             return_value: None,
+            loop_signal: None,
             recursion_depth: 0,
             loop_iterations: 0,
         }
     }
 
-    /// Main entry point: evaluate a complete program
+    // =========================================================================
+    // Public API
+    // =========================================================================
+
+    /// Execute a complete [`Program`], returning the last evaluated value.
+    ///
+    /// State from a previous run (variables, functions) is intentionally
+    /// preserved so that callers can run multiple snippets in the same REPL
+    /// session.  Safety counters are reset on each call.
     pub fn eval_program(&mut self, program: &Program) -> Result<Value, String> {
-        // Reset limits for new program execution
         self.recursion_depth = 0;
         self.loop_iterations = 0;
         self.loop_signal = None;
 
-        // First pass: collect all function definitions.
-        // Wrap each definition in an Rc so call sites can borrow without cloning.
+        // Pass 1 – register all function definitions before executing anything
+        // so that call-before-definition works at the top level.
         for item in &program.items {
             if let TopLevel::Function {
                 name, params, body, ..
@@ -73,54 +115,56 @@ impl Evaluator {
             }
         }
 
-        // Second pass: execute program
-        let result = Value::Null;
+        // Pass 2 – execute everything that is not a function definition.
+        let mut last = Value::Null;
         for item in &program.items {
-            match item {
+            last = match item {
+                TopLevel::Function { .. } => Value::Null, // already registered
+
                 TopLevel::GlobalVar { name, init, .. } => {
-                    let value = if let Some(expr) = init {
-                        self.eval_expr(expr)?
-                    } else {
-                        Value::Null
-                    };
+                    let value = init
+                        .as_ref()
+                        .map(|expr| self.eval_expr(expr))
+                        .transpose()?
+                        .unwrap_or(Value::Null);
                     self.env.set(name.clone(), value);
+                    Value::Null
                 }
-                TopLevel::Function { .. } => {
-                    // Already processed in first pass
-                }
-                TopLevel::Stmt { stmt, .. } => {
-                    self.eval_stmt(stmt)?;
-                }
-            }
+
+                TopLevel::Stmt { stmt, .. } => self.eval_stmt(stmt)?,
+            };
         }
 
-        Ok(result)
+        Ok(last)
     }
 
-    /// Evaluate a block of statements
+    // =========================================================================
+    // Block and statement evaluation
+    // =========================================================================
+
+    /// Evaluate every statement in `block` in order, stopping early on
+    /// `return`, `break`, or `continue`.
     fn eval_block(&mut self, block: &Block) -> Result<Value, String> {
-        let mut result = Value::Null;
+        let mut last = Value::Null;
         for stmt in &block.stmts {
-            result = self.eval_stmt(stmt)?;
-            // Stop on return, break, or continue signals.
+            last = self.eval_stmt(stmt)?;
             if self.return_value.is_some() || self.loop_signal.is_some() {
                 break;
             }
         }
-        Ok(result)
+        Ok(last)
     }
 
-    /// Evaluate a single statement
     fn eval_stmt(&mut self, stmt: &Statement) -> Result<Value, String> {
         match stmt {
             Statement::Expr(expr) => self.eval_expr(expr),
 
             Statement::VarDecl { name, init, .. } => {
-                let value = if let Some(expr) = init {
-                    self.eval_expr(expr)?
-                } else {
-                    Value::Null
-                };
+                let value = init
+                    .as_ref()
+                    .map(|expr| self.eval_expr(expr))
+                    .transpose()?
+                    .unwrap_or(Value::Null);
                 self.env.set(name.clone(), value);
                 Ok(Value::Null)
             }
@@ -132,27 +176,21 @@ impl Evaluator {
                 else_branch,
                 ..
             } => {
-                let cond_value = self.eval_expr(cond)?;
-                if cond_value.is_truthy() {
-                    self.eval_block(then_branch)
-                } else {
-                    // Check each else-if branch in order.
-                    let mut matched = false;
-                    let mut result = Value::Null;
-                    for branch in else_if_branches {
-                        let branch_cond = self.eval_expr(&branch.cond)?;
-                        if branch_cond.is_truthy() {
-                            result = self.eval_block(&branch.body)?;
-                            matched = true;
-                            break;
-                        }
+                if self.eval_expr(cond)?.is_truthy() {
+                    return self.eval_block(then_branch);
+                }
+
+                // Walk the `else if` chain until one condition is truthy.
+                for branch in else_if_branches {
+                    if self.eval_expr(&branch.cond)?.is_truthy() {
+                        return self.eval_block(&branch.body);
                     }
-                    if !matched {
-                        if let Some(else_b) = else_branch {
-                            result = self.eval_block(else_b)?;
-                        }
-                    }
-                    Ok(result)
+                }
+
+                // Fall through to the optional `else` block.
+                match else_branch {
+                    Some(block) => self.eval_block(block),
+                    None => Ok(Value::Null),
                 }
             }
 
@@ -165,17 +203,20 @@ impl Evaluator {
                             MAX_LOOP_ITERATIONS
                         ));
                     }
-                    // Evaluate condition without cloning: is_truthy takes &self.
+
                     if !self.eval_expr(cond)?.is_truthy() {
                         break;
                     }
+
                     self.eval_block(body)?;
+
                     if self.return_value.is_some() {
                         break;
                     }
+
                     match self.loop_signal.take() {
-                        Some(Signal::Break) => break,
-                        Some(Signal::Continue) => continue,
+                        Some(LoopSignal::Break) => break,
+                        Some(LoopSignal::Continue) => continue,
                         None => {}
                     }
                 }
@@ -183,287 +224,269 @@ impl Evaluator {
             }
 
             Statement::Break { .. } => {
-                self.loop_signal = Some(Signal::Break);
+                self.loop_signal = Some(LoopSignal::Break);
                 Ok(Value::Null)
             }
 
             Statement::Continue { .. } => {
-                self.loop_signal = Some(Signal::Continue);
+                self.loop_signal = Some(LoopSignal::Continue);
                 Ok(Value::Null)
             }
 
             Statement::Return { value, .. } => {
-                let ret_val = if let Some(expr) = value {
-                    self.eval_expr(expr)?
-                } else {
-                    Value::Null
-                };
-                self.return_value = Some(ret_val.clone());
-                Ok(ret_val)
+                let ret = value
+                    .as_ref()
+                    .map(|expr| self.eval_expr(expr))
+                    .transpose()?
+                    .unwrap_or(Value::Null);
+                self.return_value = Some(ret.clone());
+                Ok(ret)
             }
         }
     }
 
-    /// Evaluate an expression
+    // =========================================================================
+    // Expression evaluation
+    // =========================================================================
+
     fn eval_expr(&mut self, expr: &Expression) -> Result<Value, String> {
         match expr {
+            // ── Literals ─────────────────────────────────────────────────────
             Expression::Number(n, _) => Ok(Value::Number(*n)),
             Expression::Float(f, _) => Ok(Value::Float(*f)),
             Expression::Bool(b, _) => Ok(Value::Bool(*b)),
             Expression::StringLiteral(s, _) => Ok(Value::String(s.clone())),
+
+            // ── Variable read ─────────────────────────────────────────────────
             Expression::Var(name, _) => self
                 .env
                 .get(name)
-                .ok_or_else(|| format!("Undefined variable: '{}'", name)),
+                .ok_or_else(|| format!("Undefined variable: '{name}'")),
 
+            // ── Unary operators ───────────────────────────────────────────────
             Expression::Unary { operator, expr, .. } => {
                 let val = self.eval_expr(expr)?;
                 match operator.as_str() {
                     "-" => match val {
                         Value::Number(n) => Ok(Value::Number(-n)),
                         Value::Float(f) => Ok(Value::Float(-f)),
-                        _ => Err(format!("Cannot negate {}", val.type_name())),
+                        _ => Err(format!(
+                            "Cannot negate a value of type '{}'",
+                            val.type_name()
+                        )),
                     },
                     "!" => Ok(val.not()),
-                    _ => Err(format!("Unknown unary operator: '{}'", operator)),
+                    op => Err(format!("Unknown unary operator: '{op}'")),
                 }
             }
 
+            // ── Binary operators ──────────────────────────────────────────────
             Expression::Binary {
                 left, op, right, ..
-            } => {
-                // Implement short-circuit evaluation for logical operators
-                match op {
-                    crate::parser::ast::BinOp::And => {
-                        let left_val = self.eval_expr(left)?;
-                        // Short-circuit: if left is falsy, don't evaluate right
-                        if !left_val.is_truthy() {
-                            return Ok(left_val);
-                        }
-                        let right_val = self.eval_expr(right)?;
-                        Ok(left_val.and(&right_val))
-                    }
-                    crate::parser::ast::BinOp::Or => {
-                        let left_val = self.eval_expr(left)?;
-                        // Short-circuit: if left is truthy, don't evaluate right
-                        if left_val.is_truthy() {
-                            return Ok(left_val);
-                        }
-                        let right_val = self.eval_expr(right)?;
-                        Ok(left_val.or(&right_val))
-                    }
-                    _ => {
-                        // For all other operators, evaluate both sides
-                        let left_val = self.eval_expr(left)?;
-                        let right_val = self.eval_expr(right)?;
+            } => self.eval_binary(left, op, right),
 
-                        match op {
-                            crate::parser::ast::BinOp::Add => left_val.add(&right_val),
-                            crate::parser::ast::BinOp::Sub => left_val.subtract(&right_val),
-                            crate::parser::ast::BinOp::Mul => left_val.multiply(&right_val),
-                            crate::parser::ast::BinOp::Div => left_val.divide(&right_val),
-                            crate::parser::ast::BinOp::Mod => left_val.modulo(&right_val),
-                            crate::parser::ast::BinOp::Eq => {
-                                Ok(Value::Bool(left_val.equals(&right_val)))
-                            }
-                            crate::parser::ast::BinOp::Neq => {
-                                Ok(Value::Bool(!left_val.equals(&right_val)))
-                            }
-                            crate::parser::ast::BinOp::Lt => {
-                                Ok(Value::Bool(left_val.less_than(&right_val)?))
-                            }
-                            crate::parser::ast::BinOp::Gt => {
-                                Ok(Value::Bool(left_val.greater_than(&right_val)?))
-                            }
-                            crate::parser::ast::BinOp::Le => {
-                                Ok(Value::Bool(left_val.less_equal(&right_val)?))
-                            }
-                            crate::parser::ast::BinOp::Ge => {
-                                Ok(Value::Bool(left_val.greater_equal(&right_val)?))
-                            }
-                            crate::parser::ast::BinOp::And | crate::parser::ast::BinOp::Or => {
-                                unreachable!("AND/OR should be handled above")
-                            }
-                        }
-                    }
-                }
-            }
-
+            // ── Assignment ────────────────────────────────────────────────────
             Expression::Assign { name, value, .. } => {
                 let val = self.eval_expr(value)?;
-                // update() takes ownership; we return a clone only if the
-                // caller actually needs the value (assignment-as-expression).
-                // For statement-level assignments the clone is unavoidable with
-                // the current Value API, but we avoid a *second* clone here.
                 self.env.update(name, val.clone())?;
                 Ok(val)
             }
 
+            // ── Function call ─────────────────────────────────────────────────
             Expression::Call { name, args, .. } => self.eval_call(name, args),
         }
     }
 
-    /// Check if a function is a built-in function
-    fn is_builtin_function(&self, name: &str) -> bool {
-        matches!(
-            name,
-            "print" | "len" | "str" | "int" | "float" | "abs" | "type"
-        )
+    /// Evaluate a binary expression, handling short-circuit operators first.
+    fn eval_binary(
+        &mut self,
+        left: &Expression,
+        op: &BinOp,
+        right: &Expression,
+    ) -> Result<Value, String> {
+        // Short-circuit `&&` and `||` are handled before evaluating the RHS.
+        match op {
+            BinOp::And => {
+                let lhs = self.eval_expr(left)?;
+                if !lhs.is_truthy() {
+                    return Ok(lhs); // short-circuit: false && _ = false
+                }
+                let rhs = self.eval_expr(right)?;
+                return Ok(lhs.and(&rhs));
+            }
+            BinOp::Or => {
+                let lhs = self.eval_expr(left)?;
+                if lhs.is_truthy() {
+                    return Ok(lhs); // short-circuit: true || _ = true
+                }
+                let rhs = self.eval_expr(right)?;
+                return Ok(lhs.or(&rhs));
+            }
+            _ => {}
+        }
+
+        // All other operators evaluate both sides eagerly.
+        let lhs = self.eval_expr(left)?;
+        let rhs = self.eval_expr(right)?;
+
+        match op {
+            BinOp::Add => lhs.add(&rhs),
+            BinOp::Sub => lhs.subtract(&rhs),
+            BinOp::Mul => lhs.multiply(&rhs),
+            BinOp::Div => lhs.divide(&rhs),
+            BinOp::Mod => lhs.modulo(&rhs),
+            BinOp::Eq => Ok(Value::Bool(lhs.equals(&rhs))),
+            BinOp::Neq => Ok(Value::Bool(!lhs.equals(&rhs))),
+            BinOp::Lt => Ok(Value::Bool(lhs.less_than(&rhs)?)),
+            BinOp::Gt => Ok(Value::Bool(lhs.greater_than(&rhs)?)),
+            BinOp::Le => Ok(Value::Bool(lhs.less_equal(&rhs)?)),
+            BinOp::Ge => Ok(Value::Bool(lhs.greater_equal(&rhs)?)),
+            // Already handled in the short-circuit block above.
+            BinOp::And | BinOp::Or => unreachable!("&&/|| handled above"),
+        }
     }
 
-    /// Evaluate a function call
+    // =========================================================================
+    // Function call dispatch
+    // =========================================================================
+
     fn eval_call(&mut self, name: &str, args: &[Expression]) -> Result<Value, String> {
-        // Check recursion depth for user-defined functions
-        let should_track_depth = !self.is_builtin_function(name);
-        if should_track_depth {
-            self.recursion_depth += 1;
-            if self.recursion_depth > MAX_RECURSION_DEPTH {
-                self.recursion_depth -= 1;
-                return Err(format!(
-                    "Maximum recursion depth exceeded ({})",
-                    MAX_RECURSION_DEPTH
-                ));
-            }
+        // Built-ins never count towards the recursion limit.
+        if let Some(result) = self.try_eval_builtin(name, args)? {
+            return Ok(result);
         }
-        // Built-in functions
-        match name {
-            "print" => {
-                for arg in args {
-                    let val = self.eval_expr(arg)?;
-                    println!("{}", val);
-                }
-                Ok(Value::Null)
-            }
 
-            "len" => {
-                if args.len() != 1 {
-                    return Err(format!("len() expects 1 argument, got {}", args.len()));
-                }
-                let val = self.eval_expr(&args[0])?;
-                match val {
-                    Value::String(s) => Ok(Value::Number(s.len() as i64)),
-                    Value::Number(n) => Ok(Value::Number(n.to_string().len() as i64)),
-                    _ => Err(format!("len() does not work with {}", val.type_name())),
-                }
-            }
+        // ── User-defined function ─────────────────────────────────────────────
 
+        // Guard: check and increment recursion depth before doing anything else
+        // so that the decrement in the cleanup path is always balanced.
+        self.recursion_depth += 1;
+        if self.recursion_depth > MAX_RECURSION_DEPTH {
+            self.recursion_depth -= 1;
+            return Err(format!(
+                "Maximum recursion depth exceeded ({})",
+                MAX_RECURSION_DEPTH
+            ));
+        }
+
+        // Retrieve the definition — clone the Rc handle (cheap), not the AST.
+        let def = self
+            .functions
+            .get(name)
+            .cloned()
+            .ok_or_else(|| format!("Undefined function: '{name}'"))?;
+
+        let (params, body) = (def.0.as_slice(), &def.1);
+
+        if args.len() != params.len() {
+            self.recursion_depth -= 1;
+            return Err(format!(
+                "Function '{name}' expects {} argument(s), got {}",
+                params.len(),
+                args.len()
+            ));
+        }
+
+        // Evaluate arguments in the *caller's* scope before pushing a new frame.
+        let evaluated_args = self.eval_args(args)?;
+
+        // Open a new scope and bind parameters to the evaluated arguments.
+        self.env.push_scope();
+        for (param, value) in params.iter().zip(evaluated_args) {
+            self.env.set(param.clone(), value);
+        }
+
+        // Execute the body, then tear down the scope regardless of outcome.
+        self.return_value = None;
+        let body_result = self.eval_block(body);
+        self.env.pop_scope();
+        self.recursion_depth -= 1;
+
+        // Surface any error from the body.
+        body_result?;
+
+        // Collect the pending return value (or `null` for void functions).
+        Ok(self.return_value.take().unwrap_or(Value::Null))
+    }
+
+    /// Evaluate a slice of argument expressions in the current scope, returning
+    /// the results as an owned `Vec`.  Stops and propagates the first error.
+    fn eval_args(&mut self, args: &[Expression]) -> Result<Vec<Value>, String> {
+        args.iter().map(|arg| self.eval_expr(arg)).collect()
+    }
+
+    /// Try to evaluate `name` as a built-in function.
+    ///
+    /// Returns:
+    /// - `Ok(Some(value))` — the call was handled by a built-in.
+    /// - `Ok(None)` — `name` is not a built-in; the caller should try
+    ///   user-defined functions next.
+    /// - `Err(msg)` — a built-in was matched but the call was invalid.
+    fn try_eval_builtin(
+        &mut self,
+        name: &str,
+        args: &[Expression],
+    ) -> Result<Option<Value>, String> {
+        let result = match name {
+            "print" => self.builtin_print(args)?,
+            "len" => self.builtin_single_arg(name, args, |v| match v {
+                Value::String(s) => Ok(Value::Number(s.len() as i64)),
+                Value::Number(n) => Ok(Value::Number(n.to_string().len() as i64)),
+                other => Err(format!(
+                    "len() does not support type '{}'",
+                    other.type_name()
+                )),
+            })?,
             "str" => {
-                if args.len() != 1 {
-                    return Err(format!("str() expects 1 argument, got {}", args.len()));
-                }
-                let val = self.eval_expr(&args[0])?;
-                Ok(Value::String(val.to_string_value()))
+                self.builtin_single_arg(name, args, |v| Ok(Value::String(v.to_string_value())))?
             }
+            "int" => self.builtin_single_arg(name, args, |v| Ok(Value::Number(v.to_int()?)))?,
+            "float" => self.builtin_single_arg(name, args, |v| Ok(Value::Float(v.to_number()?)))?,
+            "abs" => self.builtin_single_arg(name, args, |v| match v {
+                Value::Number(n) => Ok(Value::Number(n.abs())),
+                Value::Float(f) => Ok(Value::Float(f.abs())),
+                other => Err(format!(
+                    "abs() does not support type '{}'",
+                    other.type_name()
+                )),
+            })?,
+            "type" => self
+                .builtin_single_arg(name, args, |v| Ok(Value::String(v.type_name().to_string())))?,
+            // Not a built-in.
+            _ => return Ok(None),
+        };
+        Ok(Some(result))
+    }
 
-            "int" => {
-                if args.len() != 1 {
-                    return Err(format!("int() expects 1 argument, got {}", args.len()));
-                }
-                let val = self.eval_expr(&args[0])?;
-                Ok(Value::Number(val.to_int()?))
-            }
+    // ── Built-in helpers ──────────────────────────────────────────────────────
 
-            "float" => {
-                if args.len() != 1 {
-                    return Err(format!("float() expects 1 argument, got {}", args.len()));
-                }
-                let val = self.eval_expr(&args[0])?;
-                Ok(Value::Float(val.to_number()?))
-            }
-
-            "abs" => {
-                if args.len() != 1 {
-                    return Err(format!("abs() expects 1 argument, got {}", args.len()));
-                }
-                let val = self.eval_expr(&args[0])?;
-                match val {
-                    Value::Number(n) => Ok(Value::Number(n.abs())),
-                    Value::Float(f) => Ok(Value::Float(f.abs())),
-                    _ => Err(format!("abs() does not work with {}", val.type_name())),
-                }
-            }
-
-            "type" => {
-                if args.len() != 1 {
-                    return Err(format!("type() expects 1 argument, got {}", args.len()));
-                }
-                let val = self.eval_expr(&args[0])?;
-                Ok(Value::String(val.type_name().to_string()))
-            }
-
-            _ => {
-                // User-defined functions
-                if let Some(def) = self.functions.get(name).cloned() {
-                    // Clone the Rc (cheap reference-count bump), not the AST.
-                    let (params, body) = (def.0.clone(), def.1.clone());
-                    if args.len() != params.len() {
-                        if should_track_depth {
-                            self.recursion_depth -= 1;
-                        }
-                        return Err(format!(
-                            "Function '{}' expects {} arguments, got {}",
-                            name,
-                            params.len(),
-                            args.len()
-                        ));
-                    }
-
-                    // Create new scope for function
-                    self.env.push_scope();
-
-                    // Evaluate arguments and bind to parameters
-                    let mut eval_error = None;
-                    for (param, arg) in params.iter().zip(args.iter()) {
-                        match self.eval_expr(arg) {
-                            Ok(arg_val) => self.env.set(param.clone(), arg_val),
-                            Err(e) => {
-                                eval_error = Some(e);
-                                break;
-                            }
-                        }
-                    }
-
-                    if let Some(e) = eval_error {
-                        self.env.pop_scope();
-                        if should_track_depth {
-                            self.recursion_depth -= 1;
-                        }
-                        return Err(e);
-                    }
-
-                    // Execute function body
-                    self.return_value = None;
-                    let block_result = self.eval_block(&body);
-
-                    // Get return value (even if error occurs)
-                    let result = match block_result {
-                        Ok(_) => self.return_value.take().unwrap_or(Value::Null),
-                        Err(e) => {
-                            self.env.pop_scope();
-                            if should_track_depth {
-                                self.recursion_depth -= 1;
-                            }
-                            return Err(e);
-                        }
-                    };
-
-                    // Exit function scope
-                    self.env.pop_scope();
-
-                    // Decrement recursion depth
-                    if should_track_depth {
-                        self.recursion_depth -= 1;
-                    }
-
-                    Ok(result)
-                } else {
-                    if should_track_depth {
-                        self.recursion_depth -= 1;
-                    }
-                    Err(format!("Undefined function: '{}'", name))
-                }
-            }
+    /// `print(v1, v2, …)` — prints each argument on its own line.
+    fn builtin_print(&mut self, args: &[Expression]) -> Result<Value, String> {
+        for arg in args {
+            let val = self.eval_expr(arg)?;
+            println!("{val}");
         }
+        Ok(Value::Null)
+    }
+
+    /// Helper for built-ins that accept exactly one argument.
+    ///
+    /// Evaluates the single argument, then calls `f` with the resulting
+    /// [`Value`].  Returns an arity error if the argument count is wrong.
+    fn builtin_single_arg(
+        &mut self,
+        name: &str,
+        args: &[Expression],
+        f: impl FnOnce(Value) -> Result<Value, String>,
+    ) -> Result<Value, String> {
+        if args.len() != 1 {
+            return Err(format!(
+                "{name}() expects exactly 1 argument, got {}",
+                args.len()
+            ));
+        }
+        let val = self.eval_expr(&args[0])?;
+        f(val)
     }
 }
 
@@ -473,35 +496,36 @@ impl Default for Evaluator {
     }
 }
 
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::lexer::Lexer;
+    use crate::lexer::TokenKind;
     use crate::parser::Parser;
 
+    /// Tokenise, parse, and evaluate a snippet of Halo source code.
     fn eval_code(code: &str) -> Result<Value, String> {
         let mut lexer = Lexer::new(code.to_string());
         let mut tokens = Vec::new();
-
         loop {
-            let token = lexer.next_token();
-            let is_eof = token.token_type == crate::lexer::TokenType::EOF;
-            tokens.push(token);
+            let tok = lexer.next_token();
+            let is_eof = tok.kind == TokenKind::Eof;
+            tokens.push(tok);
             if is_eof {
                 break;
             }
         }
-
         let mut parser = Parser::new(tokens);
-        let program = parser.parse().map_err(|e| e.join(", "))?;
-
+        let program = parser.parse().map_err(|errs| errs.join("; "))?;
         let mut evaluator = Evaluator::new();
         evaluator.eval_program(&program)
     }
 
     #[test]
     fn test_simple_arithmetic() {
-        assert_eq!(eval_code("a = 5").unwrap(), Value::Null);
+        assert_eq!(eval_code("x = 2 + 3").unwrap(), Value::Null);
     }
 
     #[test]
@@ -512,98 +536,109 @@ mod tests {
     #[test]
     fn test_addition() {
         let code = "
-        add(a, b) {
-            return a + b
-        }
-        ";
-        eval_code(code).unwrap();
+add(a, b) {
+    return a + b
+}
+result = add(3, 4)
+";
+        assert_eq!(eval_code(code).unwrap(), Value::Null);
     }
 
     #[test]
     fn test_factorial() {
         let code = "
-        factorial(n) {
-            if n <= 1 {
-                return 1
-            }
-            return n * factorial(n - 1)
-        }
-        ";
+factorial(n) {
+    if n <= 1 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+result = factorial(5)
+";
         eval_code(code).unwrap();
     }
 
     #[test]
     fn test_undefined_variable_error() {
-        let result = eval_code("x = y + 1");
+        let result = eval_code("x = undefined_var");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Undefined variable"));
     }
 
     #[test]
     fn test_undefined_function_error() {
-        let code = "x = nonexistent()";
-        let result = eval_code(code);
+        let result = eval_code("result = undefined_func(1, 2)");
         assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Undefined function"));
     }
 
     #[test]
     fn test_modulo_operator() {
         let code = "
-        test_mod() {
-            return 10 % 3
-        }
-        ";
+mod_test(a, b) {
+    return a % b
+}
+result = mod_test(10, 3)
+";
         eval_code(code).unwrap();
     }
 
     #[test]
     fn test_logical_and() {
         let code = "
-        test_and() {
-            a = 5
-            b = 3
-            if a > 0 && b > 0 {
-                return 1
-            }
-            return 0
-        }
-        ";
+check(a, b) {
+    if a && b {
+        return 1
+    }
+    return 0
+}
+r1 = check(1, 1)
+r2 = check(1, 0)
+r3 = check(0, 1)
+";
         eval_code(code).unwrap();
     }
 
     #[test]
     fn test_logical_or() {
         let code = "
-        test_or() {
-            a = 0
-            b = 5
-            if a > 10 || b > 0 {
-                return 1
-            }
-            return 0
-        }
-        ";
+check(a, b) {
+    if a || b {
+        return 1
+    }
+    return 0
+}
+r1 = check(1, 0)
+r2 = check(0, 1)
+r3 = check(0, 0)
+";
         eval_code(code).unwrap();
     }
 
     #[test]
     fn test_recursion_depth_limit() {
         let code = "
-        infinite_recursion(n) {
-            return infinite_recursion(n + 1)
-        }
-        ";
-        // Just ensure it parses and doesn't crash during parsing
-        eval_code(code).unwrap();
+infinite(n) {
+    return infinite(n + 1)
+}
+result = infinite(0)
+";
+        let result = eval_code(code);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("Maximum recursion depth exceeded"));
     }
 
     #[test]
     fn test_integer_overflow_protection() {
-        // Test overflow detection during evaluation
-        let val_a = Value::Number(i64::MAX);
-        let val_b = Value::Number(1);
-        let result = val_a.add(&val_b);
-        // Should error on overflow
+        let code = "
+big(n) {
+    return n + 9223372036854775807
+}
+result = big(1)
+";
+        let result = eval_code(code);
         assert!(result.is_err());
     }
 }

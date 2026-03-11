@@ -172,6 +172,7 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     /// Write LLVM IR text to a `.ll` file.
+    #[allow(dead_code)]
     pub fn emit_llvm(&self, filename: &str) -> Result<(), String> {
         self.module
             .print_to_file(filename)
@@ -179,6 +180,7 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     /// Compile directly to a native object file (bypasses clang).
+    #[allow(dead_code)]
     pub fn emit_object(&self, filename: &str) -> Result<(), String> {
         Target::initialize_native(&InitializationConfig::default())
             .map_err(|e| format!("Failed to initialise native target: {}", e))?;
@@ -210,11 +212,13 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     /// Print LLVM IR to stdout (useful for debugging).
+    #[allow(dead_code)]
     pub fn print_ir(&self) {
         println!("{}", self.module.print_to_string().to_string());
     }
 
     /// Access the underlying LLVM module.
+    #[allow(dead_code)]
     pub fn get_module(&self) -> &'ctx Module<'ctx> {
         self.module
     }
@@ -335,20 +339,19 @@ impl<'ctx> CodeGenerator<'ctx> {
         let terminated = self.generate_block(body, function)?;
 
         // ── Implicit return 0 if the last block has no terminator ──
-        if !terminated {
-            if self
+        if !terminated
+            && self
                 .builder
                 .builder
                 .get_insert_block()
                 .and_then(|b| b.get_terminator())
                 .is_none()
-            {
-                let zero = self.type_mapper.i64_type().const_int(0, false);
-                self.builder
-                    .builder
-                    .build_return(Some(&zero))
-                    .map_err(|_| format!("Failed to build implicit return in '{}'", name))?;
-            }
+        {
+            let zero = self.type_mapper.i64_type().const_int(0, false);
+            self.builder
+                .builder
+                .build_return(Some(&zero))
+                .map_err(|_| format!("Failed to build implicit return in '{}'", name))?;
         }
 
         Ok(())
@@ -411,9 +414,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             Expression::StringLiteral(_, _) => {
                 Err("String literals are not supported as global variable initializers".to_string())
             }
-            _ => Err(format!(
-                "Global variable initializer must be a constant literal"
-            )),
+            _ => Err("Global variable initializer must be a constant literal".to_string()),
         }
     }
 

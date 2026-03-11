@@ -44,6 +44,7 @@ impl<'ctx> IRBuilder<'ctx> {
     }
 
     /// Return the function currently being compiled, if any.
+    #[allow(dead_code)]
     pub fn current_function(&self) -> Option<FunctionValue<'ctx>> {
         self.current_function
     }
@@ -61,6 +62,7 @@ impl<'ctx> IRBuilder<'ctx> {
 
     /// Emit a `store` of `value` into the alloca for `name`.
     /// Returns an error if the variable has not been declared.
+    #[allow(dead_code)]
     pub fn store_variable(
         &mut self,
         name: &str,
@@ -79,6 +81,7 @@ impl<'ctx> IRBuilder<'ctx> {
 
     /// Emit a `load` from the alloca for `name`.
     /// Returns an error if the variable has not been declared.
+    #[allow(dead_code)]
     pub fn load_variable(&mut self, name: &str) -> Result<BasicValueEnum<'ctx>, String> {
         let slot = self
             .allocas
