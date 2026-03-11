@@ -1,45 +1,277 @@
-# ── LLVM setup — Windows (download pre-built 7z) ─────────────────────────
-- name: Get latest LLVM 21 version (Windows)
-  if: runner.os == 'Windows'
-  id: llvm-version
-  shell: pwsh
-  run: |
-    $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/llvm/llvm-project/releases"
-    $latest21 = $releases | Where-Object { $_.tag_name -like "llvmorg-21.*" } | Select-Object -First 1
-    if (-not $latest21) {
-      Write-Error "No LLVM 21 release found"
-      exit 1
-    }
-    $version = $latest21.tag_name -replace 'llvmorg-', ''
-    Write-Host "Latest LLVM 21 version: $version"
-    echo "version=$version" >> $env:GITHUB_OUTPUT
-- name: Download and extract LLVM 21 (Windows)
-  if: runner.os == 'Windows'
-  shell: pwsh
-  run: |
-    $version = "${{ steps.llvm-version.outputs.version }}"
-    $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-win64.7z"
-    $archive = "$env:TEMP\LLVM-$version-win64.7z"
-    Write-Host "Downloading LLVM $version from $url"
-    Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing
-    Write-Host "Extracting to C:\LLVM ..."
-    # Ensure target directory exists and is empty
-    Remove-Item -Path C:\LLVM -Recurse -Force -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory -Path C:\LLVM -Force | Out-Null
-    # 7z is preinstalled on GitHub Windows runners
-    7z x $archive -oC:\LLVM -aoa | Out-Null
-    Write-Host "Verifying..."
-    if (-not (Test-Path "C:\LLVM\bin\llvm-config.exe")) {
-      Write-Error "llvm-config.exe not found after extraction."
-      exit 1
-    }
-    $ver = & "C:\LLVM\bin\llvm-config.exe" --version
-    Write-Host "Installed LLVM $ver"
-- name: Set LLVM env (Windows)
-  if: runner.os == 'Windows'
-  shell: pwsh
-  run: |
-    $llvm = "C:\LLVM"
-    Add-Content $env:GITHUB_ENV "LLVM_SYS_211_PREFIX=$llvm"
-    Add-Content $env:GITHUB_ENV "LIBCLANG_PATH=$llvm\lib"
-    Add-Content $env:GITHUB_PATH "$llvm\bin"
+# The Halo Programming Language
+# Release — triggers when a vX.Y.Z tag is pushed.
+#
+# Jobs:
+#   build   — compile for each target platform (matrix)
+#   release — create a GitHub Release and upload all artifacts
+#
+# Supported targets (all built natively, no cross-compilation):
+#   Linux   x86_64   (ubuntu-24.04)
+#   Linux   aarch64  (ubuntu-24.04-arm)
+#   macOS   x86_64   (macos-13, Intel)
+#   macOS   aarch64  (macos-14, Apple Silicon)
+#   Windows x86_64   (windows-2022)
+#
+# Why native runners? inkwell/llvm-sys compiles C++ glue code and links against
+# libLLVM at build time. Both the compiled objects and the linked library must
+# match the host architecture. Cross-compilation from ARM64 → x86_64 would
+# require a full x86_64 sysroot + libLLVM, which is equivalent to a native runner.
+#
+# macos-13 note: this is the last GitHub-hosted Intel runner. It may occasionally
+# be slow to provision; continue-on-error: true is set so a transient shortage
+# does not block the rest of the release.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]*"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  BINARY_NAME: halo
+
+jobs:
+  # ── Build ─────────────────────────────────────────────────────────────────────
+  build:
+    name: Build · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.continue-on-error == true }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── Linux x86_64 ──────────────────────────────────────────────────────
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
+            llvm_prefix: /usr/lib/llvm-21
+            archive_ext: tar.gz
+
+          # ── Linux aarch64 — native ARM runner ────────────────────────────────
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
+            llvm_prefix: /usr/lib/llvm-21
+            archive_ext: tar.gz
+
+          # ── macOS aarch64 (Apple Silicon, native) ─────────────────────────────
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            archive_ext: tar.gz
+
+          # ── macOS x86_64 (Intel, native) ──────────────────────────────────────
+          # Must use macos-13, the last Intel runner. continue-on-error guards
+          # against transient provisioning failures.
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            continue-on-error: true
+            archive_ext: tar.gz
+
+          # ── Windows x86_64 ────────────────────────────────────────────────────
+          - target: x86_64-pc-windows-msvc
+            runner: windows-2022
+            archive_ext: zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── LLVM setup — Linux ───────────────────────────────────────────────────
+      - name: Install LLVM 21 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-21.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ${{ matrix.llvm_pkg }}
+      - name: Set LLVM env (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          echo "LLVM_SYS_211_PREFIX=${{ matrix.llvm_prefix }}" >> "$GITHUB_ENV"
+          echo "${{ matrix.llvm_prefix }}/bin" >> "$GITHUB_PATH"
+
+      # ── LLVM setup — macOS ───────────────────────────────────────────────────
+      - name: Install LLVM 21 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install llvm@21
+      - name: Set LLVM env (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          LLVM_PREFIX="$(brew --prefix llvm@21)"
+          echo "LLVM_SYS_211_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          echo "${LLVM_PREFIX}/bin" >> "$GITHUB_PATH"
+          echo "LDFLAGS=-L${LLVM_PREFIX}/lib" >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I${LLVM_PREFIX}/include" >> "$GITHUB_ENV"
+
+      # ── LLVM setup — Windows (download pre-built 7z) ─────────────────────────
+      - name: Get latest LLVM 21 version (Windows)
+        if: runner.os == 'Windows'
+        id: llvm-version
+        shell: pwsh
+        run: |
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/llvm/llvm-project/releases"
+          $latest21 = $releases | Where-Object { $_.tag_name -like "llvmorg-21.*" } | Select-Object -First 1
+          if (-not $latest21) {
+            Write-Error "No LLVM 21 release found"
+            exit 1
+          }
+          $version = $latest21.tag_name -replace 'llvmorg-', ''
+          Write-Host "Latest LLVM 21 version: $version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Download and extract LLVM 21 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "${{ steps.llvm-version.outputs.version }}"
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-win64.7z"
+          $archive = "$env:TEMP\LLVM-$version-win64.7z"
+          Write-Host "Downloading LLVM $version from $url"
+          Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing
+          Write-Host "Extracting to C:\LLVM ..."
+          # Ensure target directory exists and is empty
+          Remove-Item -Path C:\LLVM -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path C:\LLVM -Force | Out-Null
+          # 7z is preinstalled on GitHub Windows runners
+          7z x $archive -oC:\LLVM -aoa | Out-Null
+          Write-Host "Verifying..."
+          if (-not (Test-Path "C:\LLVM\bin\llvm-config.exe")) {
+            Write-Error "llvm-config.exe not found after extraction."
+            exit 1
+          }
+          $ver = & "C:\LLVM\bin\llvm-config.exe" --version
+          Write-Host "Installed LLVM $ver"
+      - name: Set LLVM env (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $llvm = "C:\LLVM"
+          Add-Content $env:GITHUB_ENV "LLVM_SYS_211_PREFIX=$llvm"
+          Add-Content $env:GITHUB_ENV "LIBCLANG_PATH=$llvm\lib"
+          Add-Content $env:GITHUB_PATH "$llvm\bin"
+
+      # ── Rust toolchain ───────────────────────────────────────────────────────
+      - name: Install Rust stable + target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # ── Cargo cache (optimized with Swatinem/rust-cache) ─────────────────────
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      # ── Compile ──────────────────────────────────────────────────────────────
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # ── Quick test (verify binary runs) ──────────────────────────────────────
+      - name: Test binary
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            ./target/${{ matrix.target }}/release/${BINARY_NAME}.exe --version
+          else
+            ./target/${{ matrix.target }}/release/${BINARY_NAME} --version
+          fi
+        shell: bash
+
+      # ── Package — Linux / macOS (tar.gz) ─────────────────────────────────────
+      - name: Package (tar.gz)
+        if: matrix.archive_ext == 'tar.gz'
+        shell: bash
+        run: |
+          BIN="target/${{ matrix.target }}/release/${BINARY_NAME}"
+          ARCHIVE="${BINARY_NAME}-${{ github.ref_name }}-${{ matrix.target }}.tar.gz"
+          tar -czf "${ARCHIVE}" -C "$(dirname ${BIN})" "$(basename ${BIN})"
+          echo "ASSET=${ARCHIVE}" >> "$GITHUB_ENV"
+
+      # ── Package — Windows (zip) ───────────────────────────────────────────────
+      - name: Package (zip)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          $bin  = "target\${{ matrix.target }}\release\${env:BINARY_NAME}.exe"
+          $name = "${env:BINARY_NAME}-${{ github.ref_name }}-${{ matrix.target }}.zip"
+          Compress-Archive -Path $bin -DestinationPath $name
+          echo "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # ── Compute SHA-256 checksum ─────────────────────────────────────────────
+      - name: Checksum (Linux / macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          if command -v sha256sum &>/dev/null; then
+            sha256sum "${{ env.ASSET }}" > "${{ env.ASSET }}.sha256"
+          else
+            shasum -a 256 "${{ env.ASSET }}" > "${{ env.ASSET }}.sha256"
+          fi
+      - name: Checksum (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash "${{ env.ASSET }}" -Algorithm SHA256).Hash.ToLower()
+          "$hash  ${{ env.ASSET }}" | Out-File -Encoding ascii "${{ env.ASSET }}.sha256"
+
+      # ── Upload artifacts for the release job ─────────────────────────────────
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: |
+            ${{ env.ASSET }}
+            ${{ env.ASSET }}.sha256
+          if-no-files-found: error
+
+  # ── Release ───────────────────────────────────────────────────────────────────
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Download every artifact produced by the build matrix
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh artifacts/
+
+      # Derive a human-readable changelog from the annotated tag message.
+      # Falls back to a generic message when the tag has no annotation.
+      - name: Extract tag notes
+        run: |
+          NOTES=$(git tag -l --format='%(contents)' "${{ github.ref_name }}" 2>/dev/null || true)
+          if [ -z "$NOTES" ]; then
+            NOTES="Release ${{ github.ref_name }}"
+          fi
+          printf '%s' "$NOTES" > release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Halo ${{ github.ref_name }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
+            artifacts/**/*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
