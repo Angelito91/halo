@@ -17,10 +17,19 @@ use std::collections::HashMap;
 const MAX_RECURSION_DEPTH: usize = 1000;
 const MAX_LOOP_ITERATIONS: u64 = 1_000_000;
 
+/// Control-flow signals that can propagate up through the call stack.
+#[derive(Debug, Clone, PartialEq)]
+enum Signal {
+    Break,
+    Continue,
+}
+
 pub struct Evaluator {
     env: Environment,
     functions: HashMap<String, (Vec<String>, Block)>,
     return_value: Option<Value>,
+    /// Pending break / continue signal (cleared when consumed by a loop).
+    loop_signal: Option<Signal>,
     recursion_depth: usize,
     loop_iterations: u64,
 }
@@ -28,6 +37,7 @@ pub struct Evaluator {
 impl Evaluator {
     pub fn new() -> Self {
         Evaluator {
+            loop_signal: None,
             env: Environment::new(),
             functions: HashMap::new(),
             return_value: None,
@@ -41,6 +51,7 @@ impl Evaluator {
         // Reset limits for new program execution
         self.recursion_depth = 0;
         self.loop_iterations = 0;
+        self.loop_signal = None;
 
         // First pass: collect all function definitions
         for item in &program.items {
@@ -68,6 +79,9 @@ impl Evaluator {
                 TopLevel::Function { .. } => {
                     // Already processed in first pass
                 }
+                TopLevel::Stmt { stmt, .. } => {
+                    self.eval_stmt(stmt)?;
+                }
             }
         }
 
@@ -79,8 +93,8 @@ impl Evaluator {
         let mut result = Value::Null;
         for stmt in &block.stmts {
             result = self.eval_stmt(stmt)?;
-            // If return encountered, stop execution
-            if self.return_value.is_some() {
+            // Stop on return, break, or continue signals.
+            if self.return_value.is_some() || self.loop_signal.is_some() {
                 break;
             }
         }
@@ -105,16 +119,31 @@ impl Evaluator {
             Statement::If {
                 cond,
                 then_branch,
+                else_if_branches,
                 else_branch,
                 ..
             } => {
                 let cond_value = self.eval_expr(cond)?;
                 if cond_value.is_truthy() {
                     self.eval_block(then_branch)
-                } else if let Some(else_b) = else_branch {
-                    self.eval_block(else_b)
                 } else {
-                    Ok(Value::Null)
+                    // Check each else-if branch in order.
+                    let mut matched = false;
+                    let mut result = Value::Null;
+                    for branch in else_if_branches {
+                        let branch_cond = self.eval_expr(&branch.cond)?;
+                        if branch_cond.is_truthy() {
+                            result = self.eval_block(&branch.body)?;
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if !matched {
+                        if let Some(else_b) = else_branch {
+                            result = self.eval_block(else_b)?;
+                        }
+                    }
+                    Ok(result)
                 }
             }
 
@@ -136,8 +165,23 @@ impl Evaluator {
                     if self.return_value.is_some() {
                         break;
                     }
+                    match self.loop_signal.take() {
+                        Some(Signal::Break) => break,
+                        Some(Signal::Continue) => continue,
+                        None => {}
+                    }
                 }
                 Ok(result)
+            }
+
+            Statement::Break { .. } => {
+                self.loop_signal = Some(Signal::Break);
+                Ok(Value::Null)
+            }
+
+            Statement::Continue { .. } => {
+                self.loop_signal = Some(Signal::Continue);
+                Ok(Value::Null)
             }
 
             Statement::Return { value, .. } => {
@@ -158,6 +202,7 @@ impl Evaluator {
             Expression::Number(n, _) => Ok(Value::Number(*n)),
             Expression::Float(f, _) => Ok(Value::Float(*f)),
             Expression::Bool(b, _) => Ok(Value::Bool(*b)),
+            Expression::StringLiteral(s, _) => Ok(Value::String(s.clone())),
             Expression::Var(name, _) => self
                 .env
                 .get(name)

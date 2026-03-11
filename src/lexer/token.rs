@@ -1,6 +1,6 @@
 // The Halo Programming Language
+// Token definitions
 // Version: 0.2.0
-// Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
@@ -9,25 +9,32 @@ use crate::parser::ast::Position;
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(dead_code)]
 pub enum TokenType {
-    // Special Words
+    // Keywords
     If,
     Else,
     While,
-    True,
     Return,
+    True,
     False,
+    Break,
+    Continue,
 
     // Identifiers and literals
     Identifier,
     Number,
+    StringLit, // "hello world"
 
-    // Operators
-    Plus,         // +
-    Minus,        // -
-    Star,         // *
-    Slash,        // /
-    Modulo,       // %
-    Assign,       // =
+    // Arithmetic operators
+    Plus,   // +
+    Minus,  // -
+    Star,   // *
+    Slash,  // /
+    Modulo, // %
+
+    // Assignment
+    Assign, // =
+
+    // Comparison operators
     Equal,        // ==
     NotEqual,     // !=
     Less,         // <
@@ -35,7 +42,7 @@ pub enum TokenType {
     LessEqual,    // <=
     GreaterEqual, // >=
 
-    // Comparative
+    // Logical operators
     And, // &&
     Or,  // ||
     Not, // !
@@ -56,8 +63,8 @@ pub enum TokenType {
     Whitespace,
     #[allow(dead_code)]
     Comment,
-    Newline, // For statement termination without ;
-    Unknown, // For invalid/unknown characters
+    Newline, // Statement terminator (no semicolons)
+    Unknown, // Invalid / unrecognised character
     EOF,
 }
 

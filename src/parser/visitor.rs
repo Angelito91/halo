@@ -24,6 +24,9 @@ pub trait ASTVisitor {
                 self.visit_block(body);
             }
             TopLevel::GlobalVar { .. } => {}
+            TopLevel::Stmt { stmt, .. } => {
+                self.visit_statement(stmt);
+            }
         }
     }
 
@@ -44,11 +47,16 @@ pub trait ASTVisitor {
             Statement::If {
                 cond,
                 then_branch,
+                else_if_branches,
                 else_branch,
                 ..
             } => {
                 self.visit_expression(cond);
                 self.visit_block(then_branch);
+                for branch in else_if_branches {
+                    self.visit_expression(&branch.cond);
+                    self.visit_block(&branch.body);
+                }
                 if let Some(else_b) = else_branch {
                     self.visit_block(else_b);
                 }
@@ -62,6 +70,7 @@ pub trait ASTVisitor {
                     self.visit_expression(e);
                 }
             }
+            Statement::Break { .. } | Statement::Continue { .. } => {}
         }
     }
 
@@ -70,6 +79,7 @@ pub trait ASTVisitor {
             Expression::Number(_, _)
             | Expression::Float(_, _)
             | Expression::Bool(_, _)
+            | Expression::StringLiteral(_, _)
             | Expression::Var(_, _) => {}
             Expression::Unary { expr, .. } => self.visit_expression(expr),
             Expression::Binary { left, right, .. } => {

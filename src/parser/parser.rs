@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::lexer::{Token, TokenType};
-use crate::parser::ast::{BinOp, Block, Expression, Program, Statement, TopLevel};
+use crate::parser::ast::{BinOp, Block, ElseIfBranch, Expression, Program, Statement, TopLevel};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -58,6 +58,17 @@ impl Parser {
 
         if self.is_at_end() {
             return None;
+        }
+
+        // if / while / break / continue / return at top-level → parse as a
+        // statement and wrap it so the compiler collects it into main.
+        if self.check(TokenType::If)
+            || self.check(TokenType::While)
+            || self.check(TokenType::Break)
+            || self.check(TokenType::Continue)
+            || self.check(TokenType::Return)
+        {
+            return self.parse_toplevel_statement();
         }
 
         if self.check(TokenType::Identifier) {
@@ -155,6 +166,14 @@ impl Parser {
         })
     }
 
+    /// Wrap a top-level statement (if / while / break / continue / return)
+    /// as a synthetic `__stmt` GlobalVar so the compiler emits it inside main.
+    fn parse_toplevel_statement(&mut self) -> Option<TopLevel> {
+        let stmt = self.parse_statement()?;
+        let pos = stmt.pos();
+        Some(TopLevel::Stmt { stmt, pos })
+    }
+
     fn parse_block(&mut self) -> Block {
         let pos = self.previous().position;
         let mut stmts = Vec::new();
@@ -188,6 +207,12 @@ impl Parser {
             self.parse_return_statement()
         } else if self.match_token(TokenType::While) {
             self.parse_while_statement()
+        } else if self.match_token(TokenType::Break) {
+            let pos = self.previous().position;
+            Some(Statement::Break { pos })
+        } else if self.match_token(TokenType::Continue) {
+            let pos = self.previous().position;
+            Some(Statement::Continue { pos })
         } else if self.check(TokenType::Identifier) {
             let saved_current = self.current;
             self.advance();
@@ -210,17 +235,52 @@ impl Parser {
         self.consume(TokenType::LeftBrace, "Expected '{' after if condition")?;
         let then_branch = self.parse_block();
         self.consume(TokenType::RightBrace, "Expected '}' after if body")?;
-        let else_branch = if self.match_token(TokenType::Else) {
-            self.consume(TokenType::LeftBrace, "Expected '{' after else")?;
-            let block = self.parse_block();
-            self.consume(TokenType::RightBrace, "Expected '}' after else body")?;
-            Some(block)
-        } else {
-            None
-        };
+
+        let mut else_if_branches: Vec<ElseIfBranch> = Vec::new();
+        let mut else_branch: Option<Block> = None;
+
+        // Skip newlines before potential else / else if
+        while self.check(TokenType::Newline) {
+            self.advance();
+        }
+
+        while self.match_token(TokenType::Else) {
+            // Skip newlines after `else`
+            while self.check(TokenType::Newline) {
+                self.advance();
+            }
+
+            if self.match_token(TokenType::If) {
+                // `else if <cond> { ... }`
+                let branch_pos = self.previous().position;
+                let branch_cond = self.parse_expression()?;
+                self.consume(TokenType::LeftBrace, "Expected '{' after else if condition")?;
+                let branch_body = self.parse_block();
+                self.consume(TokenType::RightBrace, "Expected '}' after else if body")?;
+                else_if_branches.push(ElseIfBranch {
+                    cond: branch_cond,
+                    body: branch_body,
+                    pos: branch_pos,
+                });
+
+                // Skip newlines before potential next else / else if
+                while self.check(TokenType::Newline) {
+                    self.advance();
+                }
+            } else {
+                // Plain `else { ... }`
+                self.consume(TokenType::LeftBrace, "Expected '{' after else")?;
+                let block = self.parse_block();
+                self.consume(TokenType::RightBrace, "Expected '}' after else body")?;
+                else_branch = Some(block);
+                break; // nothing can follow a plain else
+            }
+        }
+
         Some(Statement::If {
             cond,
             then_branch,
+            else_if_branches,
             else_branch,
             pos,
         })
@@ -389,12 +449,20 @@ impl Parser {
 
     fn parse_unary(&mut self) -> Option<Expression> {
         if self.match_token(TokenType::Minus) {
-            let op = "-".to_string();
+            let pos = self.previous().position;
             let expr = self.parse_unary()?;
             Some(Expression::Unary {
-                operator: op,
+                operator: "-".to_string(),
                 expr: Box::new(expr),
-                pos: self.previous().position,
+                pos,
+            })
+        } else if self.match_token(TokenType::Not) {
+            let pos = self.previous().position;
+            let expr = self.parse_unary()?;
+            Some(Expression::Unary {
+                operator: "!".to_string(),
+                expr: Box::new(expr),
+                pos,
             })
         } else {
             self.parse_primary()
@@ -406,6 +474,11 @@ impl Parser {
             let prev_token = self.previous();
             let value: i64 = prev_token.lexeme.parse().ok()?;
             Some(Expression::Number(value, prev_token.position))
+        } else if self.match_token(TokenType::StringLit) {
+            let prev_token = self.previous();
+            let s = prev_token.lexeme.clone();
+            let pos = prev_token.position;
+            Some(Expression::StringLiteral(s, pos))
         } else if self.match_token(TokenType::True) {
             Some(Expression::Bool(true, self.previous().position))
         } else if self.match_token(TokenType::False) {

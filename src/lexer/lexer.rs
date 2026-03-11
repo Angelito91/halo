@@ -1,6 +1,6 @@
 // The Halo Programming Language
+// Lexer — converts source text into a token stream
 // Version: 0.2.0
-// Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
@@ -16,62 +16,36 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(input: String) -> Self {
-        let chars: Vec<char> = input.chars().collect();
         Lexer {
-            input: chars,
+            input: input.chars().collect(),
             position: 0,
-            line: 1u32,
-            column: 1u32,
+            line: 1,
+            column: 1,
         }
     }
 
-    // Get the current character without advancing the position
+    // ── Character navigation ──────────────────────────────────────────────────
+
     pub fn current_char(&self) -> Option<char> {
-        if self.position < self.input.len() {
-            Some(self.input[self.position])
-        } else {
-            None
-        }
+        self.input.get(self.position).copied()
     }
 
-    // Peek at the next character without advancing
     pub fn peek_char(&self) -> Option<char> {
-        if self.position + 1 < self.input.len() {
-            Some(self.input[self.position + 1])
-        } else {
-            None
-        }
+        self.input.get(self.position + 1).copied()
     }
 
-    // Get the current character and advance the position
     pub fn next_char(&mut self) -> Option<char> {
-        if self.position < self.input.len() {
-            let c = self.input[self.position];
-            self.position += 1;
-            if c == '\n' {
-                self.line += 1;
-                self.column = 1;
-            } else {
-                self.column += 1;
-            }
-            Some(c)
+        let c = self.input.get(self.position).copied()?;
+        self.position += 1;
+        if c == '\n' {
+            self.line += 1;
+            self.column = 1;
         } else {
-            None
+            self.column += 1;
         }
+        Some(c)
     }
 
-    // Skip whitespace characters
-    pub fn skip_whitespace(&mut self) {
-        while let Some(c) = self.current_char() {
-            if c.is_whitespace() && c != '\n' {
-                self.next_char();
-            } else {
-                break;
-            }
-        }
-    }
-
-    // Get current position
     fn get_position(&self) -> Position {
         Position {
             line: self.line,
@@ -79,15 +53,33 @@ impl Lexer {
         }
     }
 
-    // A way to create simple tokens
-    pub fn simple_token(&mut self, token_type: TokenType, c: char) -> Token {
-        let pos = self.get_position();
-        self.next_char();
-        Token::new(token_type, c.to_string(), pos)
+    // ── Whitespace / comment skipping ─────────────────────────────────────────
+
+    pub fn skip_whitespace(&mut self) {
+        while let Some(c) = self.current_char() {
+            if c != '\n' && c.is_whitespace() {
+                self.next_char();
+            } else {
+                break;
+            }
+        }
     }
 
-    // Check if a word is a keyword and return the appropriate TokenType
-    fn get_keyword_token_type(word: &str) -> Option<TokenType> {
+    fn skip_line_comment(&mut self) {
+        // Caller already verified current == '/' && peek == '/'
+        self.next_char(); // first  /
+        self.next_char(); // second /
+        while let Some(c) = self.current_char() {
+            if c == '\n' {
+                break; // leave the newline for the main loop
+            }
+            self.next_char();
+        }
+    }
+
+    // ── Keyword table ─────────────────────────────────────────────────────────
+
+    fn keyword(word: &str) -> Option<TokenType> {
         match word {
             "if" => Some(TokenType::If),
             "else" => Some(TokenType::Else),
@@ -95,6 +87,8 @@ impl Lexer {
             "return" => Some(TokenType::Return),
             "true" => Some(TokenType::True),
             "false" => Some(TokenType::False),
+            "break" => Some(TokenType::Break),
+            "continue" => Some(TokenType::Continue),
             "and" => Some(TokenType::And),
             "or" => Some(TokenType::Or),
             "not" => Some(TokenType::Not),
@@ -102,38 +96,104 @@ impl Lexer {
         }
     }
 
-    // Skip single-line comments (// ... end of line)
-    fn skip_comment(&mut self) {
-        if self.current_char() == Some('/') && self.peek_char() == Some('/') {
-            self.next_char(); // consume first /
-            self.next_char(); // consume second /
+    // ── Simple single-character token helper ──────────────────────────────────
 
-            // Read until we find newline or EOF
-            while let Some(c) = self.current_char() {
-                if c == '\n' {
-                    // Don't consume the newline, let next_token handle it
-                    break;
-                }
-                self.next_char();
-            }
-        }
+    pub fn simple_token(&mut self, tt: TokenType, c: char) -> Token {
+        let pos = self.get_position();
+        self.next_char();
+        Token::new(tt, c.to_string(), pos)
     }
 
-    // Create next token
-    pub fn next_token(&mut self) -> Token {
-        self.skip_whitespace();
+    // ── String literal tokenizer ──────────────────────────────────────────────
 
-        // Skip comments
-        while self.current_char() == Some('/') && self.peek_char() == Some('/') {
-            self.skip_comment();
+    /// Scan a double-quoted string literal starting after the opening `"`.
+    /// Supports the following escape sequences:
+    ///   \\  →  \
+    ///   \"  →  "
+    ///   \n  →  newline
+    ///   \t  →  tab
+    ///   \r  →  carriage return
+    /// Any other `\x` is left as `\x` (passed through unchanged).
+    fn scan_string(&mut self, pos: Position) -> Token {
+        let mut value = String::new();
+
+        loop {
+            match self.current_char() {
+                None => {
+                    // Unterminated string — emit what we have with Unknown type
+                    // so the parser can surface a meaningful error.
+                    return Token::new(TokenType::Unknown, value, pos);
+                }
+                Some('"') => {
+                    self.next_char(); // consume closing "
+                    break;
+                }
+                Some('\\') => {
+                    self.next_char(); // consume backslash
+                    match self.current_char() {
+                        Some('\\') => {
+                            self.next_char();
+                            value.push('\\');
+                        }
+                        Some('"') => {
+                            self.next_char();
+                            value.push('"');
+                        }
+                        Some('n') => {
+                            self.next_char();
+                            value.push('\n');
+                        }
+                        Some('t') => {
+                            self.next_char();
+                            value.push('\t');
+                        }
+                        Some('r') => {
+                            self.next_char();
+                            value.push('\r');
+                        }
+                        Some(c) => {
+                            self.next_char();
+                            value.push('\\');
+                            value.push(c);
+                        }
+                        None => break,
+                    }
+                }
+                Some('\n') => {
+                    // Newline inside a string — include it and keep scanning.
+                    self.next_char();
+                    value.push('\n');
+                }
+                Some(c) => {
+                    self.next_char();
+                    value.push(c);
+                }
+            }
+        }
+
+        Token::new(TokenType::StringLit, value, pos)
+    }
+
+    // ── Main tokenizer ────────────────────────────────────────────────────────
+
+    pub fn next_token(&mut self) -> Token {
+        // Skip horizontal whitespace and line comments, then repeat.
+        loop {
             self.skip_whitespace();
+            if self.current_char() == Some('/') && self.peek_char() == Some('/') {
+                self.skip_line_comment();
+            } else {
+                break;
+            }
         }
 
         let pos = self.get_position();
 
         match self.current_char() {
-            None => Token::new(TokenType::EOF, String::from("EOF"), pos),
+            // ── EOF ───────────────────────────────────────────────────────────
+            None => Token::new(TokenType::EOF, "EOF".to_string(), pos),
 
+            // ── Identifiers / keywords ────────────────────────────────────────
             Some(c) if c.is_alphabetic() || c == '_' => {
                 let mut ident = String::new();
                 while let Some(c) = self.current_char() {
@@ -144,104 +204,99 @@ impl Lexer {
                         break;
                     }
                 }
-
-                let token_type =
-                    Self::get_keyword_token_type(&ident).unwrap_or(TokenType::Identifier);
-
-                Token::new(token_type, ident, pos)
+                let tt = Self::keyword(&ident).unwrap_or(TokenType::Identifier);
+                Token::new(tt, ident, pos)
             }
 
-            Some(c) if c.is_numeric() => {
-                let mut num_str = String::new();
+            // ── Numeric literals ──────────────────────────────────────────────
+            Some(c) if c.is_ascii_digit() => {
+                let mut num = String::new();
+                let mut has_dot = false;
                 while let Some(c) = self.current_char() {
-                    if c.is_numeric() || c == '.' {
-                        num_str.push(c);
+                    if c.is_ascii_digit() {
+                        num.push(c);
+                        self.next_char();
+                    } else if c == '.'
+                        && !has_dot
+                        && self.peek_char().map_or(false, |p| p.is_ascii_digit())
+                    {
+                        has_dot = true;
+                        num.push(c);
                         self.next_char();
                     } else {
                         break;
                     }
                 }
-
-                Token::new(TokenType::Number, num_str, pos)
+                Token::new(TokenType::Number, num, pos)
             }
 
-            // Two-character operators
+            // ── String literals ───────────────────────────────────────────────
+            Some('"') => {
+                self.next_char(); // consume opening "
+                self.scan_string(pos)
+            }
+
+            // ── Two-character operators ───────────────────────────────────────
             Some('=') => {
                 self.next_char();
                 if self.current_char() == Some('=') {
                     self.next_char();
-                    Token::new(TokenType::Equal, String::from("=="), pos)
+                    Token::new(TokenType::Equal, "==".to_string(), pos)
                 } else {
-                    Token::new(TokenType::Assign, String::from("="), pos)
+                    Token::new(TokenType::Assign, "=".to_string(), pos)
                 }
             }
-
             Some('!') => {
                 self.next_char();
                 if self.current_char() == Some('=') {
                     self.next_char();
-                    Token::new(TokenType::NotEqual, String::from("!="), pos)
+                    Token::new(TokenType::NotEqual, "!=".to_string(), pos)
                 } else {
-                    Token::new(TokenType::Not, String::from("!"), pos)
+                    Token::new(TokenType::Not, "!".to_string(), pos)
                 }
             }
-
             Some('<') => {
                 self.next_char();
                 if self.current_char() == Some('=') {
                     self.next_char();
-                    Token::new(TokenType::LessEqual, String::from("<="), pos)
+                    Token::new(TokenType::LessEqual, "<=".to_string(), pos)
                 } else {
-                    Token::new(TokenType::Less, String::from("<"), pos)
+                    Token::new(TokenType::Less, "<".to_string(), pos)
                 }
             }
-
             Some('>') => {
                 self.next_char();
                 if self.current_char() == Some('=') {
                     self.next_char();
-                    Token::new(TokenType::GreaterEqual, String::from(">="), pos)
+                    Token::new(TokenType::GreaterEqual, ">=".to_string(), pos)
                 } else {
-                    Token::new(TokenType::Greater, String::from(">"), pos)
+                    Token::new(TokenType::Greater, ">".to_string(), pos)
                 }
             }
-
             Some('&') => {
                 self.next_char();
                 if self.current_char() == Some('&') {
                     self.next_char();
-                    Token::new(TokenType::And, String::from("&&"), pos)
+                    Token::new(TokenType::And, "&&".to_string(), pos)
                 } else {
-                    Token::new(TokenType::Unknown, String::from("&"), pos)
+                    Token::new(TokenType::Unknown, "&".to_string(), pos)
                 }
             }
-
             Some('|') => {
                 self.next_char();
                 if self.current_char() == Some('|') {
                     self.next_char();
-                    Token::new(TokenType::Or, String::from("||"), pos)
+                    Token::new(TokenType::Or, "||".to_string(), pos)
                 } else {
-                    Token::new(TokenType::Unknown, String::from("|"), pos)
+                    Token::new(TokenType::Unknown, "|".to_string(), pos)
                 }
             }
 
-            // Single character operators and delimiters
+            // ── Single-character tokens ───────────────────────────────────────
             Some('+') => self.simple_token(TokenType::Plus, '+'),
             Some('-') => self.simple_token(TokenType::Minus, '-'),
             Some('*') => self.simple_token(TokenType::Star, '*'),
-            Some('/') => {
-                // Check if this is a comment (// requires peeking ahead)
-                if self.peek_char() == Some('/') {
-                    // This is a comment, skip it
-                    self.skip_comment();
-                    // Return next token after comment
-                    return self.next_token();
-                } else {
-                    // This is division operator
-                    self.simple_token(TokenType::Slash, '/')
-                }
-            }
+            Some('/') => self.simple_token(TokenType::Slash, '/'),
             Some('%') => self.simple_token(TokenType::Modulo, '%'),
             Some('(') => self.simple_token(TokenType::LeftParen, '('),
             Some(')') => self.simple_token(TokenType::RightParen, ')'),
@@ -252,12 +307,14 @@ impl Lexer {
             Some(':') => self.simple_token(TokenType::Colon, ':'),
             Some(',') => self.simple_token(TokenType::Comma, ','),
             Some('.') => self.simple_token(TokenType::Dot, '.'),
+
+            // ── Newline (statement terminator) ────────────────────────────────
             Some('\n') => {
                 self.next_char();
-                Token::new(TokenType::Newline, String::from("\n"), pos)
+                Token::new(TokenType::Newline, "\n".to_string(), pos)
             }
 
-            // For unknown characters
+            // ── Unknown / invalid character ───────────────────────────────────
             Some(c) => {
                 self.next_char();
                 Token::new(TokenType::Unknown, c.to_string(), pos)

@@ -318,6 +318,9 @@ fn display_ast(program: &parser::ast::Program) {
                     println!("  Initializer: none");
                 }
             }
+            parser::ast::TopLevel::Stmt { stmt, .. } => {
+                println!("  TopLevelStmt: {}", stmt);
+            }
         }
         println!();
     }

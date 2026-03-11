@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use crate::compiler::builder::IRBuilder;
 use crate::compiler::types::TypeMapper;
 use crate::parser::ast::{BinOp, Block, Expression, Program, Statement, TopLevel};
+use inkwell::basic_block::BasicBlock;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CodeGenerator
@@ -30,6 +31,8 @@ pub struct CodeGenerator<'ctx> {
     globals: HashMap<String, GlobalValue<'ctx>>,
     /// Cached format-string globals for printf calls.
     string_globals: HashMap<String, GlobalValue<'ctx>>,
+    /// Stack of (loop_cond_bb, loop_exit_bb) for break/continue support.
+    loop_stack: Vec<(BasicBlock<'ctx>, BasicBlock<'ctx>)>,
 }
 
 impl<'ctx> CodeGenerator<'ctx> {
@@ -45,6 +48,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             functions: HashMap::new(),
             globals: HashMap::new(),
             string_globals: HashMap::new(),
+            loop_stack: Vec::new(),
         }
     }
 
@@ -89,6 +93,11 @@ impl<'ctx> CodeGenerator<'ctx> {
                     if let Some(expr) = init {
                         top_level_stmts.push(Statement::Expr(expr.clone()));
                     }
+                }
+
+                // A bare top-level statement (if, while, break, continue, return).
+                TopLevel::Stmt { stmt, .. } => {
+                    top_level_stmts.push(stmt.clone());
                 }
 
                 TopLevel::GlobalVar { name, init, .. } => {
@@ -302,6 +311,9 @@ impl<'ctx> CodeGenerator<'ctx> {
                 .i1_type()
                 .const_int(if *b { 1 } else { 0 }, false)
                 .into()),
+            Expression::StringLiteral(_, _) => {
+                Err("String literals are not supported as global variable initializers".to_string())
+            }
             _ => Err(format!(
                 "Global variable initializer must be a constant literal"
             )),
@@ -362,26 +374,34 @@ impl<'ctx> CodeGenerator<'ctx> {
                 Ok(false)
             }
 
-            // ── If / else ────────────────────────────────────────────────────
+            // ── If / else if / else ──────────────────────────────────────────
             Statement::If {
                 cond,
                 then_branch,
+                else_if_branches,
                 else_branch,
                 ..
             } => {
+                let merge_bb = self.context.append_basic_block(function, "if.merge");
+
+                // Helper closure: emit a branch to merge_bb if the current
+                // block doesn't already have a terminator.
+                // We track whether every reachable path terminates.
+                let mut all_terminated = true;
+
+                // ── then ──────────────────────────────────────────────────────
                 let cond_val = self.generate_expression(cond)?;
                 let cond_i1 = self.coerce_to_bool(cond_val)?;
 
                 let then_bb = self.context.append_basic_block(function, "if.then");
-                let else_bb = self.context.append_basic_block(function, "if.else");
-                let merge_bb = self.context.append_basic_block(function, "if.merge");
+                // next_bb will be the first else-if or (if none) the else/merge block.
+                let next_bb = self.context.append_basic_block(function, "if.next");
 
                 self.builder
                     .builder
-                    .build_conditional_branch(cond_i1, then_bb, else_bb)
-                    .map_err(|_| "Failed to build conditional branch")?;
+                    .build_conditional_branch(cond_i1, then_bb, next_bb)
+                    .map_err(|_| "Failed to build if conditional branch")?;
 
-                // ── then ──
                 self.builder.builder.position_at_end(then_bb);
                 let then_terminated = self.generate_block(then_branch, function)?;
                 if !then_terminated
@@ -397,37 +417,89 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .build_unconditional_branch(merge_bb)
                         .map_err(|_| "Failed to branch to if.merge from then")?;
                 }
+                if !then_terminated {
+                    all_terminated = false;
+                }
 
-                // ── else ──
-                self.builder.builder.position_at_end(else_bb);
+                // ── else if chains ────────────────────────────────────────────
+                let mut current_next_bb = next_bb;
+                for (idx, branch) in else_if_branches.iter().enumerate() {
+                    self.builder.builder.position_at_end(current_next_bb);
+
+                    let branch_cond_val = self.generate_expression(&branch.cond)?;
+                    let branch_cond_i1 = self.coerce_to_bool(branch_cond_val)?;
+
+                    let branch_then_bb = self
+                        .context
+                        .append_basic_block(function, &format!("elif.then.{}", idx));
+                    let branch_next_bb = self
+                        .context
+                        .append_basic_block(function, &format!("elif.next.{}", idx));
+
+                    self.builder
+                        .builder
+                        .build_conditional_branch(branch_cond_i1, branch_then_bb, branch_next_bb)
+                        .map_err(|_| "Failed to build else-if conditional branch")?;
+
+                    self.builder.builder.position_at_end(branch_then_bb);
+                    let branch_terminated = self.generate_block(&branch.body, function)?;
+                    if !branch_terminated
+                        && self
+                            .builder
+                            .builder
+                            .get_insert_block()
+                            .and_then(|b| b.get_terminator())
+                            .is_none()
+                    {
+                        self.builder
+                            .builder
+                            .build_unconditional_branch(merge_bb)
+                            .map_err(|_| "Failed to branch to if.merge from else-if")?;
+                    }
+                    if !branch_terminated {
+                        all_terminated = false;
+                    }
+
+                    current_next_bb = branch_next_bb;
+                }
+
+                // ── else (or fall-through) ─────────────────────────────────────
+                self.builder.builder.position_at_end(current_next_bb);
                 let else_terminated = if let Some(else_b) = else_branch {
-                    self.generate_block(else_b, function)?
+                    let t = self.generate_block(else_b, function)?;
+                    if !t
+                        && self
+                            .builder
+                            .builder
+                            .get_insert_block()
+                            .and_then(|b| b.get_terminator())
+                            .is_none()
+                    {
+                        self.builder
+                            .builder
+                            .build_unconditional_branch(merge_bb)
+                            .map_err(|_| "Failed to branch to if.merge from else")?;
+                    }
+                    t
                 } else {
-                    false
-                };
-                if !else_terminated
-                    && self
-                        .builder
-                        .builder
-                        .get_insert_block()
-                        .and_then(|b| b.get_terminator())
-                        .is_none()
-                {
+                    // No else branch → fall through to merge.
                     self.builder
                         .builder
                         .build_unconditional_branch(merge_bb)
-                        .map_err(|_| "Failed to branch to if.merge from else")?;
+                        .map_err(|_| "Failed to branch to if.merge (no else)")?;
+                    false
+                };
+
+                if !else_terminated {
+                    all_terminated = false;
                 }
 
-                // If both branches always terminate, the merge block is
-                // unreachable; we still position there so subsequent
-                // statements have somewhere to go, but we report termination.
                 self.builder.builder.position_at_end(merge_bb);
 
-                // The if-statement itself only terminates the enclosing block
-                // when *both* branches terminate AND there is no else-less path.
-                let both_terminated = then_terminated && (else_branch.is_some() && else_terminated);
-                Ok(both_terminated)
+                // Only report termination when every branch (including the
+                // implicit fall-through when there is no else) terminates.
+                let has_else = else_branch.is_some();
+                Ok(all_terminated && has_else)
             }
 
             // ── While loop ───────────────────────────────────────────────────
@@ -452,7 +524,11 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 // ── body ──
                 self.builder.builder.position_at_end(body_bb);
+                // Push loop context so break/continue can find the right blocks.
+                self.loop_stack.push((cond_bb, exit_bb));
                 let body_terminated = self.generate_block(body, function)?;
+                self.loop_stack.pop();
+
                 // Only jump back if the body didn't already terminate.
                 if !body_terminated
                     && self
@@ -470,6 +546,34 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.builder.builder.position_at_end(exit_bb);
                 Ok(false)
+            }
+
+            // ── Break ────────────────────────────────────────────────────────
+            Statement::Break { .. } => {
+                let exit_bb = self
+                    .loop_stack
+                    .last()
+                    .map(|(_, exit)| *exit)
+                    .ok_or_else(|| "`break` used outside of a loop".to_string())?;
+                self.builder
+                    .builder
+                    .build_unconditional_branch(exit_bb)
+                    .map_err(|_| "Failed to build break branch")?;
+                Ok(true)
+            }
+
+            // ── Continue ─────────────────────────────────────────────────────
+            Statement::Continue { .. } => {
+                let cond_bb = self
+                    .loop_stack
+                    .last()
+                    .map(|(cond, _)| *cond)
+                    .ok_or_else(|| "`continue` used outside of a loop".to_string())?;
+                self.builder
+                    .builder
+                    .build_unconditional_branch(cond_bb)
+                    .map_err(|_| "Failed to build continue branch")?;
+                Ok(true)
             }
 
             // ── Return ───────────────────────────────────────────────────────
@@ -510,6 +614,11 @@ impl<'ctx> CodeGenerator<'ctx> {
                 .i1_type()
                 .const_int(if *b { 1 } else { 0 }, false)
                 .into()),
+            // ── String literal ───────────────────────────────────────────────
+            Expression::StringLiteral(s, _) => {
+                let gv = self.get_or_create_string(s, &format!("str.lit.{}", s.len()));
+                Ok(gv.as_pointer_value().into())
+            }
 
             // ── Variable read ────────────────────────────────────────────────
             Expression::Var(name, _) => {
@@ -859,6 +968,15 @@ impl<'ctx> CodeGenerator<'ctx> {
                 .builder
                 .build_call(printf, &[fmt_ptr, fval], "printf_f")
                 .map_err(|_| "Failed to call printf (float)")?;
+        } else if val.is_pointer_value() {
+            // Pointer values are assumed to be null-terminated C strings (%s).
+            let fmt = self.get_or_create_string("%s", "fmt_str");
+            let fmt_ptr: BasicMetadataValueEnum = fmt.as_pointer_value().into();
+            let sval: BasicMetadataValueEnum = val.into_pointer_value().into();
+            self.builder
+                .builder
+                .build_call(printf, &[fmt_ptr, sval], "printf_s")
+                .map_err(|_| "Failed to call printf (string)")?;
         } else {
             // All integer/bool values → widen to i64 and print as %lld.
             let wide = self.widen_to_i64(val)?;
