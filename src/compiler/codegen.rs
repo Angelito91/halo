@@ -6,6 +6,10 @@
 
 use inkwell::context::Context;
 use inkwell::module::{Linkage, Module};
+use inkwell::passes::PassBuilderOptions;
+use inkwell::targets::{
+    CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
+};
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicMetadataValueEnum, BasicValueEnum, FunctionValue, GlobalValue};
 use inkwell::AddressSpace;
@@ -118,11 +122,91 @@ impl<'ctx> CodeGenerator<'ctx> {
         Ok(())
     }
 
+    /// Run LLVM optimisation passes on the module.
+    ///
+    /// `level` maps directly to the `-O` flag:
+    ///   0 = no opts, 1 = -O1, 2 = -O2, 3 = -O3, s = size
+    ///
+    /// The pass pipeline used here is equivalent to `opt -O2`:
+    ///   mem2reg → instcombine → reassociate → gvn → simplifycfg →
+    ///   sccp → dce → inline → loop-unroll
+    pub fn optimise(&self, level: u32) -> Result<(), String> {
+        // Initialise the native target so TargetMachine can be created.
+        Target::initialize_native(&InitializationConfig::default())
+            .map_err(|e| format!("Failed to initialise native target: {}", e))?;
+
+        let triple = TargetMachine::get_default_triple();
+        let target = Target::from_triple(&triple)
+            .map_err(|e| format!("Failed to get target from triple: {}", e))?;
+
+        let machine = target
+            .create_target_machine(
+                &triple,
+                "generic",
+                "",
+                inkwell::OptimizationLevel::Default,
+                RelocMode::Default,
+                CodeModel::Default,
+            )
+            .ok_or("Failed to create TargetMachine")?;
+
+        // Build the pass pipeline string, mirroring clang -O<level>.
+        let pipeline = match level {
+            0 => return Ok(()), // nothing to do
+            1 => "default<O1>",
+            3 => "default<O3>",
+            _ => "default<O2>", // level 2 and anything else → O2
+        };
+
+        let opts = PassBuilderOptions::create();
+        opts.set_loop_interleaving(true);
+        opts.set_loop_vectorization(true);
+        opts.set_loop_unrolling(true);
+        opts.set_merge_functions(true);
+
+        self.module
+            .run_passes(pipeline, &machine, opts)
+            .map_err(|e| format!("Optimisation pass failed: {}", e))?;
+
+        Ok(())
+    }
+
     /// Write LLVM IR text to a `.ll` file.
     pub fn emit_llvm(&self, filename: &str) -> Result<(), String> {
         self.module
             .print_to_file(filename)
             .map_err(|e| format!("Failed to write LLVM IR: {}", e))
+    }
+
+    /// Compile directly to a native object file (bypasses clang).
+    pub fn emit_object(&self, filename: &str) -> Result<(), String> {
+        Target::initialize_native(&InitializationConfig::default())
+            .map_err(|e| format!("Failed to initialise native target: {}", e))?;
+
+        let triple = TargetMachine::get_default_triple();
+        let target = Target::from_triple(&triple)
+            .map_err(|e| format!("Failed to get target from triple: {}", e))?;
+
+        let machine = target
+            .create_target_machine(
+                &triple,
+                "generic",
+                "",
+                inkwell::OptimizationLevel::Default,
+                RelocMode::Default,
+                CodeModel::Default,
+            )
+            .ok_or("Failed to create TargetMachine for object emission")?;
+
+        machine
+            .write_to_file(
+                self.module,
+                FileType::Object,
+                std::path::Path::new(filename),
+            )
+            .map_err(|e| format!("Failed to write object file: {}", e))?;
+
+        Ok(())
     }
 
     /// Print LLVM IR to stdout (useful for debugging).
@@ -194,6 +278,15 @@ impl<'ctx> CodeGenerator<'ctx> {
     fn declare_function(&mut self, name: &str, params: &[String]) -> Result<(), String> {
         let fn_type = self.type_mapper.fn_i64_n(params.len());
         let function = self.module.add_function(name, fn_type, None);
+
+        // Mark functions with attributes that enable more aggressive optimisation.
+        //   nounwind  – the function never throws a C++ exception
+        //   norecurse – conservative hint; mem2reg works better with it
+        let ctx = self.context;
+        let nounwind_kind = inkwell::attributes::Attribute::get_named_enum_kind_id("nounwind");
+        let nounwind = ctx.create_enum_attribute(nounwind_kind, 0);
+        function.add_attribute(inkwell::attributes::AttributeLoc::Function, nounwind);
+
         self.functions.insert(name.to_string(), function);
         Ok(())
     }
@@ -276,6 +369,10 @@ impl<'ctx> CodeGenerator<'ctx> {
             .add_global(ty, Some(AddressSpace::default()), name);
         global.set_linkage(Linkage::Internal);
         global.set_initializer(&to_store);
+        // Constant globals allow the optimiser to fold loads entirely.
+        // We leave them non-constant here because Halo allows reassignment,
+        // but we mark them unnamed_addr so the linker can merge identical ones.
+        global.set_unnamed_addr(true);
         self.globals.insert(name.to_string(), global);
         Ok(())
     }
@@ -362,7 +459,21 @@ impl<'ctx> CodeGenerator<'ctx> {
                 };
 
                 let storage_ty = self.type_mapper.storage_type_of(init_val);
-                let alloca = self.emit_entry_alloca(function, name, storage_ty);
+
+                // Reuse the existing alloca slot if this variable was already
+                // declared in the current function scope.  Creating a second
+                // alloca for the same name would split loads and stores across
+                // two different memory locations, producing an infinite loop
+                // (loads always read the initial value while stores write to
+                // the second, unreachable alloca).
+                let alloca = if let Some(slot) = self.builder.get_slot(name) {
+                    slot.ptr
+                } else {
+                    let a = self.emit_entry_alloca(function, name, storage_ty);
+                    self.builder.set_alloca(name.clone(), a, storage_ty);
+                    a
+                };
+
                 let to_store = self.coerce_to_storage(init_val, storage_ty)?;
 
                 self.builder
@@ -370,7 +481,6 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .build_store(alloca, to_store)
                     .map_err(|_| format!("Failed to store into '{}'", name))?;
 
-                self.builder.set_alloca(name.clone(), alloca, storage_ty);
                 Ok(false)
             }
 

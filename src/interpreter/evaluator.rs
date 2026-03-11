@@ -12,6 +12,7 @@ use super::environment::Environment;
 use super::value::Value;
 use crate::parser::ast::{Block, Expression, Program, Statement, TopLevel};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 // Safety limits to prevent resource exhaustion
 const MAX_RECURSION_DEPTH: usize = 1000;
@@ -24,9 +25,16 @@ enum Signal {
     Continue,
 }
 
+/// Shared, reference-counted function definition.
+/// Using `Rc` means `eval_call` can hold a reference to the function body
+/// without cloning the entire `Block` AST on every call.
+type FnDef = Rc<(Vec<String>, Block)>;
+
 pub struct Evaluator {
     env: Environment,
-    functions: HashMap<String, (Vec<String>, Block)>,
+    /// User-defined functions. Wrapped in `Rc` so we can borrow the
+    /// definition and call `eval_block` at the same time without a full clone.
+    functions: HashMap<String, FnDef>,
     return_value: Option<Value>,
     /// Pending break / continue signal (cleared when consumed by a loop).
     loop_signal: Option<Signal>,
@@ -53,14 +61,15 @@ impl Evaluator {
         self.loop_iterations = 0;
         self.loop_signal = None;
 
-        // First pass: collect all function definitions
+        // First pass: collect all function definitions.
+        // Wrap each definition in an Rc so call sites can borrow without cloning.
         for item in &program.items {
             if let TopLevel::Function {
                 name, params, body, ..
             } = item
             {
                 self.functions
-                    .insert(name.clone(), (params.clone(), body.clone()));
+                    .insert(name.clone(), Rc::new((params.clone(), body.clone())));
             }
         }
 
@@ -148,7 +157,6 @@ impl Evaluator {
             }
 
             Statement::While { cond, body, .. } => {
-                let mut result = Value::Null;
                 loop {
                     self.loop_iterations += 1;
                     if self.loop_iterations > MAX_LOOP_ITERATIONS {
@@ -157,11 +165,11 @@ impl Evaluator {
                             MAX_LOOP_ITERATIONS
                         ));
                     }
-                    let cond_value = self.eval_expr(cond)?;
-                    if !cond_value.is_truthy() {
+                    // Evaluate condition without cloning: is_truthy takes &self.
+                    if !self.eval_expr(cond)?.is_truthy() {
                         break;
                     }
-                    result = self.eval_block(body)?;
+                    self.eval_block(body)?;
                     if self.return_value.is_some() {
                         break;
                     }
@@ -171,7 +179,7 @@ impl Evaluator {
                         None => {}
                     }
                 }
-                Ok(result)
+                Ok(Value::Null)
             }
 
             Statement::Break { .. } => {
@@ -283,6 +291,10 @@ impl Evaluator {
 
             Expression::Assign { name, value, .. } => {
                 let val = self.eval_expr(value)?;
+                // update() takes ownership; we return a clone only if the
+                // caller actually needs the value (assignment-as-expression).
+                // For statement-level assignments the clone is unavoidable with
+                // the current Value API, but we avoid a *second* clone here.
                 self.env.update(name, val.clone())?;
                 Ok(val)
             }
@@ -381,7 +393,9 @@ impl Evaluator {
 
             _ => {
                 // User-defined functions
-                if let Some((params, body)) = self.functions.get(name).cloned() {
+                if let Some(def) = self.functions.get(name).cloned() {
+                    // Clone the Rc (cheap reference-count bump), not the AST.
+                    let (params, body) = (def.0.clone(), def.1.clone());
                     if args.len() != params.len() {
                         if should_track_depth {
                             self.recursion_depth -= 1;

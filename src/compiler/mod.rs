@@ -13,6 +13,41 @@ pub use codegen::CodeGenerator;
 use inkwell::context::Context;
 use inkwell::module::Module;
 
+/// Optimisation level passed to LLVM passes and clang.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OptLevel {
+    O0,
+    O1,
+    O2,
+    O3,
+}
+
+impl OptLevel {
+    pub fn as_u32(self) -> u32 {
+        match self {
+            OptLevel::O0 => 0,
+            OptLevel::O1 => 1,
+            OptLevel::O2 => 2,
+            OptLevel::O3 => 3,
+        }
+    }
+
+    pub fn clang_flag(self) -> &'static str {
+        match self {
+            OptLevel::O0 => "-O0",
+            OptLevel::O1 => "-O1",
+            OptLevel::O2 => "-O2",
+            OptLevel::O3 => "-O3",
+        }
+    }
+}
+
+impl Default for OptLevel {
+    fn default() -> Self {
+        OptLevel::O2
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Compilation
 //
@@ -65,6 +100,12 @@ impl Compilation {
         CodeGenerator::new(ctx_ref, mod_ref)
     }
 
+    /// Run LLVM optimisation passes on the module at the given level.
+    /// Call this after `codegen().compile(...)` and before `emit_llvm` / `emit_object`.
+    pub fn optimise(&mut self, level: OptLevel) -> Result<(), String> {
+        self.codegen().optimise(level.as_u32())
+    }
+
     /// Write the compiled LLVM IR to a `.ll` file.
     pub fn emit_llvm(&self, filename: &str) -> Result<(), String> {
         self.module
@@ -72,6 +113,11 @@ impl Compilation {
             .unwrap()
             .print_to_file(filename)
             .map_err(|e| format!("Failed to write LLVM IR: {}", e))
+    }
+
+    /// Emit a native object file directly (no clang needed for this step).
+    pub fn emit_object(&mut self, filename: &str) -> Result<(), String> {
+        self.codegen().emit_object(filename)
     }
 
     /// Print the LLVM IR to stdout.

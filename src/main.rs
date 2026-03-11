@@ -15,7 +15,7 @@ mod interpreter;
 mod lexer;
 mod parser;
 
-use compiler::Compilation;
+use compiler::{Compilation, OptLevel};
 use interpreter::Evaluator;
 use lexer::Lexer;
 use lexer::TokenType;
@@ -35,6 +35,8 @@ struct Args {
     run: bool,
     /// -o <path>  : output path for --compile / --run
     output: Option<String>,
+    /// --opt-level <0-3> : LLVM optimisation level (default: 2)
+    opt_level: OptLevel,
 }
 
 /// Parses command-line arguments
@@ -53,6 +55,7 @@ fn parse_args() -> Result<Args, String> {
     let mut emit_llvm = false;
     let mut run = false;
     let mut output: Option<String> = None;
+    let mut opt_level = OptLevel::O2;
 
     let mut i = 1;
     while i < args.len() {
@@ -70,6 +73,24 @@ fn parse_args() -> Result<Args, String> {
                 }
                 output = Some(args[i].clone());
             }
+            "--opt-level" | "-O" => {
+                i += 1;
+                if i >= args.len() {
+                    return Err("Expected level (0-3) after --opt-level".to_string());
+                }
+                opt_level = match args[i].as_str() {
+                    "0" => OptLevel::O0,
+                    "1" => OptLevel::O1,
+                    "2" => OptLevel::O2,
+                    "3" => OptLevel::O3,
+                    other => return Err(format!("Invalid opt-level '{}', expected 0-3", other)),
+                };
+            }
+            // Compact forms: -O0  -O1  -O2  -O3
+            "-O0" => opt_level = OptLevel::O0,
+            "-O1" => opt_level = OptLevel::O1,
+            "-O2" => opt_level = OptLevel::O2,
+            "-O3" => opt_level = OptLevel::O3,
             "--help" | "-h" => {
                 print_help();
                 process::exit(0);
@@ -101,6 +122,7 @@ fn parse_args() -> Result<Args, String> {
         emit_llvm,
         run,
         output,
+        opt_level,
     })
 }
 
@@ -121,6 +143,7 @@ fn print_help() {
     println!("        --emit-llvm    Write LLVM IR (.ll) next to the source file");
     println!("    -r, --run          Compile and run immediately (uses a temp binary)");
     println!("    -o <path>          Output path for --compile or --run");
+    println!("    -O, --opt-level N  LLVM optimisation level: 0=none 1 2 3 (default: 2)");
     println!("    -h, --help         Print this help message");
     println!("    -V, --version      Print version information\n");
 
@@ -130,6 +153,7 @@ fn print_help() {
     println!("    halo --compile -o out script.halo  Compile to ./out");
     println!("    halo --emit-llvm script.halo       Emit script.ll");
     println!("    halo --run script.halo             Compile and run immediately");
+    println!("    halo --run -O3 script.halo         Compile with max optimisation and run");
     println!("    halo --ast script.halo             Show AST then interpret\n");
 
     println!("FILE EXTENSION:");
@@ -190,6 +214,7 @@ fn compile_program(
     source_path: &str,
     output_path: Option<&str>,
     emit_llvm: bool,
+    opt_level: OptLevel,
     verbose: bool,
 ) -> Result<String, String> {
     // Derive default output paths from the source file name
@@ -212,6 +237,21 @@ fn compile_program(
     comp.codegen()
         .compile(program)
         .map_err(|e| format!("Code generation error: {}", e))?;
+
+    // Run LLVM optimisation passes before emitting.
+    if opt_level != OptLevel::O0 {
+        if verbose {
+            println!(
+                "⚡ Running LLVM optimisation passes (O{})...",
+                opt_level.as_u32()
+            );
+        }
+        comp.optimise(opt_level)
+            .map_err(|e| format!("Optimisation error: {}", e))?;
+        if verbose {
+            println!("✅ Optimisation done\n");
+        }
+    }
 
     if verbose {
         println!("✅ LLVM IR generated\n");
@@ -244,7 +284,7 @@ fn compile_program(
     }
 
     let clang_status = std::process::Command::new("clang")
-        .args([&ll_path, "-o", &bin_path, "-lm"])
+        .args([&ll_path, opt_level.clang_flag(), "-o", &bin_path, "-lm"])
         .status()
         .map_err(|e| format!("Failed to invoke clang: {}. Is clang installed?", e))?;
 
@@ -418,6 +458,7 @@ fn main() {
             &args.file_path,
             args.output.as_deref(),
             args.emit_llvm,
+            args.opt_level,
             args.verbose,
         ) {
             Ok(path) => path,

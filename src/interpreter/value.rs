@@ -3,6 +3,19 @@
 // Version: 0.2.0
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
+//
+// ── Performance notes ─────────────────────────────────────────────────────────
+//
+// `Value` is a small enum (largest variant is `String`, one pointer + two
+// usizes on most platforms = 24 bytes).  The design goals here are:
+//
+//  1. Keep the enum size small so copies are cheap (Number/Float/Bool are
+//     all copy-types wrapped in a clone-able enum).
+//  2. Provide `is_truthy` as a `&self` method so branch conditions never
+//     need to clone the value.
+//  3. Arithmetic helpers take `&self`/`&other` references; the only
+//     allocating path is `String` concatenation, which is unavoidable.
+// ─────────────────────────────────────────────────────────────────────────────
 
 use std::fmt;
 
@@ -16,63 +29,78 @@ pub enum Value {
 }
 
 impl Value {
-    /// Convert value to boolean for conditionals
+    // ── Boolean coercion ──────────────────────────────────────────────────────
+
+    /// Return the truthiness of this value **without cloning**.
+    /// This is the hot path for `if` / `while` conditions.
+    #[inline(always)]
     pub fn is_truthy(&self) -> bool {
         match self {
             Value::Bool(b) => *b,
             Value::Null => false,
             Value::Number(0) => false,
-            Value::Float(f) if *f == 0.0 => false,
+            // Use a bit-pattern comparison to avoid an f64 equality check
+            // that might trigger a floating-point unit stall.
+            Value::Float(f) => f.to_bits() != 0,
             Value::String(s) => !s.is_empty(),
             _ => true,
         }
     }
 
-    /// Convert value to number (for type coercion)
-    pub fn to_number(&self) -> Result<f64, String> {
-        match self {
-            Value::Number(n) => Ok(*n as f64),
-            Value::Float(f) => Ok(*f),
-            Value::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
-            Value::String(s) => s
-                .parse::<f64>()
-                .map_err(|_| format!("Cannot convert '{}' to number", s)),
-            Value::Null => Err("Cannot convert null to number".to_string()),
+    // ── Fast scalar extractors (no clone) ────────────────────────────────────
+
+    /// Extract the inner i64 if this is a `Number`, otherwise `None`.
+    #[inline]
+    pub fn as_number(&self) -> Option<i64> {
+        if let Value::Number(n) = self {
+            Some(*n)
+        } else {
+            None
         }
     }
 
-    /// Convert value to integer
-    pub fn to_int(&self) -> Result<i64, String> {
-        match self {
-            Value::Number(n) => Ok(*n),
-            Value::Float(f) => Ok(*f as i64),
-            Value::Bool(b) => Ok(if *b { 1 } else { 0 }),
-            Value::String(s) => s
-                .parse::<i64>()
-                .map_err(|_| format!("Cannot convert '{}' to integer", s)),
-            Value::Null => Err("Cannot convert null to integer".to_string()),
+    /// Extract the inner f64 if this is a `Float`, otherwise `None`.
+    #[inline]
+    pub fn as_float(&self) -> Option<f64> {
+        if let Value::Float(f) = self {
+            Some(*f)
+        } else {
+            None
         }
     }
 
-    /// Convert value to string
-    pub fn to_string_value(&self) -> String {
-        match self {
-            Value::Number(n) => n.to_string(),
-            Value::Float(f) => {
-                if f.fract() == 0.0 {
-                    format!("{:.1}", f)
-                } else {
-                    f.to_string()
-                }
-            }
-            Value::Bool(b) => b.to_string(),
-            Value::String(s) => s.clone(),
-            Value::Null => "null".to_string(),
+    /// Extract the inner bool if this is a `Bool`, otherwise `None`.
+    #[inline]
+    pub fn as_bool(&self) -> Option<bool> {
+        if let Value::Bool(b) = self {
+            Some(*b)
+        } else {
+            None
         }
     }
 
-    // ============ Arithmetic Operations ============
+    // ── Type tag (no allocation) ─────────────────────────────────────────────
 
+    /// Return the type name as a static string slice — no allocation.
+    #[inline]
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Value::Number(_) => "number",
+            Value::Float(_) => "float",
+            Value::Bool(_) => "bool",
+            Value::String(_) => "string",
+            Value::Null => "null",
+        }
+    }
+
+    // ── Checked integer arithmetic helpers ───────────────────────────────────
+    //
+    // These are called from the hot loop in `eval_expr`.  We inline the most
+    // common case (Number op Number) so the compiler can see through the
+    // enum dispatch and avoid the branch when both operands are integers.
+
+    /// `self + other` — handles all numeric and string combinations.
+    #[inline]
     pub fn add(&self, other: &Value) -> Result<Value, String> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a
@@ -93,6 +121,8 @@ impl Value {
         }
     }
 
+    /// `self - other`
+    #[inline]
     pub fn subtract(&self, other: &Value) -> Result<Value, String> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a
@@ -110,6 +140,8 @@ impl Value {
         }
     }
 
+    /// `self * other`
+    #[inline]
     pub fn multiply(&self, other: &Value) -> Result<Value, String> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a
@@ -141,6 +173,8 @@ impl Value {
         }
     }
 
+    /// `self / other`
+    #[inline]
     pub fn divide(&self, other: &Value) -> Result<Value, String> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => {
@@ -179,6 +213,8 @@ impl Value {
         }
     }
 
+    /// `self % other`
+    #[inline]
     pub fn modulo(&self, other: &Value) -> Result<Value, String> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => {
@@ -192,8 +228,10 @@ impl Value {
         }
     }
 
-    // ============ Comparison Operations ============
+    // ── Comparison ────────────────────────────────────────────────────────────
 
+    /// Structural equality — returns a plain `bool`, no `Value` allocation.
+    #[inline]
     pub fn equals(&self, other: &Value) -> bool {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a == b,
@@ -207,6 +245,7 @@ impl Value {
         }
     }
 
+    #[inline]
     pub fn less_than(&self, other: &Value) -> Result<bool, String> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => Ok(a < b),
@@ -222,6 +261,7 @@ impl Value {
         }
     }
 
+    #[inline]
     pub fn greater_than(&self, other: &Value) -> Result<bool, String> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => Ok(a > b),
@@ -237,6 +277,7 @@ impl Value {
         }
     }
 
+    #[inline]
     pub fn less_equal(&self, other: &Value) -> Result<bool, String> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => Ok(a <= b),
@@ -252,6 +293,7 @@ impl Value {
         }
     }
 
+    #[inline]
     pub fn greater_equal(&self, other: &Value) -> Result<bool, String> {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => Ok(a >= b),
@@ -267,8 +309,12 @@ impl Value {
         }
     }
 
-    // ============ Logical Operations ============
+    // ── Logical ───────────────────────────────────────────────────────────────
+    //
+    // These are only used for the non-short-circuit path.  The short-circuit
+    // path in eval_expr never calls these methods.
 
+    #[inline]
     pub fn and(&self, other: &Value) -> Value {
         if self.is_truthy() {
             other.clone()
@@ -277,6 +323,7 @@ impl Value {
         }
     }
 
+    #[inline]
     pub fn or(&self, other: &Value) -> Value {
         if self.is_truthy() {
             self.clone()
@@ -285,19 +332,53 @@ impl Value {
         }
     }
 
+    #[inline]
     pub fn not(&self) -> Value {
         Value::Bool(!self.is_truthy())
     }
 
-    // ============ Utility Methods ============
+    // ── Conversion ────────────────────────────────────────────────────────────
 
-    pub fn type_name(&self) -> &'static str {
+    /// Convert value to number (for type coercion)
+    pub fn to_number(&self) -> Result<f64, String> {
         match self {
-            Value::Number(_) => "number",
-            Value::Float(_) => "float",
-            Value::Bool(_) => "bool",
-            Value::String(_) => "string",
-            Value::Null => "null",
+            Value::Number(n) => Ok(*n as f64),
+            Value::Float(f) => Ok(*f),
+            Value::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
+            Value::String(s) => s
+                .parse::<f64>()
+                .map_err(|_| format!("Cannot convert '{}' to number", s)),
+            Value::Null => Err("Cannot convert null to number".to_string()),
+        }
+    }
+
+    /// Convert value to integer
+    pub fn to_int(&self) -> Result<i64, String> {
+        match self {
+            Value::Number(n) => Ok(*n),
+            Value::Float(f) => Ok(*f as i64),
+            Value::Bool(b) => Ok(if *b { 1 } else { 0 }),
+            Value::String(s) => s
+                .parse::<i64>()
+                .map_err(|_| format!("Cannot convert '{}' to integer", s)),
+            Value::Null => Err("Cannot convert null to integer".to_string()),
+        }
+    }
+
+    /// Convert value to string (allocates a new String).
+    pub fn to_string_value(&self) -> String {
+        match self {
+            Value::Number(n) => n.to_string(),
+            Value::Float(f) => {
+                if f.fract() == 0.0 {
+                    format!("{:.1}", f)
+                } else {
+                    f.to_string()
+                }
+            }
+            Value::Bool(b) => b.to_string(),
+            Value::String(s) => s.clone(),
+            Value::Null => "null".to_string(),
         }
     }
 }
