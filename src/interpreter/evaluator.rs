@@ -37,7 +37,7 @@ use std::rc::Rc;
 #[cfg(not(test))]
 const MAX_RECURSION_DEPTH: usize = 500;
 #[cfg(test)]
-const MAX_RECURSION_DEPTH: usize = 50;
+const MAX_RECURSION_DEPTH: usize = 15;
 const MAX_LOOP_ITERATIONS: u64 = 1_000_000;
 
 // ── Control-flow signals ──────────────────────────────────────────────────────
