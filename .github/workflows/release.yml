@@ -5,28 +5,21 @@
 #   build   — compile for each target platform (matrix)
 #   release — create a GitHub Release and upload all artifacts
 #
-# Supported targets:
-#   Linux   x86_64   (ubuntu-24.04,     native)
-#   Linux   aarch64  (ubuntu-24.04-arm, native ARM runner)
-#   macOS   x86_64   (macos-13,         native Intel runner)
-#   macOS   aarch64  (macos-14,         native Apple Silicon)
-#   Windows x86_64   (windows-2022,     native)
+# Supported targets (all built natively, no cross-compilation):
+#   Linux   x86_64   (ubuntu-24.04)
+#   Linux   aarch64  (ubuntu-24.04-arm)
+#   macOS   x86_64   (macos-13, Intel)
+#   macOS   aarch64  (macos-14, Apple Silicon)
+#   Windows x86_64   (windows-2022)
 #
-# Why one native runner per architecture instead of cross-compilation?
-#   inkwell/llvm-sys compiles C++ glue code via a build.rs and links against
-#   libLLVM at BUILD time. Both the compiled objects and the linked library
-#   must match the HOST architecture of the runner process. Attempting to
-#   cross-compile from arm64→x86_64 on macos-14 produces:
-#     "found architecture 'arm64', required architecture 'x86_64'"
-#   because llvm-sys built its .rlib for arm64. There is no workaround short
-#   of providing a full x86_64 sysroot + x86_64 libLLVM, which is equivalent
-#   to running a native x86_64 runner. Same reasoning applies to Linux aarch64
-#   (ubuntu-24.04-arm) and Windows (windows-2022).
+# Why native runners? inkwell/llvm-sys compiles C++ glue code and links against
+# libLLVM at build time. Both the compiled objects and the linked library must
+# match the host architecture. Cross-compilation from ARM64 → x86_64 would
+# require a full x86_64 sysroot + libLLVM, which is equivalent to a native runner.
 #
-# macos-13 note:
-#   macos-13 is the last GitHub-hosted Intel runner. It may occasionally be
-#   slow to provision; continue-on-error: true is set so a transient runner
-#   shortage does not block the rest of the release.
+# macos-13 note: this is the last GitHub-hosted Intel runner. It may occasionally
+# be slow to provision; continue-on-error: true is set so a transient shortage
+# does not block the rest of the release.
 
 name: Release
 
@@ -71,12 +64,10 @@ jobs:
             archive_ext: tar.gz
 
           # ── macOS x86_64 (Intel, native) ──────────────────────────────────────
-          # Must use a native x86_64 runner — llvm-sys compiles C++ objects for
-          # the host arch; cross-compiling from arm64 produces an arch mismatch
-          # at link time. continue-on-error guards against transient runner
-          # provisioning failures on the aging macos-13 pool.
+          # Must use macos-13, the last Intel runner. continue-on-error guards
+          # against transient provisioning failures.
           - target: x86_64-apple-darwin
-            runner: macos-14
+            runner: macos-13
             continue-on-error: true
             archive_ext: tar.gz
 
@@ -99,12 +90,11 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/llvm-21.list
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends ${{ matrix.llvm_pkg }}
-
       - name: Set LLVM env (Linux)
         if: runner.os == 'Linux'
         run: |
           echo "LLVM_SYS_211_PREFIX=${{ matrix.llvm_prefix }}" >> "$GITHUB_ENV"
-          echo "PATH=${{ matrix.llvm_prefix }}/bin:$PATH"      >> "$GITHUB_ENV"
+          echo "${{ matrix.llvm_prefix }}/bin" >> "$GITHUB_PATH"
 
       # ── LLVM setup — macOS ───────────────────────────────────────────────────
       - name: Install LLVM 21 (macOS)
@@ -112,31 +102,40 @@ jobs:
         run: |
           brew update
           brew install llvm@21
-
       - name: Set LLVM env (macOS)
         if: runner.os == 'macOS'
         run: |
           LLVM_PREFIX="$(brew --prefix llvm@21)"
           echo "LLVM_SYS_211_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
-          echo "PATH=${LLVM_PREFIX}/bin:$PATH"       >> "$GITHUB_ENV"
-          echo "LDFLAGS=-L${LLVM_PREFIX}/lib"        >> "$GITHUB_ENV"
-          echo "CPPFLAGS=-I${LLVM_PREFIX}/include"   >> "$GITHUB_ENV"
+          echo "${LLVM_PREFIX}/bin" >> "$GITHUB_PATH"
+          echo "LDFLAGS=-L${LLVM_PREFIX}/lib" >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I${LLVM_PREFIX}/include" >> "$GITHUB_ENV"
 
-      # ── LLVM setup — Windows ─────────────────────────────────────────────────
-      # winget is not available on windows-2022 runners.
-      # Download the official LLVM 21.1.0 installer from llvm/llvm-project
-      # releases and run it silently with the NSIS /S /D flags.
-      # We install to C:\LLVM (no spaces) to avoid path-quoting issues.
+      # ── LLVM setup — Windows (dynamic version detection) ────────────────────
+      - name: Get latest LLVM 21 version (Windows)
+        if: runner.os == 'Windows'
+        id: llvm-version
+        shell: pwsh
+        run: |
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/llvm/llvm-project/releases"
+          $latest21 = $releases | Where-Object { $_.tag_name -like "llvmorg-21.*" } | Select-Object -First 1
+          if (-not $latest21) {
+            Write-Error "No LLVM 21 release found"
+            exit 1
+          }
+          $version = $latest21.tag_name -replace 'llvmorg-', ''
+          Write-Host "Latest LLVM 21 version: $version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
       - name: Install LLVM 21 (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $url       = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.0/LLVM-21.1.0-win64.exe"
-          $installer = "$env:TEMP\LLVM-21.1.0-win64.exe"
-          Write-Host "Downloading LLVM 21.1.0..."
+          $version = "${{ steps.llvm-version.outputs.version }}"
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-win64.exe"
+          $installer = "$env:TEMP\LLVM-$version-win64.exe"
+          Write-Host "Downloading LLVM $version from $url"
           Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
           Write-Host "Running silent installer to C:\LLVM ..."
-          # /S = silent, /D = destination (must be last, no quotes around path)
           $proc = Start-Process -FilePath $installer `
                                 -ArgumentList "/S /D=C:\LLVM" `
                                 -Wait -PassThru
@@ -151,7 +150,6 @@ jobs:
           }
           $ver = & "C:\LLVM\bin\llvm-config.exe" --version
           Write-Host "Installed LLVM $ver"
-
       - name: Set LLVM env (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -167,20 +165,25 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      # ── Cargo cache ──────────────────────────────────────────────────────────
-      - name: Cache Cargo registry & build
-        uses: actions/cache@v4
+      # ── Cargo cache (optimized with Swatinem/rust-cache) ─────────────────────
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: release-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: release-${{ matrix.target }}-
+          key: release-${{ matrix.target }}
 
       # ── Compile ──────────────────────────────────────────────────────────────
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
+
+      # ── Quick test (verify binary runs) ──────────────────────────────────────
+      - name: Test binary
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            ./target/${{ matrix.target }}/release/${BINARY_NAME}.exe --version
+          else
+            ./target/${{ matrix.target }}/release/${BINARY_NAME} --version
+          fi
+        shell: bash
 
       # ── Package — Linux / macOS (tar.gz) ─────────────────────────────────────
       - name: Package (tar.gz)
@@ -203,7 +206,6 @@ jobs:
           echo "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       # ── Compute SHA-256 checksum ─────────────────────────────────────────────
-      # macOS ships 'shasum' instead of 'sha256sum' — use a portable fallback.
       - name: Checksum (Linux / macOS)
         if: runner.os != 'Windows'
         shell: bash
@@ -213,7 +215,6 @@ jobs:
           else
             shasum -a 256 "${{ env.ASSET }}" > "${{ env.ASSET }}.sha256"
           fi
-
       - name: Checksum (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
