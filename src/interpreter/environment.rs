@@ -1,6 +1,6 @@
 // The Halo Programming Language
 // Environment for variable scoping
-// Version: 0.1.0
+// Version: 0.2.0
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
@@ -59,11 +59,6 @@ impl Environment {
         if self.scopes.len() > 1 {
             self.scopes.pop();
         }
-    }
-
-    /// Get current scope depth
-    pub fn depth(&self) -> usize {
-        self.scopes.len()
     }
 }
 
@@ -136,20 +131,5 @@ mod tests {
         let mut env = Environment::new();
         env.update("x", Value::Number(42)).unwrap();
         assert_eq!(env.get("x"), Some(Value::Number(42)));
-    }
-
-    #[test]
-    fn test_scope_depth() {
-        let mut env = Environment::new();
-        assert_eq!(env.depth(), 1);
-
-        env.push_scope();
-        assert_eq!(env.depth(), 2);
-
-        env.push_scope();
-        assert_eq!(env.depth(), 3);
-
-        env.pop_scope();
-        assert_eq!(env.depth(), 2);
     }
 }

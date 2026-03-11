@@ -1,8 +1,12 @@
 // The Halo Programming Language
 // AST Evaluator and Interpreter
-// Version: 0.1.0
+// Version: 0.2.0
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
+//
+// This module implements the tree-walking interpreter for the Halo language.
+// It maintains proper recursion depth tracking and loop iteration counting
+// to prevent resource exhaustion attacks.
 
 use super::environment::Environment;
 use super::value::Value;
@@ -175,32 +179,60 @@ impl Evaluator {
             Expression::Binary {
                 left, op, right, ..
             } => {
-                let left_val = self.eval_expr(left)?;
-
-                let right_val = self.eval_expr(right)?;
-
+                // Implement short-circuit evaluation for logical operators
                 match op {
-                    crate::parser::ast::BinOp::Add => left_val.add(&right_val),
-                    crate::parser::ast::BinOp::Sub => left_val.subtract(&right_val),
-                    crate::parser::ast::BinOp::Mul => left_val.multiply(&right_val),
-                    crate::parser::ast::BinOp::Div => left_val.divide(&right_val),
-                    crate::parser::ast::BinOp::Mod => left_val.modulo(&right_val),
-                    crate::parser::ast::BinOp::Eq => Ok(Value::Bool(left_val.equals(&right_val))),
-                    crate::parser::ast::BinOp::Neq => Ok(Value::Bool(!left_val.equals(&right_val))),
-                    crate::parser::ast::BinOp::Lt => {
-                        Ok(Value::Bool(left_val.less_than(&right_val)?))
+                    crate::parser::ast::BinOp::And => {
+                        let left_val = self.eval_expr(left)?;
+                        // Short-circuit: if left is falsy, don't evaluate right
+                        if !left_val.is_truthy() {
+                            return Ok(left_val);
+                        }
+                        let right_val = self.eval_expr(right)?;
+                        Ok(left_val.and(&right_val))
                     }
-                    crate::parser::ast::BinOp::Gt => {
-                        Ok(Value::Bool(left_val.greater_than(&right_val)?))
+                    crate::parser::ast::BinOp::Or => {
+                        let left_val = self.eval_expr(left)?;
+                        // Short-circuit: if left is truthy, don't evaluate right
+                        if left_val.is_truthy() {
+                            return Ok(left_val);
+                        }
+                        let right_val = self.eval_expr(right)?;
+                        Ok(left_val.or(&right_val))
                     }
-                    crate::parser::ast::BinOp::Le => {
-                        Ok(Value::Bool(left_val.less_equal(&right_val)?))
+                    _ => {
+                        // For all other operators, evaluate both sides
+                        let left_val = self.eval_expr(left)?;
+                        let right_val = self.eval_expr(right)?;
+
+                        match op {
+                            crate::parser::ast::BinOp::Add => left_val.add(&right_val),
+                            crate::parser::ast::BinOp::Sub => left_val.subtract(&right_val),
+                            crate::parser::ast::BinOp::Mul => left_val.multiply(&right_val),
+                            crate::parser::ast::BinOp::Div => left_val.divide(&right_val),
+                            crate::parser::ast::BinOp::Mod => left_val.modulo(&right_val),
+                            crate::parser::ast::BinOp::Eq => {
+                                Ok(Value::Bool(left_val.equals(&right_val)))
+                            }
+                            crate::parser::ast::BinOp::Neq => {
+                                Ok(Value::Bool(!left_val.equals(&right_val)))
+                            }
+                            crate::parser::ast::BinOp::Lt => {
+                                Ok(Value::Bool(left_val.less_than(&right_val)?))
+                            }
+                            crate::parser::ast::BinOp::Gt => {
+                                Ok(Value::Bool(left_val.greater_than(&right_val)?))
+                            }
+                            crate::parser::ast::BinOp::Le => {
+                                Ok(Value::Bool(left_val.less_equal(&right_val)?))
+                            }
+                            crate::parser::ast::BinOp::Ge => {
+                                Ok(Value::Bool(left_val.greater_equal(&right_val)?))
+                            }
+                            crate::parser::ast::BinOp::And | crate::parser::ast::BinOp::Or => {
+                                unreachable!("AND/OR should be handled above")
+                            }
+                        }
                     }
-                    crate::parser::ast::BinOp::Ge => {
-                        Ok(Value::Bool(left_val.greater_equal(&right_val)?))
-                    }
-                    crate::parser::ast::BinOp::And => Ok(left_val.and(&right_val)),
-                    crate::parser::ast::BinOp::Or => Ok(left_val.or(&right_val)),
                 }
             }
 
@@ -225,7 +257,8 @@ impl Evaluator {
     /// Evaluate a function call
     fn eval_call(&mut self, name: &str, args: &[Expression]) -> Result<Value, String> {
         // Check recursion depth for user-defined functions
-        if !self.is_builtin_function(name) {
+        let should_track_depth = !self.is_builtin_function(name);
+        if should_track_depth {
             self.recursion_depth += 1;
             if self.recursion_depth > MAX_RECURSION_DEPTH {
                 self.recursion_depth -= 1;
@@ -305,6 +338,9 @@ impl Evaluator {
                 // User-defined functions
                 if let Some((params, body)) = self.functions.get(name).cloned() {
                     if args.len() != params.len() {
+                        if should_track_depth {
+                            self.recursion_depth -= 1;
+                        }
                         return Err(format!(
                             "Function '{}' expects {} arguments, got {}",
                             name,
@@ -317,26 +353,54 @@ impl Evaluator {
                     self.env.push_scope();
 
                     // Evaluate arguments and bind to parameters
+                    let mut eval_error = None;
                     for (param, arg) in params.iter().zip(args.iter()) {
-                        let arg_val = self.eval_expr(arg)?;
-                        self.env.set(param.clone(), arg_val);
+                        match self.eval_expr(arg) {
+                            Ok(arg_val) => self.env.set(param.clone(), arg_val),
+                            Err(e) => {
+                                eval_error = Some(e);
+                                break;
+                            }
+                        }
+                    }
+
+                    if let Some(e) = eval_error {
+                        self.env.pop_scope();
+                        if should_track_depth {
+                            self.recursion_depth -= 1;
+                        }
+                        return Err(e);
                     }
 
                     // Execute function body
                     self.return_value = None;
-                    let _ = self.eval_block(&body)?;
+                    let block_result = self.eval_block(&body);
 
-                    // Get return value
-                    let result = self.return_value.take().unwrap_or(Value::Null);
+                    // Get return value (even if error occurs)
+                    let result = match block_result {
+                        Ok(_) => self.return_value.take().unwrap_or(Value::Null),
+                        Err(e) => {
+                            self.env.pop_scope();
+                            if should_track_depth {
+                                self.recursion_depth -= 1;
+                            }
+                            return Err(e);
+                        }
+                    };
 
                     // Exit function scope
                     self.env.pop_scope();
 
                     // Decrement recursion depth
-                    self.recursion_depth -= 1;
+                    if should_track_depth {
+                        self.recursion_depth -= 1;
+                    }
 
                     Ok(result)
                 } else {
+                    if should_track_depth {
+                        self.recursion_depth -= 1;
+                    }
                     Err(format!("Undefined function: '{}'", name))
                 }
             }
