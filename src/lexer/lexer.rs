@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.1.0
+// Version: 0.2.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -212,7 +212,7 @@ impl Lexer {
                     self.next_char();
                     Token::new(TokenType::And, String::from("&&"), pos)
                 } else {
-                    Token::new(TokenType::Identifier, String::from("& UNKNOWN"), pos)
+                    Token::new(TokenType::Unknown, String::from("&"), pos)
                 }
             }
 
@@ -222,7 +222,7 @@ impl Lexer {
                     self.next_char();
                     Token::new(TokenType::Or, String::from("||"), pos)
                 } else {
-                    Token::new(TokenType::Identifier, String::from("| UNKNOWN"), pos)
+                    Token::new(TokenType::Unknown, String::from("|"), pos)
                 }
             }
 
@@ -260,7 +260,7 @@ impl Lexer {
             // For unknown characters
             Some(c) => {
                 self.next_char();
-                Token::new(TokenType::Identifier, format!("{} UNKNOWN", c), pos)
+                Token::new(TokenType::Unknown, c.to_string(), pos)
             }
         }
     }

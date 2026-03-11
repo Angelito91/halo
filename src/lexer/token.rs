@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.1.0
+// Version: 0.2.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -7,6 +7,7 @@
 use crate::parser::ast::Position;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)]
 pub enum TokenType {
     // Special Words
     If,
@@ -51,9 +52,12 @@ pub enum TokenType {
     Dot,          // .
 
     // Special
+    #[allow(dead_code)]
     Whitespace,
+    #[allow(dead_code)]
     Comment,
     Newline, // For statement termination without ;
+    Unknown, // For invalid/unknown characters
     EOF,
 }
 
