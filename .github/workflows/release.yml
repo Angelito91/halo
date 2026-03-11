@@ -40,18 +40,14 @@ jobs:
             cross: false
             llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
             llvm_prefix: /usr/lib/llvm-21
-            llvm_env: LLVM_SYS_210_PREFIX
             archive_ext: tar.gz
 
           # ── Linux aarch64 ─────────────────────────────────────────────────────
-          # cross-rs builds inside a Docker container that already has LLVM, so
-          # we only need to install LLVM on the host for the build script probe.
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04
             cross: true
             llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
             llvm_prefix: /usr/lib/llvm-21
-            llvm_env: LLVM_SYS_210_PREFIX
             archive_ext: tar.gz
 
           # ── macOS x86_64 ──────────────────────────────────────────────────────
@@ -90,8 +86,8 @@ jobs:
       - name: Set LLVM env (Linux)
         if: runner.os == 'Linux'
         run: |
-          echo "${{ matrix.llvm_env }}=${{ matrix.llvm_prefix }}" >> "$GITHUB_ENV"
-          echo "PATH=${{ matrix.llvm_prefix }}/bin:$PATH"         >> "$GITHUB_ENV"
+          echo "LLVM_SYS_211_PREFIX=${{ matrix.llvm_prefix }}" >> "$GITHUB_ENV"
+          echo "PATH=${{ matrix.llvm_prefix }}/bin:$PATH"      >> "$GITHUB_ENV"
 
       # ── LLVM setup — macOS ───────────────────────────────────────────────────
       - name: Install LLVM 21 (macOS)
@@ -104,19 +100,36 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           LLVM_PREFIX="$(brew --prefix llvm@21)"
-          echo "LLVM_SYS_210_PREFIX=${LLVM_PREFIX}"        >> "$GITHUB_ENV"
-          echo "PATH=${LLVM_PREFIX}/bin:$PATH"             >> "$GITHUB_ENV"
-          echo "LDFLAGS=-L${LLVM_PREFIX}/lib"              >> "$GITHUB_ENV"
-          echo "CPPFLAGS=-I${LLVM_PREFIX}/include"         >> "$GITHUB_ENV"
+          echo "LLVM_SYS_211_PREFIX=${LLVM_PREFIX}"  >> "$GITHUB_ENV"
+          echo "PATH=${LLVM_PREFIX}/bin:$PATH"        >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L${LLVM_PREFIX}/lib"         >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I${LLVM_PREFIX}/include"    >> "$GITHUB_ENV"
 
       # ── LLVM setup — Windows ─────────────────────────────────────────────────
+      # choco's LLVM package is unreliable for specific patch versions.
+      # We download the official LLVM 21.1.0 installer directly from GitHub
+      # releases and install it silently instead.
       - name: Install LLVM 21 (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install llvm --version=21.1.0 --allow-downgrade -y
-          echo "LLVM_SYS_210_PREFIX=C:\Program Files\LLVM" >> $env:GITHUB_ENV
-          echo "PATH=C:\Program Files\LLVM\bin;$env:PATH"  >> $env:GITHUB_ENV
+          $url      = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.0/LLVM-21.1.0-win64.exe"
+          $installer = "$env:TEMP\LLVM-21.1.0-win64.exe"
+          Write-Host "Downloading LLVM 21.1.0 installer…"
+          (New-Object Net.WebClient).DownloadFile($url, $installer)
+          Write-Host "Running installer…"
+          Start-Process -FilePath $installer -ArgumentList "/S" -Wait
+          Write-Host "Done."
+
+      - name: Set LLVM env (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # The silent installer places LLVM under C:\Program Files\LLVM
+          $llvm = "C:\Program Files\LLVM"
+          echo "LLVM_SYS_211_PREFIX=$llvm"       >> $env:GITHUB_ENV
+          echo "PATH=$llvm\bin;$env:PATH"         >> $env:GITHUB_ENV
+          echo "LIBCLANG_PATH=$llvm\lib"          >> $env:GITHUB_ENV
 
       # ── Rust toolchain ───────────────────────────────────────────────────────
       - name: Install Rust stable + target
@@ -223,7 +236,6 @@ jobs:
           if [ -z "$NOTES" ]; then
             NOTES="Release ${{ github.ref_name }}"
           fi
-          # Write to a file to preserve newlines
           printf '%s' "$NOTES" > release_notes.md
 
       - name: Create GitHub Release

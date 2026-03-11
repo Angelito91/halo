@@ -56,7 +56,7 @@ jobs:
 
       - name: Set LLVM environment variables
         run: |
-          echo "LLVM_SYS_210_PREFIX=/usr/lib/llvm-21" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_211_PREFIX=/usr/lib/llvm-21" >> "$GITHUB_ENV"
           echo "PATH=/usr/lib/llvm-21/bin:$PATH"      >> "$GITHUB_ENV"
 
       - name: Install Rust stable + clippy
@@ -98,7 +98,7 @@ jobs:
 
       - name: Set LLVM environment variables
         run: |
-          echo "LLVM_SYS_210_PREFIX=/usr/lib/llvm-21" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_211_PREFIX=/usr/lib/llvm-21" >> "$GITHUB_ENV"
           echo "PATH=/usr/lib/llvm-21/bin:$PATH"      >> "$GITHUB_ENV"
 
       - name: Install Rust stable
