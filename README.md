@@ -175,8 +175,10 @@ Halo proporciona las siguientes funciones integradas:
 
 ### Requisitos
 
-- Rust 1.56+ ([Instalar Rust](https://www.rust-lang.org/tools/install))
+- Rust 1.70+ ([Instalar Rust](https://www.rust-lang.org/tools/install))
 - Cargo (incluido con Rust)
+- LLVM 21 (necesario para compilar a binario nativo)
+- Clang (para el enlazado final)
 
 ### Compilar desde fuente
 
@@ -188,46 +190,121 @@ cd halo
 # Compilar en modo debug
 cargo build
 
-# Compilar en modo release (optimizado)
+# Compilar en modo release (optimizado, binario pequeño)
 cargo build --release
+
+# Verificar errores sin compilar (más rápido)
+cargo check
 ```
 
 ## 🚀 Uso
 
-### Ejecutar el compilador
+Halo tiene dos binarios: `halo` (intérprete + compilador) y `haloc` (compilador dedicado).
+
+### `halo` — Intérprete y compilador principal
+
+#### Modo intérprete (por defecto)
 
 ```bash
-# Ejecutar con el ejemplo por defecto
-cargo run
-
-# Con optimizaciones
-cargo run --release
+# Ejecutar un archivo directamente con el intérprete
+cargo run --bin halo -- examples/factorial.halo
+cargo run --bin halo -- examples/test_return.halo
 ```
 
-### Ejecutar un archivo .halo
-
-Para ejecutar un programa Halo, primero necesitas compilar el proyecto. La CLI mejorada está en progreso, por ahora puedes:
+#### Ver el análisis léxico (tokens)
 
 ```bash
-# Ejecutar el intérprete con un archivo (próximamente)
-# cargo run examples/factorial.halo
+# Mostrar todos los tokens que produce el lexer
+cargo run --bin halo -- --tokens examples/factorial.halo
+cargo run --bin halo -- -t examples/factorial.halo
 ```
 
-### Ejecutar las pruebas
+#### Ver el árbol sintáctico (AST)
 
 ```bash
-# Todas las pruebas
-cargo test
-
-# Pruebas verbosas
-cargo test -- --nocapture
-
-# Prueba específica
-cargo test test_factorial
-
-# Pruebas de integración solo
-cargo test --test interpreter_tests
+# Mostrar el AST que produce el parser
+cargo run --bin halo -- --ast examples/factorial.halo
+cargo run --bin halo -- -a examples/factorial.halo
 ```
+
+#### Modo verbose (muestra cada fase del pipeline)
+
+```bash
+# Tokenización + AST + LLVM IR + resultado, todo junto
+cargo run --bin halo -- --verbose examples/factorial.halo
+cargo run --bin halo -- -v examples/factorial.halo
+```
+
+#### Compilar a binario nativo
+
+```bash
+# Compilar a binario (queda como ./factorial)
+cargo run --bin halo -- --compile examples/factorial.halo
+
+# Compilar con nombre de salida personalizado
+cargo run --bin halo -- --compile -o mi_programa examples/factorial.halo
+
+# Compilar y ejecutar inmediatamente
+cargo run --bin halo -- --compile --run examples/factorial.halo
+cargo run --bin halo -- -c -r examples/factorial.halo
+```
+
+#### Emitir LLVM IR
+
+```bash
+# Genera el archivo .ll con el IR de LLVM junto al fuente
+cargo run --bin halo -- --emit-llvm examples/factorial.halo
+```
+
+#### Referencia rápida de flags (`halo`)
+
+| Flag            | Alias | Descripción                                      |
+|-----------------|-------|--------------------------------------------------|
+| `--tokens`      | `-t`  | Muestra los tokens del lexer                     |
+| `--ast`         | `-a`  | Muestra el AST del parser                        |
+| `--verbose`     | `-v`  | Muestra cada fase del pipeline                   |
+| `--compile`     | `-c`  | Compila a binario nativo vía clang               |
+| `--emit-llvm`   |       | Genera el archivo `.ll` con el IR de LLVM        |
+| `--run`         | `-r`  | Compila y ejecuta inmediatamente                 |
+| `-o <ruta>`     |       | Ruta de salida del binario compilado             |
+| `--help`        | `-h`  | Muestra la ayuda                                 |
+| `--version`     | `-V`  | Muestra la versión                               |
+
+---
+
+### `haloc` — Compilador dedicado
+
+Compilador standalone más parecido a `gcc`. No tiene modo intérprete.
+
+```bash
+# Compilar a a.out
+cargo run --bin haloc -- examples/factorial.halo
+
+# Compilar con nombre de salida personalizado
+cargo run --bin haloc -- examples/factorial.halo -o factorial
+
+# Emitir LLVM IR (.ll)
+cargo run --bin haloc -- examples/factorial.halo -emit-llvm
+
+# Compilar con optimizaciones (llc -O2)
+cargo run --bin haloc -- examples/factorial.halo -O
+
+# Modo verbose (muestra cada paso: tokenizar → parsear → codegen → ensamblar → linkear)
+cargo run --bin haloc -- examples/factorial.halo -v
+
+# Compilar con nombre personalizado y verbose
+cargo run --bin haloc -- examples/factorial.halo -o factorial -v
+```
+
+#### Referencia rápida de flags (`haloc`)
+
+| Flag          | Descripción                                          |
+|---------------|------------------------------------------------------|
+| `-o <salida>` | Nombre del binario de salida (por defecto: `a.out`)  |
+| `-emit-llvm`  | Emite el archivo `.ll` con el IR de LLVM             |
+| `-O`          | Activa optimizaciones vía `llc -O2`                  |
+| `-v`          | Verbose: muestra cada paso del proceso               |
+| `-h, --help`  | Muestra la ayuda                                     |
 
 ## 💡 Ejemplos
 
@@ -310,37 +387,47 @@ print(back_to_int)         // 42
 ```
 halo/
 ├── 📦 src/                          # Código fuente
-│   ├── 🎯 lexer/                    # Análisis léxico
-│   │   ├── lexer.rs                 # Tokenizador
-│   │   ├── token.rs                 # Definiciones de tokens
-│   │   └── mod.rs                   # Módulo
-│   ├── 🌳 parser/                   # Análisis sintáctico
-│   │   ├── ast.rs                   # Definiciones AST
+│   ├── 🎯 lexer/                    # FASE 1 — Análisis léxico
+│   │   ├── lexer.rs                 # Tokenizador carácter a carácter
+│   │   ├── token.rs                 # Definición de TokenType y Token
+│   │   └── mod.rs                   # Exports públicos del módulo
+│   ├── 🌳 parser/                   # FASE 2 — Análisis sintáctico
+│   │   ├── ast.rs                   # Tipos del AST (Expression, Statement, TopLevel...)
 │   │   ├── parser.rs                # Parser recursivo descendente
-│   │   ├── visitor.rs               # Patrón Visitor para AST
-│   │   └── mod.rs                   # Módulo
-│   ├── ⚙️  interpreter/             # Intérprete
-│   │   ├── value.rs                 # Valores en runtime
-│   │   ├── environment.rs           # Gestión de variables
-│   │   ├── evaluator.rs             # Evaluador de AST
-│   │   └── mod.rs                   # Módulo
-│   ├── main.rs                      # Punto de entrada
-│   └── lib.rs                       # Raíz de biblioteca
+│   │   ├── visitor.rs               # Patrón Visitor (para análisis futuros)
+│   │   └── mod.rs                   # Exports públicos del módulo
+│   ├── ⚙️  interpreter/             # FASE 3A — Intérprete tree-walking
+│   │   ├── value.rs                 # Tipos de valor en runtime (Number, Float, Bool...)
+│   │   ├── environment.rs           # Scoping: pila de HashMaps por ámbito
+│   │   ├── evaluator.rs             # Evaluador del AST + funciones built-in
+│   │   └── mod.rs                   # Exports públicos del módulo
+│   ├── 🔧 compiler/                 # FASE 3B — Compilador LLVM
+│   │   ├── mod.rs                   # Compilation: dueño del Context y Module de LLVM
+│   │   ├── types.rs                 # TypeMapper: tipos Halo → tipos LLVM
+│   │   ├── builder.rs               # IRBuilder: gestión de allocas y variables
+│   │   └── codegen.rs               # CodeGenerator: AST → LLVM IR
+│   ├── bin/
+│   │   └── haloc.rs                 # Binario haloc (compilador standalone)
+│   ├── main.rs                      # Binario halo (intérprete + compilador)
+│   └── lib.rs                       # Raíz de biblioteca (exports públicos)
 │
-├── 📚 examples/                     # Programas de ejemplo
-│   ├── factorial.halo
-│   ├── fibonacci.halo
-│   └── even_numbers.halo
+├── 📚 examples/                     # Programas de ejemplo en Halo
+│   ├── factorial.halo               # Recursión, if, return
+│   ├── fibonacci.halo               # Recursión doble, while
+│   ├── even_numbers.halo            # while, módulo %
+│   ├── test_func_call.halo          # Llamadas entre funciones
+│   ├── test_return.halo             # return en distintos puntos
+│   ├── logical_and_modulo.halo      # Operadores &&, ||, %
+│   └── comments.halo                # Comentarios // en distintas posiciones
 │
-├── 🧪 tests/                        # Pruebas integrales
-│   └── interpreter_tests.rs
+├── 🧪 tests/                        # Tests de integración
+│   └── interpreter_tests.rs         # 74 tests end-to-end del intérprete
 │
 ├── 📖 Documentación
 │   ├── README.md                    # Este archivo
-│   ├── SYNTAX.md                    # Especificación de sintaxis
-│   └── COMMITS_SIMPLE.txt           # Guía de commits
+│   └── SYNTAX.md                    # Especificación completa de sintaxis
 │
-├── Cargo.toml                       # Manifest de Rust
+├── Cargo.toml                       # Manifest de Rust (deps: inkwell/LLVM 21)
 ├── Cargo.lock                       # Lock de dependencias
 ├── LICENSE                          # Licencia MPL 2.0
 └── halo.png                         # Banner del proyecto
@@ -480,25 +567,64 @@ print(test(5))          // 55
 
 ## 🧪 Testing
 
-Halo incluye un suite de pruebas completo:
+Halo incluye un suite de pruebas completo con tests unitarios e integración.
 
-### Pruebas Unitarias
+### Ejecutar todos los tests
 
 ```bash
-# En los módulos individuales
-cargo test lexer::
-cargo test parser::
-cargo test interpreter::
+# Todos los tests (unitarios + integración)
+cargo test
+
+# Ver el output de print! dentro de los tests
+cargo test -- --nocapture
+
+# Ejecutar tests en paralelo con más detalle
+cargo test -- --test-threads=4
 ```
 
-### Pruebas de Integración
+### Tests unitarios por módulo
 
 ```bash
-# Suite completo de integración
+# Solo tests del compilador (TypeMapper, etc.)
+cargo test compiler
+
+# Solo tests del intérprete (Evaluator, Environment, Value)
+cargo test interpreter
+
+# Solo tests de un submódulo específico
+cargo test interpreter::evaluator
+cargo test interpreter::environment
+cargo test interpreter::value
+cargo test compiler::types
+```
+
+### Tests de integración
+
+```bash
+# Suite completo de integración (74 tests end-to-end)
 cargo test --test interpreter_tests
 
-# Con output
+# Con output detallado
 cargo test --test interpreter_tests -- --nocapture
+
+# Un test específico por nombre
+cargo test test_factorial_recursive
+cargo test test_fibonacci_recursive
+cargo test test_while_loop
+cargo test test_logical_and
+```
+
+### Diagnósticos y linting
+
+```bash
+# Verificar errores de compilación sin construir (rápido)
+cargo check
+
+# Linter con sugerencias de mejora
+cargo clippy
+
+# Formatear el código
+cargo fmt
 ```
 
 ### Coverage
