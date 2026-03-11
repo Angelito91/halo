@@ -76,7 +76,7 @@ jobs:
           # at link time. continue-on-error guards against transient runner
           # provisioning failures on the aging macos-13 pool.
           - target: x86_64-apple-darwin
-            runner: macos-13
+            runner: macos-14
             continue-on-error: true
             archive_ext: tar.gz
 
@@ -123,33 +123,42 @@ jobs:
           echo "CPPFLAGS=-I${LLVM_PREFIX}/include"   >> "$GITHUB_ENV"
 
       # ── LLVM setup — Windows ─────────────────────────────────────────────────
-      # Use winget to install LLVM 21 — it is pre-installed on windows-2022
-      # runners and handles PATH registration reliably.
+      # winget is not available on windows-2022 runners.
+      # Download the official LLVM 21.1.0 installer from llvm/llvm-project
+      # releases and run it silently with the NSIS /S /D flags.
+      # We install to C:\LLVM (no spaces) to avoid path-quoting issues.
       - name: Install LLVM 21 (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Write-Host "Installing LLVM 21.1.0 via winget..."
-          winget install --id LLVM.LLVM --version 21.1.0 `
-            --exact --accept-source-agreements --accept-package-agreements `
-            --silent --override "/S /D=C:\LLVM"
-          Write-Host "Verifying installation..."
+          $url       = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.0/LLVM-21.1.0-win64.exe"
+          $installer = "$env:TEMP\LLVM-21.1.0-win64.exe"
+          Write-Host "Downloading LLVM 21.1.0..."
+          Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
+          Write-Host "Running silent installer to C:\LLVM ..."
+          # /S = silent, /D = destination (must be last, no quotes around path)
+          $proc = Start-Process -FilePath $installer `
+                                -ArgumentList "/S /D=C:\LLVM" `
+                                -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Write-Error "Installer exited with code $($proc.ExitCode)"
+            exit 1
+          }
+          Write-Host "Verifying..."
           if (-not (Test-Path "C:\LLVM\bin\llvm-config.exe")) {
-            Write-Error "llvm-config.exe not found — install failed."
+            Write-Error "llvm-config.exe not found after install."
             exit 1
           }
           $ver = & "C:\LLVM\bin\llvm-config.exe" --version
-          Write-Host "LLVM version: $ver"
+          Write-Host "Installed LLVM $ver"
 
       - name: Set LLVM env (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $llvm = "C:\LLVM"
-          # Use Add-Content so multi-line writes to GITHUB_ENV are reliable
           Add-Content $env:GITHUB_ENV "LLVM_SYS_211_PREFIX=$llvm"
           Add-Content $env:GITHUB_ENV "LIBCLANG_PATH=$llvm\lib"
-          # Prepend to PATH so llvm-config is found by llvm-sys build script
           Add-Content $env:GITHUB_PATH "$llvm\bin"
 
       # ── Rust toolchain ───────────────────────────────────────────────────────
