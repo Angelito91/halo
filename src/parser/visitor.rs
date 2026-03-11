@@ -1,11 +1,16 @@
 // The Halo Programming Language
 // Visitor module
-// Version: 0.1.0
+// Version: 0.2.0
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
+//
+// NOTE: This visitor pattern is currently not used in the interpreter.
+// It's kept for potential future use in optimization passes, linting, or analysis tools.
+// To use this, enable the visitor module exports in parser/mod.rs
 
 use crate::parser::ast::{Block, Expression, Program, Statement, TopLevel};
 
+#[allow(dead_code)]
 pub trait ASTVisitor {
     fn visit_program(&mut self, program: &Program) {
         for item in &program.items {

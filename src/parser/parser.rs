@@ -1,6 +1,6 @@
 // The Halo Programming Language
 // Parser module
-// Version: 0.1.0
+// Version: 0.2.0
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
@@ -235,20 +235,19 @@ impl Parser {
         Some(Statement::While { cond, body, pos })
     }
 
-
     fn parse_return_statement(&mut self) -> Option<Statement> {
         let pos = self.previous().position;
-        
+
         // Check if there's an expression after return
-        let value = if self.check(TokenType::Newline) 
-            || self.check(TokenType::RightBrace) 
-            || self.is_at_end() 
+        let value = if self.check(TokenType::Newline)
+            || self.check(TokenType::RightBrace)
+            || self.is_at_end()
         {
             None
         } else {
             self.parse_expression()
         };
-        
+
         Some(Statement::Return { value, pos })
     }
     fn parse_var_decl(&mut self) -> Option<Statement> {

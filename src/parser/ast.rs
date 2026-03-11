@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.1.0
+// Version: 0.2.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -19,6 +19,7 @@ pub struct Position {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<Statement>,
+    #[allow(dead_code)]
     pub pos: Position,
 }
 
@@ -74,30 +75,35 @@ impl fmt::Display for BinOp {
 // ===== Expression =====
 // Language expressions
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum Expression {
-    Number(i64, Position),
-    Float(f64, Position),
-    Bool(bool, Position),
-    Var(String, Position),
+    Number(i64, #[allow(dead_code)] Position),
+    Float(f64, #[allow(dead_code)] Position),
+    Bool(bool, #[allow(dead_code)] Position),
+    Var(String, #[allow(dead_code)] Position),
     Unary {
         operator: String,
         expr: Box<Expression>,
+        #[allow(dead_code)]
         pos: Position,
     },
     Binary {
         left: Box<Expression>,
         op: BinOp,
         right: Box<Expression>,
+        #[allow(dead_code)]
         pos: Position,
     },
     Assign {
         name: String,
         value: Box<Expression>,
+        #[allow(dead_code)]
         pos: Position,
     },
     Call {
         name: String,
         args: Vec<Expression>,
+        #[allow(dead_code)]
         pos: Position,
     },
 }
@@ -151,21 +157,25 @@ pub enum Statement {
     VarDecl {
         name: String,
         init: Option<Expression>,
+        #[allow(dead_code)]
         pos: Position,
     },
     If {
         cond: Expression,
         then_branch: Block,
         else_branch: Option<Block>,
+        #[allow(dead_code)]
         pos: Position,
     },
     While {
         cond: Expression,
         body: Block,
+        #[allow(dead_code)]
         pos: Position,
     },
     Return {
         value: Option<Expression>,
+        #[allow(dead_code)]
         pos: Position,
     },
 }
@@ -218,6 +228,7 @@ impl fmt::Display for Statement {
 }
 
 impl Statement {
+    #[allow(dead_code)]
     pub fn pos(&self) -> Position {
         match self {
             Statement::Expr(e) => e.pos(),
@@ -237,16 +248,19 @@ pub enum TopLevel {
         name: String,
         params: Vec<String>,
         body: Block,
+        #[allow(dead_code)]
         pos: Position,
     },
     GlobalVar {
         name: String,
         init: Option<Expression>,
+        #[allow(dead_code)]
         pos: Position,
     },
 }
 
 impl TopLevel {
+    #[allow(dead_code)]
     pub fn pos(&self) -> Position {
         match self {
             TopLevel::Function { pos, .. } => *pos,
