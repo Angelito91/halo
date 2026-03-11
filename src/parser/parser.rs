@@ -1,4 +1,6 @@
 // The Halo Programming Language
+// Version: 0.2.0
+// Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
@@ -98,6 +100,21 @@ impl Parser {
             // whether we are looking at a function declaration, a global
             // variable assignment, or a standalone expression.
             return self.parse_toplevel_identifier();
+        }
+
+        // Bare literal expressions and unary-prefixed expressions at the top
+        // level are valid (e.g. `1 + 2`, `"hello"`, `-x`, `!flag`, `(a + b)`).
+        if matches!(
+            self.peek().kind,
+            TokenKind::Number
+                | TokenKind::StringLit
+                | TokenKind::True
+                | TokenKind::False
+                | TokenKind::Minus
+                | TokenKind::Not
+                | TokenKind::LeftParen
+        ) {
+            return self.parse_toplevel_expression();
         }
 
         self.error("Expected a function definition, global variable, or statement");
@@ -530,10 +547,19 @@ impl Parser {
     fn parse_primary(&mut self) -> Option<Expression> {
         if self.advance_if(TokenKind::Number) {
             let tok = self.previous();
-            // `parse::<i64>()` returns `None` on overflow — the `?` propagates
-            // the failure up and adds an implicit error via the `ok()?` chain.
-            let value = tok.lexeme.parse::<i64>().ok()?;
-            return Some(Expression::Number(value, tok.position));
+            let lexeme = tok.lexeme.clone();
+            let pos = tok.position;
+            // Try integer first; if the lexeme contains a dot (float literal)
+            // or overflows i64, fall back to f64.
+            if let Ok(value) = lexeme.parse::<i64>() {
+                return Some(Expression::Number(value, pos));
+            }
+            if let Ok(value) = lexeme.parse::<f64>() {
+                return Some(Expression::Float(value, pos));
+            }
+            // Neither parse succeeded — surface an error.
+            self.error(&format!("Invalid numeric literal '{lexeme}'"));
+            return None;
         }
 
         if self.advance_if(TokenKind::StringLit) {

@@ -1,4 +1,6 @@
 // The Halo Programming Language
+// Version: 0.2.0
+// Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 //
@@ -127,8 +129,17 @@ impl Evaluator {
                         .map(|expr| self.eval_expr(expr))
                         .transpose()?
                         .unwrap_or(Value::Null);
-                    self.env.set(name.clone(), value);
-                    Value::Null
+                    // "__expr" is a synthetic name the parser gives to bare
+                    // top-level expressions (e.g. `x`, `f()`, `1 + 2`).
+                    // We still store it so downstream code can inspect it, but
+                    // we also propagate its value as the "last" result so that
+                    // eval_program returns it correctly.
+                    if name == "__expr" {
+                        value
+                    } else {
+                        self.env.set(name.clone(), value);
+                        Value::Null
+                    }
                 }
 
                 TopLevel::Stmt { stmt, .. } => self.eval_stmt(stmt)?,

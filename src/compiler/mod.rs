@@ -1,6 +1,6 @@
 // The Halo Programming Language
-// Compiler module - LLVM-based code generation
 // Version: 0.2.0
+// Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
