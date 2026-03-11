@@ -8,9 +8,21 @@
 # Supported targets:
 #   Linux   x86_64   (ubuntu-24.04,     native)
 #   Linux   aarch64  (ubuntu-24.04-arm, native ARM runner)
-#   macOS   x86_64   (macos-13,         native Intel — still available via macos-13 label)
+#   macOS   x86_64   (macos-14,         cross from Apple Silicon — Apple SDK covers both arches)
 #   macOS   aarch64  (macos-14,         native Apple Silicon)
 #   Windows x86_64   (windows-2022,     native)
+#
+# Why native runners instead of cross-rs / cargo cross-compile?
+#   inkwell/llvm-sys links against libLLVM.so at BUILD time. That library must
+#   match the HOST architecture of the compiler process — you cannot simply
+#   point LLVM_SYS_211_PREFIX at an aarch64 libLLVM while running an x86_64
+#   build script. Native runners sidestep the problem entirely.
+#
+# macOS note:
+#   Apple Silicon runners (macos-14) ship the full Xcode SDK which includes
+#   support for both arm64 and x86_64. Adding the x86_64-apple-darwin Rust
+#   target and passing --target to cargo is enough; LLVM itself runs natively
+#   on arm64 and emits x86_64 code via the target triple.
 
 name: Release
 
@@ -42,20 +54,21 @@ jobs:
             archive_ext: tar.gz
 
           # ── Linux aarch64 — native ARM runner ────────────────────────────────
-          # GitHub-hosted ubuntu-24.04-arm runner: no cross-compilation needed.
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
             llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
             llvm_prefix: /usr/lib/llvm-21
             archive_ext: tar.gz
 
-          # ── macOS x86_64 ──────────────────────────────────────────────────────
-          - target: x86_64-apple-darwin
-            runner: macos-13
+          # ── macOS aarch64 (Apple Silicon, native) ─────────────────────────────
+          - target: aarch64-apple-darwin
+            runner: macos-14
             archive_ext: tar.gz
 
-          # ── macOS aarch64 (Apple Silicon) ─────────────────────────────────────
-          - target: aarch64-apple-darwin
+          # ── macOS x86_64 (cross from Apple Silicon) ───────────────────────────
+          # macos-14 runners have the full Xcode SDK which supports both arches.
+          # LLVM runs natively on arm64 and emits x86_64 via the target triple.
+          - target: x86_64-apple-darwin
             runner: macos-14
             archive_ext: tar.gz
 
@@ -122,9 +135,9 @@ jobs:
         shell: pwsh
         run: |
           $llvm = "C:\Program Files\LLVM"
-          echo "LLVM_SYS_211_PREFIX=$llvm"  >> $env:GITHUB_ENV
-          echo "PATH=$llvm\bin;$env:PATH"   >> $env:GITHUB_ENV
-          echo "LIBCLANG_PATH=$llvm\lib"    >> $env:GITHUB_ENV
+          echo "LLVM_SYS_211_PREFIX=$llvm" >> $env:GITHUB_ENV
+          echo "PATH=$llvm\bin;$env:PATH"  >> $env:GITHUB_ENV
+          echo "LIBCLANG_PATH=$llvm\lib"   >> $env:GITHUB_ENV
 
       # ── Rust toolchain ───────────────────────────────────────────────────────
       - name: Install Rust stable + target
@@ -168,7 +181,7 @@ jobs:
           echo "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       # ── Compute SHA-256 checksum ─────────────────────────────────────────────
-      # macOS ships 'shasum' instead of 'sha256sum' — use a portable one-liner.
+      # macOS ships 'shasum' instead of 'sha256sum' — use a portable fallback.
       - name: Checksum (Linux / macOS)
         if: runner.os != 'Windows'
         shell: bash
