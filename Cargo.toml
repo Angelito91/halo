@@ -1,6 +1,22 @@
 [package]
 name = "halo"
-version = "0.1.0"
-edition = "2024"
+version = "0.2.0"
+edition = "2021"
+
+[[bin]]
+name = "halo"
+path = "src/main.rs"
+
+[[bin]]
+name = "haloc"
+path = "src/bin/haloc.rs"
 
 [dependencies]
+inkwell = { version = "0.8.0", features = ["llvm21-1"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
