@@ -1,28 +1,37 @@
 # The Halo Programming Language
-# CI — runs on every push and pull request.
+# CI — runs on every push to main/master and on every pull request.
 #
 # Jobs:
-#   test   — cargo test (debug)
 #   fmt    — cargo fmt --check
 #   clippy — cargo clippy -- -D warnings
+#   test   — cargo test (debug)
 
 name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: [main, master]
   pull_request:
-    branches: ["**"]
+
+# Cancel any in-progress run for the same branch / PR so we don't waste minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+
+# Minimal permissions — CI only needs to read the repo.
+permissions:
+  contents: read
 
 jobs:
   # ── Format ───────────────────────────────────────────────────────────────────
   fmt:
     name: Format (cargo fmt)
     runs-on: ubuntu-24.04
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,17 +41,23 @@ jobs:
         with:
           components: rustfmt
 
+      # rustfmt does not touch compiled code so no build cache is needed.
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-  # ── Lint ─────────────────────────────────────────────────────────────────────
-  clippy:
-    name: Lint (cargo clippy)
+  # ── Lint + Test ──────────────────────────────────────────────────────────────
+  # Both clippy and cargo test require a full build with LLVM, so we install
+  # LLVM once and run both checks in the same job to avoid duplicating the
+  # heavy LLVM installation step across two separate jobs.
+  check:
+    name: Lint & Test (clippy + cargo test)
     runs-on: ubuntu-24.04
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── LLVM 21 ──────────────────────────────────────────────────────────────
       - name: Install LLVM 21
         run: |
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
@@ -57,62 +72,25 @@ jobs:
       - name: Set LLVM environment variables
         run: |
           echo "LLVM_SYS_211_PREFIX=/usr/lib/llvm-21" >> "$GITHUB_ENV"
-          echo "PATH=/usr/lib/llvm-21/bin:$PATH"      >> "$GITHUB_ENV"
+          echo "/usr/lib/llvm-21/bin"                 >> "$GITHUB_PATH"
 
-      - name: Install Rust stable + clippy
+      # ── Rust toolchain ───────────────────────────────────────────────────────
+      - name: Install Rust stable (clippy + rustfmt components)
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
 
-      - name: Cache Cargo registry & build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: clippy-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: clippy-${{ runner.os }}-
+      # ── Cargo cache ──────────────────────────────────────────────────────────
+      # Swatinem/rust-cache is the community-standard action for Rust caching.
+      # It caches ~/.cargo/registry, ~/.cargo/git, and target/ automatically,
+      # and uses a smart key that includes OS, toolchain, and Cargo.lock.
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
 
+      # ── Lint ─────────────────────────────────────────────────────────────────
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-  # ── Tests ─────────────────────────────────────────────────────────────────────
-  test:
-    name: Test (cargo test)
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install LLVM 21
-        run: |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
-            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" \
-            | sudo tee /etc/apt/sources.list.d/llvm-21.list
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            llvm-21 llvm-21-dev libpolly-21-dev \
-            libclang-common-21-dev clang-21
-
-      - name: Set LLVM environment variables
-        run: |
-          echo "LLVM_SYS_211_PREFIX=/usr/lib/llvm-21" >> "$GITHUB_ENV"
-          echo "PATH=/usr/lib/llvm-21/bin:$PATH"      >> "$GITHUB_ENV"
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo registry & build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: test-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: test-${{ runner.os }}-
-
+      # ── Tests ────────────────────────────────────────────────────────────────
       - name: Run tests
         run: cargo test --all -- --nocapture
