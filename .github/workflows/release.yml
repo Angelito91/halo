@@ -1,0 +1,241 @@
+# The Halo Programming Language
+# Release — triggers when a vX.Y.Z tag is pushed.
+#
+# Jobs:
+#   build   — cross-compile for each target platform (matrix)
+#   release — create a GitHub Release and upload all artifacts
+#
+# Supported targets:
+#   Linux   x86_64   (ubuntu-24.04, native)
+#   Linux   aarch64  (ubuntu-24.04, cross via cross-rs)
+#   macOS   x86_64   (macos-13,     native)
+#   macOS   aarch64  (macos-14,     native Apple Silicon)
+#   Windows x86_64   (windows-2022, native)
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]*"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  BINARY_NAME: halo
+
+jobs:
+  # ── Build ─────────────────────────────────────────────────────────────────────
+  build:
+    name: Build · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── Linux x86_64 ──────────────────────────────────────────────────────
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            cross: false
+            llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
+            llvm_prefix: /usr/lib/llvm-21
+            llvm_env: LLVM_SYS_210_PREFIX
+            archive_ext: tar.gz
+
+          # ── Linux aarch64 ─────────────────────────────────────────────────────
+          # cross-rs builds inside a Docker container that already has LLVM, so
+          # we only need to install LLVM on the host for the build script probe.
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            cross: true
+            llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
+            llvm_prefix: /usr/lib/llvm-21
+            llvm_env: LLVM_SYS_210_PREFIX
+            archive_ext: tar.gz
+
+          # ── macOS x86_64 ──────────────────────────────────────────────────────
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            cross: false
+            archive_ext: tar.gz
+
+          # ── macOS aarch64 (Apple Silicon) ─────────────────────────────────────
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            cross: false
+            archive_ext: tar.gz
+
+          # ── Windows x86_64 ────────────────────────────────────────────────────
+          - target: x86_64-pc-windows-msvc
+            runner: windows-2022
+            cross: false
+            archive_ext: zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── LLVM setup — Linux ───────────────────────────────────────────────────
+      - name: Install LLVM 21 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-21.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ${{ matrix.llvm_pkg }}
+
+      - name: Set LLVM env (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          echo "${{ matrix.llvm_env }}=${{ matrix.llvm_prefix }}" >> "$GITHUB_ENV"
+          echo "PATH=${{ matrix.llvm_prefix }}/bin:$PATH"         >> "$GITHUB_ENV"
+
+      # ── LLVM setup — macOS ───────────────────────────────────────────────────
+      - name: Install LLVM 21 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install llvm@21
+
+      - name: Set LLVM env (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          LLVM_PREFIX="$(brew --prefix llvm@21)"
+          echo "LLVM_SYS_210_PREFIX=${LLVM_PREFIX}"        >> "$GITHUB_ENV"
+          echo "PATH=${LLVM_PREFIX}/bin:$PATH"             >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L${LLVM_PREFIX}/lib"              >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I${LLVM_PREFIX}/include"         >> "$GITHUB_ENV"
+
+      # ── LLVM setup — Windows ─────────────────────────────────────────────────
+      - name: Install LLVM 21 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install llvm --version=21.1.0 --allow-downgrade -y
+          echo "LLVM_SYS_210_PREFIX=C:\Program Files\LLVM" >> $env:GITHUB_ENV
+          echo "PATH=C:\Program Files\LLVM\bin;$env:PATH"  >> $env:GITHUB_ENV
+
+      # ── Rust toolchain ───────────────────────────────────────────────────────
+      - name: Install Rust stable + target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # ── cross-rs (Linux aarch64 only) ────────────────────────────────────────
+      - name: Install cross-rs
+        if: matrix.cross == true
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      # ── Cargo cache ──────────────────────────────────────────────────────────
+      - name: Cache Cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: release-${{ matrix.target }}-
+
+      # ── Compile ──────────────────────────────────────────────────────────────
+      - name: Build (native)
+        if: matrix.cross == false
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build (cross)
+        if: matrix.cross == true
+        run: cross build --release --target ${{ matrix.target }}
+
+      # ── Package — Linux / macOS (tar.gz) ─────────────────────────────────────
+      - name: Package (tar.gz)
+        if: matrix.archive_ext == 'tar.gz'
+        shell: bash
+        run: |
+          BIN="target/${{ matrix.target }}/release/${BINARY_NAME}"
+          ARCHIVE="${BINARY_NAME}-${{ github.ref_name }}-${{ matrix.target }}.tar.gz"
+          tar -czf "${ARCHIVE}" -C "$(dirname ${BIN})" "$(basename ${BIN})"
+          echo "ASSET=${ARCHIVE}" >> "$GITHUB_ENV"
+
+      # ── Package — Windows (zip) ───────────────────────────────────────────────
+      - name: Package (zip)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          $bin  = "target\${{ matrix.target }}\release\${env:BINARY_NAME}.exe"
+          $name = "${env:BINARY_NAME}-${{ github.ref_name }}-${{ matrix.target }}.zip"
+          Compress-Archive -Path $bin -DestinationPath $name
+          echo "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # ── Compute SHA-256 checksum ─────────────────────────────────────────────
+      - name: Checksum (Linux / macOS)
+        if: runner.os != 'Windows'
+        run: |
+          sha256sum "${{ env.ASSET }}" > "${{ env.ASSET }}.sha256"
+
+      - name: Checksum (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash "${{ env.ASSET }}" -Algorithm SHA256).Hash.ToLower()
+          "$hash  ${{ env.ASSET }}" | Out-File -Encoding ascii "${{ env.ASSET }}.sha256"
+
+      # ── Upload artifacts for the release job ─────────────────────────────────
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: |
+            ${{ env.ASSET }}
+            ${{ env.ASSET }}.sha256
+          if-no-files-found: error
+
+  # ── Release ───────────────────────────────────────────────────────────────────
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Download every artifact produced by the build matrix
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh artifacts/
+
+      # Derive a human-readable changelog from the annotated tag message.
+      # Falls back to a generic message when the tag has no annotation.
+      - name: Extract tag notes
+        id: tag_notes
+        run: |
+          NOTES=$(git tag -l --format='%(contents)' "${{ github.ref_name }}" 2>/dev/null || true)
+          if [ -z "$NOTES" ]; then
+            NOTES="Release ${{ github.ref_name }}"
+          fi
+          # Write to a file to preserve newlines
+          printf '%s' "$NOTES" > release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Halo ${{ github.ref_name }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
+            artifacts/**/*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
