@@ -4,9 +4,8 @@
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
-use std::env;
 use std::fs;
-use std::io::{self, Read};
+use std::path::Path;
 use std::process;
 
 mod compiler;
@@ -19,116 +18,238 @@ use interpreter::Evaluator;
 use lexer::{Lexer, TokenKind};
 use parser::Parser;
 
-// ── CLI argument types ────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-/// Parsed command-line arguments.
-struct Args {
-    /// Path to the `.halo` source file.
-    file_path: String,
-    /// `--ast` / `-a`: print the AST before running.
-    show_ast: bool,
-    /// `--tokens` / `-t`: print the token stream before running.
-    show_tokens: bool,
-    /// `--verbose` / `-v`: enable detailed progress output.
-    verbose: bool,
-    /// `--compile` / `-c`: compile to a native binary via clang.
-    compile: bool,
-    /// `--emit-llvm`: write LLVM IR next to the source file.
-    emit_llvm: bool,
-    /// `--run` / `-r`: compile to a temp binary and execute immediately.
-    run: bool,
-    /// `-o <path>`: output path for `--compile` / `--run`.
-    output: Option<String>,
-    /// `-O<N>` / `--opt-level <N>`: LLVM optimisation level (default: 2).
-    opt_level: OptLevel,
+const VERSION: &str = "0.2.0";
+const BANNER: &str = "🌟 Halo Programming Language";
+
+// ── Subcommands ───────────────────────────────────────────────────────────────
+
+#[derive(Debug)]
+enum Subcommand {
+    /// Interpret a source file (default when no subcommand is given).
+    Run,
+    /// Compile to a native binary via LLVM.
+    Build,
+    /// Parse the file and report errors without executing anything.
+    Check,
+    /// Print the token stream produced by the lexer.
+    Tokens,
+    /// Print the Abstract Syntax Tree produced by the parser.
+    Ast,
+    /// Emit LLVM IR to a `.ll` file (does not link).
+    Llvm,
 }
 
-/// Parse `std::env::args()` into an [`Args`] struct.
-///
-/// Returns `Err` with a human-readable message on any invalid input.
-fn parse_args() -> Result<Args, String> {
-    let raw: Vec<String> = env::args().collect();
+// ── Toolchain ─────────────────────────────────────────────────────────────────
 
-    if raw.len() < 2 {
-        return Err("No source file specified. Run 'halo --help' for usage.".to_string());
+/// Which external toolchain to use for the final link step in `build`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum Toolchain {
+    /// Use `clang <file.ll> -o <out>` (default, single step).
+    #[default]
+    Clang,
+    /// Use `llc <file.ll> -o <file.s>` then `cc <file.s> -o <out>`.
+    /// Useful when only `llc` and a plain C compiler are available.
+    Llc,
+}
+
+impl Toolchain {
+    fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "clang" => Ok(Toolchain::Clang),
+            "llc" => Ok(Toolchain::Llc),
+            other => Err(format!(
+                "Unknown toolchain '{other}'. Valid options are: clang, llc."
+            )),
+        }
     }
 
-    let mut file_path = String::new();
-    let mut show_ast = false;
-    let mut show_tokens = false;
-    let mut verbose = false;
-    let mut compile = false;
-    let mut emit_llvm = false;
-    let mut run = false;
+    fn name(self) -> &'static str {
+        match self {
+            Toolchain::Clang => "clang",
+            Toolchain::Llc => "llc + cc",
+        }
+    }
+}
+
+// ── CLI arguments ─────────────────────────────────────────────────────────────
+
+struct Args {
+    /// Which subcommand to execute.
+    subcommand: Subcommand,
+    /// Path to the `.halo` source file.
+    file: String,
+    /// `-o <path>`: output path for `build`.
+    output: Option<String>,
+    /// `-O<N>` / `--opt <N>`: LLVM optimisation level (default: 2).
+    opt_level: OptLevel,
+    /// `--verbose` / `-v`: print progress information for each pipeline phase.
+    verbose: bool,
+    /// `--run` / `-r`: after `build`, execute the resulting binary immediately.
+    run_after_build: bool,
+    /// `--toolchain <name>`: linker toolchain for `build` (default: clang).
+    toolchain: Toolchain,
+    /// `--emit-llvm`: keep the intermediate `.ll` file after `build`.
+    emit_llvm: bool,
+}
+
+// ── Argument parsing ──────────────────────────────────────────────────────────
+
+fn parse_args() -> Result<Args, String> {
+    let argv: Vec<String> = std::env::args().collect();
+
+    // No arguments at all — print short usage and exit cleanly.
+    if argv.len() < 2 {
+        print_usage();
+        process::exit(0);
+    }
+
+    // Detect subcommand or fallback to `run`.
+    let (subcommand, rest_start) = match argv[1].as_str() {
+        "run" => (Subcommand::Run, 2),
+        "build" => (Subcommand::Build, 2),
+        "check" => (Subcommand::Check, 2),
+        "tokens" => (Subcommand::Tokens, 2),
+        "ast" => (Subcommand::Ast, 2),
+        "llvm" => (Subcommand::Llvm, 2),
+        "help" | "--help" | "-h" => {
+            print_help();
+            process::exit(0);
+        }
+        "version" | "--version" | "-V" => {
+            print_version();
+            process::exit(0);
+        }
+        // Any unknown word that does not start with '-' is treated as a file
+        // path with the implicit `run` subcommand.
+        arg if !arg.starts_with('-') => (Subcommand::Run, 1),
+        arg => {
+            return Err(format!(
+                "Unknown subcommand or option '{arg}'.\n\
+                 Run 'halo help' for usage."
+            ))
+        }
+    };
+
+    if argv.len() <= rest_start {
+        return Err(format!(
+            "No source file provided.\n\
+             Usage: halo {} <file.halo>",
+            subcommand_name(&subcommand)
+        ));
+    }
+
+    let mut file = String::new();
     let mut output: Option<String> = None;
     let mut opt_level = OptLevel::O2;
+    let mut verbose = false;
+    let mut run_after_build = false;
+    let mut toolchain = Toolchain::default();
+    let mut emit_llvm = false;
 
-    let mut i = 1;
-    while i < raw.len() {
-        match raw[i].as_str() {
-            "--ast" | "-a" => show_ast = true,
-            "--tokens" | "-t" => show_tokens = true,
-            "--verbose" | "-v" => verbose = true,
-            "--compile" | "-c" => compile = true,
-            "--emit-llvm" => emit_llvm = true,
-            "--run" | "-r" => run = true,
-            "-o" => {
+    let mut i = rest_start;
+    while i < argv.len() {
+        match argv[i].as_str() {
+            "-o" | "--output" => {
                 i += 1;
-                if i >= raw.len() {
-                    return Err("Expected an output path after '-o'.".to_string());
+                if i >= argv.len() {
+                    return Err("Expected an output path after '-o'.".into());
                 }
-                output = Some(raw[i].clone());
+                output = Some(argv[i].clone());
             }
-            "--opt-level" | "-O" => {
+            "--opt" | "-O" => {
                 i += 1;
-                if i >= raw.len() {
-                    return Err("Expected a level (0-3) after '--opt-level'.".to_string());
+                if i >= argv.len() {
+                    return Err("Expected a level (0-3) after '--opt'.".into());
                 }
-                opt_level = parse_opt_level(&raw[i])?;
+                opt_level = parse_opt_level(&argv[i])?;
             }
-            // Compact forms: -O0  -O1  -O2  -O3
             "-O0" => opt_level = OptLevel::O0,
             "-O1" => opt_level = OptLevel::O1,
             "-O2" => opt_level = OptLevel::O2,
             "-O3" => opt_level = OptLevel::O3,
-            "--help" | "-h" => {
-                print_help();
-                process::exit(0);
+            "--verbose" | "-v" => verbose = true,
+            "--run" | "-r" => run_after_build = true,
+            "--emit-llvm" => emit_llvm = true,
+            "--toolchain" => {
+                i += 1;
+                if i >= argv.len() {
+                    return Err("Expected a toolchain name after '--toolchain'.".into());
+                }
+                toolchain = Toolchain::from_str(&argv[i])?;
             }
-            "--version" | "-V" => {
-                println!("Halo Programming Language v0.2.0");
-                process::exit(0);
-            }
+            // Anything not starting with '-' is the source file.
             arg if !arg.starts_with('-') => {
-                file_path = arg.to_string();
+                if !file.is_empty() {
+                    return Err(format!(
+                        "Unexpected extra argument '{arg}'. Only one source file is supported."
+                    ));
+                }
+                file = arg.to_string();
             }
             arg => {
                 return Err(format!(
-                    "Unknown option: '{arg}'. Run 'halo --help' for usage."
-                ));
+                    "Unknown option '{arg}'.\n\
+                     Run 'halo help' for usage."
+                ))
             }
         }
         i += 1;
     }
 
-    if file_path.is_empty() {
-        return Err("No source file specified. Run 'halo --help' for usage.".to_string());
+    if file.is_empty() {
+        return Err(format!(
+            "No source file provided.\n\
+             Usage: halo {} <file.halo>",
+            subcommand_name(&subcommand)
+        ));
+    }
+
+    // `--run` only makes sense with `build`.
+    if run_after_build && !matches!(subcommand, Subcommand::Build) {
+        return Err(
+            "'--run' / '-r' is only valid with the 'build' subcommand.\n\
+             Hint: use 'halo run <file>' to interpret directly."
+                .into(),
+        );
+    }
+
+    // `--toolchain` only makes sense with `build`.
+    if toolchain != Toolchain::Clang && !matches!(subcommand, Subcommand::Build) {
+        return Err("'--toolchain' is only valid with the 'build' subcommand.".into());
+    }
+
+    // `--emit-llvm` only makes sense with `build`.
+    if emit_llvm && !matches!(subcommand, Subcommand::Build) {
+        return Err("'--emit-llvm' is only valid with the 'build' subcommand.\n\
+             Hint: use 'halo llvm <file>' to emit IR directly."
+            .into());
     }
 
     Ok(Args {
-        file_path,
-        show_ast,
-        show_tokens,
-        verbose,
-        compile,
-        emit_llvm,
-        run,
+        subcommand,
+        file,
         output,
         opt_level,
+        verbose,
+        run_after_build,
+        toolchain,
+        emit_llvm,
     })
 }
 
-/// Convert a `"0"`–`"3"` string to an [`OptLevel`].
+fn subcommand_name(sc: &Subcommand) -> &'static str {
+    match sc {
+        Subcommand::Run => "run",
+        Subcommand::Build => "build",
+        Subcommand::Check => "check",
+        Subcommand::Tokens => "tokens",
+        Subcommand::Ast => "ast",
+        Subcommand::Llvm => "llvm",
+    }
+}
+
 fn parse_opt_level(s: &str) -> Result<OptLevel, String> {
     match s {
         "0" => Ok(OptLevel::O0),
@@ -141,64 +262,113 @@ fn parse_opt_level(s: &str) -> Result<OptLevel, String> {
     }
 }
 
-/// Prints help message
-fn print_help() {
-    println!("╔════════════════════════════════════════════════╗");
-    println!("║    🌟 Halo Programming Language v0.2.0 🌟     ║");
-    println!("╚════════════════════════════════════════════════╝\n");
+// ── Help / version output ─────────────────────────────────────────────────────
 
+fn print_version() {
+    println!("{BANNER} v{VERSION}");
+}
+
+fn print_usage() {
+    println!("{BANNER} v{VERSION}");
+    println!();
     println!("USAGE:");
-    println!("    halo [OPTIONS] <FILE>\n");
+    println!("    halo <SUBCOMMAND> <file.halo> [OPTIONS]");
+    println!("    halo <file.halo>              (shorthand for 'halo run')");
+    println!();
+    println!("SUBCOMMANDS:");
+    println!("    run     Interpret a source file (default)");
+    println!("    build   Compile to a native binary");
+    println!("    check   Parse and report errors without running");
+    println!("    tokens  Print the token stream");
+    println!("    ast     Print the Abstract Syntax Tree");
+    println!("    llvm    Emit LLVM IR to a .ll file");
+    println!();
+    println!("Run 'halo help' for full documentation.");
+}
 
-    println!("OPTIONS:");
-    println!("    -a, --ast          Display the Abstract Syntax Tree");
-    println!("    -t, --tokens       Display the tokens from lexer");
-    println!("    -v, --verbose      Enable verbose output");
-    println!("    -c, --compile      Compile to a native binary via clang");
-    println!("        --emit-llvm    Write LLVM IR (.ll) next to the source file");
-    println!("    -r, --run          Compile and run immediately (uses a temp binary)");
-    println!("    -o <path>          Output path for --compile or --run");
-    println!("    -O, --opt-level N  LLVM optimisation level: 0=none 1 2 3 (default: 2)");
-    println!("    -h, --help         Print this help message");
-    println!("    -V, --version      Print version information\n");
-
+fn print_help() {
+    println!("╔══════════════════════════════════════════════════════╗");
+    println!("║        {BANNER} v{VERSION}        ║");
+    println!("╚══════════════════════════════════════════════════════╝");
+    println!();
+    println!("USAGE:");
+    println!("    halo <SUBCOMMAND> [OPTIONS] <file.halo>");
+    println!("    halo <file.halo>                (shorthand for 'halo run')");
+    println!();
+    println!("SUBCOMMANDS:");
+    println!("    run    <file>   Interpret the source file with the tree-walking");
+    println!("                   interpreter (this is the default when no subcommand");
+    println!("                   is given).");
+    println!();
+    println!("    build  <file>   Compile to a native binary using LLVM.");
+    println!("                   Options:");
+    println!(
+        "                     -o, --output <path>        Output binary path (default: <stem>)"
+    );
+    println!("                     -O0 / -O1 / -O2 / -O3      Optimisation level (default: -O2)");
+    println!("                     --opt <N>                   Same as -ON");
+    println!("                     --toolchain <clang|llc>    Linker toolchain (default: clang)");
+    println!("                       clang  — clang <file.ll> -o <out>  (single step, default)");
+    println!("                       llc    — llc <file.ll> | cc <file.s> -o <out>  (two steps)");
+    println!("                     --emit-llvm                Keep the intermediate .ll file");
+    println!("                     -r, --run                  Execute the binary after building");
+    println!("                     -v, --verbose              Show each compilation phase");
+    println!();
+    println!("    check  <file>   Lex and parse the file, report any errors, then exit.");
+    println!("                   Exit code 0 = OK, 1 = errors.");
+    println!();
+    println!("    tokens <file>   Print every token produced by the lexer and exit.");
+    println!();
+    println!("    ast    <file>   Print the Abstract Syntax Tree produced by the parser.");
+    println!();
+    println!("    llvm   <file>   Generate LLVM IR and write it to <stem>.ll.");
+    println!("                   Options:");
+    println!("                     -o, --output <path>        Output .ll file path");
+    println!("                     -O0 / -O1 / -O2 / -O3      Optimisation level (default: -O2)");
+    println!("                     -v, --verbose              Show codegen progress");
+    println!();
+    println!("GLOBAL OPTIONS:");
+    println!("    -v, --verbose   Verbose output (supported by run, build, llvm)");
+    println!("    -h, --help      Print this help message");
+    println!("    -V, --version   Print version information");
+    println!();
     println!("EXAMPLES:");
-    println!("    halo script.halo                   Interpret script.halo");
-    println!("    halo --compile script.halo         Compile to ./script");
-    println!("    halo --compile -o out script.halo  Compile to ./out");
-    println!("    halo --emit-llvm script.halo       Emit script.ll");
-    println!("    halo --run script.halo             Compile and run immediately");
-    println!("    halo --run -O3 script.halo         Compile with max optimisation and run");
-    println!("    halo --ast script.halo             Show AST then interpret\n");
-
-    println!("FILE EXTENSION:");
-    println!("    .halo            Halo source code file\n");
-
+    println!("    halo script.halo                             # interpret");
+    println!("    halo run script.halo                         # same as above");
+    println!("    halo build script.halo                       # compile → ./script  (clang)");
+    println!("    halo build -o prog script.halo               # compile → ./prog");
+    println!("    halo build -O3 -r script.halo                # compile with O3 and run");
+    println!("    halo build --toolchain llc script.halo       # compile via llc + cc");
+    println!("    halo build --toolchain llc --emit-llvm s.halo# compile via llc + cc, keep .ll");
+    println!("    halo check script.halo                       # validate syntax only");
+    println!("    halo tokens script.halo                      # inspect the token stream");
+    println!("    halo ast    script.halo                      # inspect the AST");
+    println!("    halo llvm   script.halo                      # emit script.ll");
+    println!("    halo llvm -O3 script.halo                    # emit optimised script.ll");
+    println!();
     println!("DOCUMENTATION:");
-    println!("    For language documentation, see SYNTAX.md");
+    println!("    Language reference: SYNTAX.md");
+    println!("    Project overview:   README.md");
 }
 
 // ── Pipeline helpers ──────────────────────────────────────────────────────────
 
 /// Read the entire contents of `path` into a `String`.
-fn read_source_file(path: &str) -> Result<String, String> {
+fn read_source(path: &str) -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| format!("Cannot read '{path}': {e}"))
 }
 
-/// Read all of stdin into a `String`.
-#[allow(dead_code)]
-fn read_stdin() -> Result<String, String> {
-    let mut buf = String::new();
-    io::stdin()
-        .read_to_string(&mut buf)
-        .map_err(|e| format!("Error reading stdin: {e}"))?;
-    Ok(buf)
+/// Derive the file stem from a source path (`"examples/foo.halo"` → `"foo"`).
+fn file_stem(path: &str) -> &str {
+    Path::new(path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output")
 }
 
-/// Lex `source` into a token stream, including the terminal [`TokenKind::Eof`].
+/// Lex `source` into a token stream including the terminal `Eof` token.
 fn tokenize(source: &str) -> Vec<lexer::Token> {
     let mut lexer = Lexer::new(source.to_string());
-    // Collect tokens until (and including) Eof, then stop.
     std::iter::from_fn(move || {
         let tok = lexer.next_token();
         let done = tok.kind == TokenKind::Eof;
@@ -215,7 +385,7 @@ fn tokenize(source: &str) -> Vec<lexer::Token> {
 }
 
 /// Parse a token stream into a [`Program`] AST.
-fn parse(tokens: Vec<lexer::Token>) -> Result<parser::ast::Program, Vec<String>> {
+fn parse_tokens(tokens: Vec<lexer::Token>) -> Result<parser::ast::Program, Vec<String>> {
     Parser::new(tokens).parse()
 }
 
@@ -224,303 +394,526 @@ fn evaluate(program: &parser::ast::Program) -> Result<interpreter::Value, String
     Evaluator::new().eval_program(program)
 }
 
-/// Compile the program to LLVM IR, then to a native binary via clang.
-/// Returns the path to the produced binary.
-fn compile_program(
-    program: &parser::ast::Program,
-    source_path: &str,
-    output_path: Option<&str>,
-    emit_llvm: bool,
-    opt_level: OptLevel,
-    verbose: bool,
-) -> Result<String, String> {
-    // Derive default output paths from the source file name
-    let stem = std::path::Path::new(source_path)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("output");
-
-    let ll_path = format!("{}.ll", stem);
-    let bin_path = output_path
-        .map(|p| p.to_string())
-        .unwrap_or_else(|| stem.to_string());
-
-    // --- Code generation ---
+/// Run an external command, printing stderr and returning `false` on failure.
+fn run_command(mut cmd: process::Command, step_name: &str, verbose: bool) -> bool {
     if verbose {
-        println!("⚙️  Generating LLVM IR...");
+        // Print the command being executed.
+        eprintln!("   $ {:?}", cmd);
     }
-
-    let mut comp = Compilation::new(stem);
-    comp.codegen()
-        .compile(program)
-        .map_err(|e| format!("Code generation error: {}", e))?;
-
-    // Run LLVM optimisation passes before emitting.
-    if opt_level != OptLevel::O0 {
-        if verbose {
-            println!(
-                "⚡ Running LLVM optimisation passes (O{})...",
-                opt_level.as_u32()
-            );
-        }
-        comp.optimise(opt_level)
-            .map_err(|e| format!("Optimisation error: {}", e))?;
-        if verbose {
-            println!("✅ Optimisation done\n");
-        }
-    }
-
-    if verbose {
-        println!("✅ LLVM IR generated\n");
-        println!("📄 LLVM IR:");
-        println!("─────────────────────────────────────────");
-        comp.print_ir();
-        println!("─────────────────────────────────────────\n");
-    }
-
-    // --- Emit .ll file ---
-    if emit_llvm || verbose {
-        comp.emit_llvm(&ll_path)
-            .map_err(|e| format!("Failed to emit LLVM IR: {}", e))?;
-        if verbose || emit_llvm {
-            println!("📝 LLVM IR written to: {}", ll_path);
-        }
-    }
-
-    // --- Invoke clang to produce a native binary ---
-    if verbose {
-        println!("🔨 Compiling to native binary with clang...");
-        println!("   clang {} -o {}", ll_path, bin_path);
-    }
-
-    // We always write the .ll first (even if --emit-llvm wasn't requested)
-    // so that clang has something to compile.
-    if !emit_llvm && !verbose {
-        comp.emit_llvm(&ll_path)
-            .map_err(|e| format!("Failed to write temporary IR: {}", e))?;
-    }
-
-    let clang_status = std::process::Command::new("clang")
-        .args([&ll_path, opt_level.clang_flag(), "-o", &bin_path, "-lm"])
-        .status()
-        .map_err(|e| format!("Failed to invoke clang: {}. Is clang installed?", e))?;
-
-    if !clang_status.success() {
-        return Err(format!(
-            "clang exited with status {}",
-            clang_status.code().unwrap_or(-1)
-        ));
-    }
-
-    // Remove the temporary .ll file unless the user explicitly asked for it
-    if !emit_llvm {
-        let _ = fs::remove_file(&ll_path);
-    }
-
-    if verbose {
-        println!("✅ Binary written to: {}\n", bin_path);
-    }
-
-    Ok(bin_path)
-}
-
-// ── Display helpers ───────────────────────────────────────────────────────────
-
-/// Print the token stream produced by the lexer.
-fn display_tokens(tokens: &[lexer::Token]) {
-    println!("╔════════════════════════════════════════╗");
-    println!("║         📋 TOKENS (Lexer Output)       ║");
-    println!("╚════════════════════════════════════════╝\n");
-
-    for (i, tok) in tokens.iter().enumerate() {
-        match tok.kind {
-            TokenKind::Eof => println!("{i:3}. [EOF]"),
-            TokenKind::Newline => println!(
-                "{i:3}. [NEWLINE] at {}:{}",
-                tok.position.line, tok.position.column
-            ),
-            _ => println!(
-                "{i:3}. {:?} '{}' at {}:{}",
-                tok.kind, tok.lexeme, tok.position.line, tok.position.column
-            ),
-        }
-    }
-    println!();
-}
-
-/// Print the top-level items of a parsed [`Program`].
-fn display_ast(program: &parser::ast::Program) {
-    println!("╔════════════════════════════════════════╗");
-    println!("║      🌳 AST (Abstract Syntax Tree)     ║");
-    println!("╚════════════════════════════════════════╝\n");
-
-    for (i, item) in program.items.iter().enumerate() {
-        println!("Item {}:", i);
-        match item {
-            parser::ast::TopLevel::Function {
-                name, params, body, ..
-            } => {
-                println!("  Function: {}", name);
-                println!("  Parameters: {}", params.join(", "));
-                println!("  Body: {} statements", body.stmts.len());
-                for (j, stmt) in body.stmts.iter().enumerate() {
-                    println!("    Statement {}: {}", j, stmt);
-                }
+    match cmd.output() {
+        Ok(out) if out.status.success() => true,
+        Ok(out) => {
+            eprintln!("❌ '{step_name}' failed:");
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            if !stderr.is_empty() {
+                eprintln!("{stderr}");
             }
-            parser::ast::TopLevel::GlobalVar { name, init, .. } => {
-                println!("  GlobalVar: {}", name);
-                if let Some(expr) = init {
-                    println!("  Initializer: {}", expr);
-                } else {
-                    println!("  Initializer: none");
-                }
-            }
-            parser::ast::TopLevel::Stmt { stmt, .. } => {
-                println!("  TopLevelStmt: {}", stmt);
-            }
+            false
         }
-        println!();
+        Err(e) => {
+            eprintln!("❌ Could not launch '{step_name}': {e}");
+            false
+        }
     }
 }
 
-fn main() {
-    let args = match parse_args() {
-        Ok(args) => args,
+// ── Subcommand handlers ───────────────────────────────────────────────────────
+
+/// `halo run <file>` — interpret the source file.
+fn cmd_run(args: &Args) -> i32 {
+    let source = match read_source(&args.file) {
+        Ok(s) => s,
         Err(e) => {
             eprintln!("❌ {e}");
-            process::exit(1);
-        }
-    };
-
-    // Print header
-    if args.verbose {
-        println!("╔════════════════════════════════════════╗");
-        println!("║    🌟 Halo Interpreter v0.2.0 🌟     ║");
-        println!("╚════════════════════════════════════════╝\n");
-    }
-
-    if args.verbose {
-        println!("📂 Reading file: {}", args.file_path);
-    }
-
-    let source = match read_source_file(&args.file_path) {
-        Ok(src) => src,
-        Err(e) => {
-            eprintln!("❌ {e}");
-            process::exit(1);
+            return 1;
         }
     };
 
     if args.verbose {
-        println!("✅ Read {} bytes\n", source.len());
+        println!("📂 {}", args.file);
         println!("🔍 Tokenising…");
     }
 
-    // Lexing is infallible — the lexer never returns an error.
     let tokens = tokenize(&source);
 
     if args.verbose {
-        println!("✅ {} tokens\n", tokens.len());
-    }
-
-    if args.show_tokens {
-        display_tokens(&tokens);
-    }
-
-    if args.verbose {
+        println!("✅ {} tokens", tokens.len());
         println!("📝 Parsing…");
     }
 
-    let program = match parse(tokens) {
-        Ok(prog) => prog,
+    let program = match parse_tokens(tokens) {
+        Ok(p) => p,
         Err(errors) => {
             eprintln!("❌ Parse error(s):");
-            for err in &errors {
-                eprintln!("   {err}");
+            for e in &errors {
+                eprintln!("   {e}");
             }
-            process::exit(1);
+            return 1;
         }
     };
 
     if args.verbose {
-        println!("✅ Parsed {} top-level item(s)\n", program.items.len());
-    }
-
-    if args.show_ast {
-        display_ast(&program);
-    }
-
-    // ── Compile / emit-LLVM / run mode ───────────────────────────────────────
-    if args.compile || args.emit_llvm || args.run {
-        if args.verbose {
-            println!("🏗️  Compiling via LLVM…");
-            println!("─────────────────────────────────────────\n");
-        }
-
-        let bin_path = match compile_program(
-            &program,
-            &args.file_path,
-            args.output.as_deref(),
-            args.emit_llvm,
-            args.opt_level,
-            args.verbose,
-        ) {
-            Ok(path) => path,
-            Err(e) => {
-                eprintln!("❌ Compilation error: {e}");
-                process::exit(1);
-            }
-        };
-
-        if args.run {
-            if args.verbose {
-                println!("🚀 Running: ./{bin_path}");
-                println!("─────────────────────────────────────────\n");
-            }
-
-            let exit_status = std::process::Command::new(format!("./{bin_path}"))
-                .status()
-                .unwrap_or_else(|e| {
-                    eprintln!("❌ Failed to execute '{bin_path}': {e}");
-                    process::exit(1);
-                });
-
-            // Remove the temporary binary when no explicit output path was given.
-            if args.output.is_none() {
-                let _ = fs::remove_file(&bin_path);
-            }
-
-            if args.verbose {
-                println!("\n─────────────────────────────────────────");
-                println!("✅ Exited with code {}", exit_status.code().unwrap_or(0));
-            }
-
-            process::exit(exit_status.code().unwrap_or(0));
-        }
-
-        if !args.verbose {
-            println!("✅ Compiled successfully → {bin_path}");
-        }
-
-        return;
-    }
-
-    // ── Interpreter mode (default) ────────────────────────────────────────────
-    if args.verbose {
+        println!("✅ {} top-level item(s)", program.items.len());
         println!("▶️  Interpreting…");
-        println!("─────────────────────────────────────────\n");
+        println!("─────────────────────────────────────────");
     }
 
     match evaluate(&program) {
         Ok(_) => {
             if args.verbose {
-                println!("\n─────────────────────────────────────────");
+                println!("─────────────────────────────────────────");
                 println!("✅ Finished successfully");
             }
+            0
         }
         Err(e) => {
-            eprintln!("\n❌ Runtime error: {e}");
-            process::exit(1);
+            eprintln!("❌ Runtime error: {e}");
+            1
         }
     }
 }
+
+/// `halo build <file>` — compile to a native binary via LLVM.
+///
+/// Supports two toolchains:
+///   - `clang`  (default): `clang <file.ll> -o <out>`
+///   - `llc`             : `llc <file.ll> -o <file.s>` → `cc <file.s> -o <out>`
+fn cmd_build(args: &Args) -> i32 {
+    let source = match read_source(&args.file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("❌ {e}");
+            return 1;
+        }
+    };
+
+    if args.verbose {
+        eprintln!("╔════════════════════════════════════════╗");
+        eprintln!("║     🏗️  Halo Build Pipeline            ║");
+        eprintln!("╚════════════════════════════════════════╝");
+        eprintln!();
+        eprintln!("📂 Source    : {}", args.file);
+        eprintln!("🔧 Toolchain : {}", args.toolchain.name());
+    }
+
+    // ── Lex ───────────────────────────────────────────────────────────────────
+    if args.verbose {
+        eprintln!("🔍 Tokenising…");
+    }
+    let tokens = tokenize(&source);
+    if args.verbose {
+        eprintln!("✅ {} tokens\n", tokens.len());
+    }
+
+    // ── Parse ─────────────────────────────────────────────────────────────────
+    if args.verbose {
+        eprintln!("📝 Parsing…");
+    }
+    let program = match parse_tokens(tokens) {
+        Ok(p) => p,
+        Err(errors) => {
+            eprintln!("❌ Parse error(s):");
+            for e in &errors {
+                eprintln!("   {e}");
+            }
+            return 1;
+        }
+    };
+    if args.verbose {
+        eprintln!("✅ {} top-level item(s)\n", program.items.len());
+    }
+
+    // ── Codegen ───────────────────────────────────────────────────────────────
+    let stem = file_stem(&args.file);
+    let bin_path = args.output.as_deref().unwrap_or(stem).to_string();
+    let ll_path = format!("{stem}.ll");
+
+    if args.verbose {
+        eprintln!("⚙️  Generating LLVM IR…");
+    }
+    let mut comp = Compilation::new(stem);
+    if let Err(e) = comp.codegen().compile(&program) {
+        eprintln!("❌ Code generation error: {e}");
+        return 1;
+    }
+    if args.verbose {
+        eprintln!("✅ LLVM IR ready\n");
+    }
+
+    // ── Optimise ──────────────────────────────────────────────────────────────
+    if args.opt_level != OptLevel::O0 {
+        if args.verbose {
+            eprintln!("⚡ Optimising (O{})…", args.opt_level.as_u32());
+        }
+        if let Err(e) = comp.optimise(args.opt_level) {
+            eprintln!("❌ Optimisation error: {e}");
+            return 1;
+        }
+        if args.verbose {
+            eprintln!("✅ Optimisation done\n");
+        }
+    }
+
+    // ── Emit .ll ──────────────────────────────────────────────────────────────
+    if let Err(e) = comp.emit_llvm(&ll_path) {
+        eprintln!("❌ Failed to write LLVM IR: {e}");
+        return 1;
+    }
+    if args.verbose && args.emit_llvm {
+        eprintln!("💾 LLVM IR saved to: {ll_path}\n");
+    }
+
+    // ── Link ──────────────────────────────────────────────────────────────────
+    let link_ok = match args.toolchain {
+        Toolchain::Clang => link_with_clang(&ll_path, &bin_path, args),
+        Toolchain::Llc => link_with_llc(&ll_path, &bin_path, args),
+    };
+
+    // ── Clean up intermediate .ll ─────────────────────────────────────────────
+    if !args.emit_llvm {
+        let _ = fs::remove_file(&ll_path);
+    }
+
+    if !link_ok {
+        return 1;
+    }
+
+    if args.verbose {
+        eprintln!("✅ Binary → {bin_path}\n");
+        eprintln!("╔════════════════════════════════════════╗");
+        eprintln!("║      ✅ Build successful!              ║");
+        eprintln!("╚════════════════════════════════════════╝");
+    } else {
+        println!("✅ {bin_path}");
+    }
+
+    // ── Optional: run immediately ─────────────────────────────────────────────
+    if args.run_after_build {
+        if args.verbose {
+            eprintln!("\n🚀 Running ./{bin_path}");
+            eprintln!("─────────────────────────────────────────");
+        }
+
+        let status = process::Command::new(format!("./{bin_path}"))
+            .status()
+            .unwrap_or_else(|e| {
+                eprintln!("❌ Failed to run '{bin_path}': {e}");
+                process::exit(1);
+            });
+
+        // Remove temporary binary if the user did not specify an explicit output.
+        if args.output.is_none() {
+            let _ = fs::remove_file(&bin_path);
+        }
+
+        if args.verbose {
+            eprintln!("─────────────────────────────────────────");
+            eprintln!("✅ Exited with code {}", status.code().unwrap_or(0));
+        }
+
+        return status.code().unwrap_or(0);
+    }
+
+    0
+}
+
+/// Link using `clang <ll_path> -o <bin_path>` (default toolchain).
+fn link_with_clang(ll_path: &str, bin_path: &str, args: &Args) -> bool {
+    if args.verbose {
+        eprintln!("🔨 Linking with clang…");
+    }
+
+    let mut cmd = process::Command::new("clang");
+    cmd.args([ll_path, args.opt_level.clang_flag(), "-o", bin_path, "-lm"]);
+
+    if !run_command(cmd, "clang", args.verbose) {
+        eprintln!("❌ clang failed. Is clang installed?");
+        return false;
+    }
+
+    if args.verbose {
+        eprintln!("✅ Linked via clang\n");
+    }
+    true
+}
+
+/// Link using `llc` (IR → assembly) then `cc` (assembly → binary).
+///
+/// This is the former `haloc` toolchain, now available as
+/// `halo build --toolchain llc`.
+fn link_with_llc(ll_path: &str, bin_path: &str, args: &Args) -> bool {
+    let asm_path = format!("{bin_path}.s");
+
+    // ── Step A: llc — IR → assembly ───────────────────────────────────────────
+    if args.verbose {
+        eprintln!("🔨 Compiling IR to assembly (llc)…");
+    }
+
+    let mut llc = process::Command::new("llc");
+    llc.arg(ll_path).arg("-o").arg(&asm_path);
+    if args.opt_level != OptLevel::O0 {
+        llc.arg(args.opt_level.clang_flag()); // llc accepts -O0 .. -O3 too
+    }
+
+    if !run_command(llc, "llc", args.verbose) {
+        eprintln!("❌ llc failed. Is llc installed?");
+        return false;
+    }
+
+    if args.verbose {
+        eprintln!("✅ Assembly: {asm_path}\n");
+        eprintln!("🔗 Linking with cc…");
+    }
+
+    // ── Step B: cc — assembly → executable ────────────────────────────────────
+    let mut cc = process::Command::new("cc");
+    cc.arg(&asm_path).arg("-o").arg(bin_path);
+
+    if !run_command(cc, "cc", args.verbose) {
+        eprintln!("❌ cc failed. Is a C compiler installed?");
+        let _ = fs::remove_file(&asm_path);
+        return false;
+    }
+
+    // Always remove the intermediate assembly file.
+    let _ = fs::remove_file(&asm_path);
+
+    if args.verbose {
+        eprintln!("✅ Linked via llc + cc\n");
+    }
+    true
+}
+
+/// `halo check <file>` — lex + parse, report errors, exit 0 if clean.
+fn cmd_check(args: &Args) -> i32 {
+    let source = match read_source(&args.file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("❌ {e}");
+            return 1;
+        }
+    };
+
+    let tokens = tokenize(&source);
+
+    match parse_tokens(tokens) {
+        Ok(program) => {
+            println!(
+                "✅ {} — OK ({} top-level item(s))",
+                args.file,
+                program.items.len()
+            );
+            0
+        }
+        Err(errors) => {
+            eprintln!("❌ {} — {} error(s):", args.file, errors.len());
+            for e in &errors {
+                eprintln!("   {e}");
+            }
+            1
+        }
+    }
+}
+
+/// `halo tokens <file>` — print the token stream and exit.
+fn cmd_tokens(args: &Args) -> i32 {
+    let source = match read_source(&args.file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("❌ {e}");
+            return 1;
+        }
+    };
+
+    let tokens = tokenize(&source);
+
+    println!("╔════════════════════════════════════════╗");
+    println!("║       📋 Token Stream — {:<14} ║", file_stem(&args.file));
+    println!("╚════════════════════════════════════════╝");
+    println!();
+
+    for (i, tok) in tokens.iter().enumerate() {
+        match tok.kind {
+            TokenKind::Eof => {
+                println!("{i:4}  EOF");
+            }
+            TokenKind::Newline => {
+                println!(
+                    "{i:4}  NEWLINE                     {}:{}",
+                    tok.position.line, tok.position.column
+                );
+            }
+            _ => {
+                println!(
+                    "{i:4}  {:<20} {:>10}    {}:{}",
+                    format!("{:?}", tok.kind),
+                    format!("'{}'", tok.lexeme),
+                    tok.position.line,
+                    tok.position.column
+                );
+            }
+        }
+    }
+
+    println!();
+    println!("{} token(s)", tokens.len());
+    0
+}
+
+/// `halo ast <file>` — print the Abstract Syntax Tree and exit.
+fn cmd_ast(args: &Args) -> i32 {
+    let source = match read_source(&args.file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("❌ {e}");
+            return 1;
+        }
+    };
+
+    let tokens = tokenize(&source);
+
+    let program = match parse_tokens(tokens) {
+        Ok(p) => p,
+        Err(errors) => {
+            eprintln!("❌ Parse error(s):");
+            for e in &errors {
+                eprintln!("   {e}");
+            }
+            return 1;
+        }
+    };
+
+    println!("╔════════════════════════════════════════╗");
+    println!(
+        "║   🌳 Abstract Syntax Tree — {:<11} ║",
+        file_stem(&args.file)
+    );
+    println!("╚════════════════════════════════════════╝");
+    println!();
+
+    for (i, item) in program.items.iter().enumerate() {
+        println!("[{i}] {item_kind}", item_kind = toplevel_kind(item));
+        match item {
+            parser::ast::TopLevel::Function {
+                name, params, body, ..
+            } => {
+                println!("    name   : {name}");
+                if params.is_empty() {
+                    println!("    params : (none)");
+                } else {
+                    println!("    params : {}", params.join(", "));
+                }
+                println!("    body   : {} statement(s)", body.stmts.len());
+                for (j, stmt) in body.stmts.iter().enumerate() {
+                    println!("      [{j}] {stmt}");
+                }
+            }
+            parser::ast::TopLevel::GlobalVar { name, init, .. } => {
+                println!("    name   : {name}");
+                match init {
+                    Some(expr) => println!("    init   : {expr}"),
+                    None => println!("    init   : (none)"),
+                }
+            }
+            parser::ast::TopLevel::Stmt { stmt, .. } => {
+                println!("    stmt   : {stmt}");
+            }
+        }
+        println!();
+    }
+
+    println!("{} top-level item(s)", program.items.len());
+    0
+}
+
+fn toplevel_kind(item: &parser::ast::TopLevel) -> &'static str {
+    match item {
+        parser::ast::TopLevel::Function { .. } => "Function",
+        parser::ast::TopLevel::GlobalVar { .. } => "GlobalVar",
+        parser::ast::TopLevel::Stmt { .. } => "Stmt",
+    }
+}
+
+/// `halo llvm <file>` — emit LLVM IR to a `.ll` file.
+fn cmd_llvm(args: &Args) -> i32 {
+    let source = match read_source(&args.file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("❌ {e}");
+            return 1;
+        }
+    };
+
+    if args.verbose {
+        eprintln!("🔍 Tokenising…");
+    }
+    let tokens = tokenize(&source);
+
+    if args.verbose {
+        eprintln!("📝 Parsing…");
+    }
+    let program = match parse_tokens(tokens) {
+        Ok(p) => p,
+        Err(errors) => {
+            eprintln!("❌ Parse error(s):");
+            for e in &errors {
+                eprintln!("   {e}");
+            }
+            return 1;
+        }
+    };
+
+    let stem = file_stem(&args.file);
+    let ll_path = args.output.clone().unwrap_or_else(|| format!("{stem}.ll"));
+
+    if args.verbose {
+        eprintln!("⚙️  Generating LLVM IR…");
+    }
+    let mut comp = Compilation::new(stem);
+    if let Err(e) = comp.codegen().compile(&program) {
+        eprintln!("❌ Code generation error: {e}");
+        return 1;
+    }
+
+    if args.opt_level != OptLevel::O0 {
+        if args.verbose {
+            eprintln!("⚡ Optimising (O{})…", args.opt_level.as_u32());
+        }
+        if let Err(e) = comp.optimise(args.opt_level) {
+            eprintln!("❌ Optimisation error: {e}");
+            return 1;
+        }
+    }
+
+    if let Err(e) = comp.emit_llvm(&ll_path) {
+        eprintln!("❌ Failed to write '{ll_path}': {e}");
+        return 1;
+    }
+
+    println!("✅ LLVM IR → {ll_path}");
+    0
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+fn main() {
+    let args = match parse_args() {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("❌ {e}");
+            process::exit(1);
+        }
+    };
+
+    let exit_code = match args.subcommand {
+        Subcommand::Run => cmd_run(&args),
+        Subcommand::Build => cmd_build(&args),
+        Subcommand::Check => cmd_check(&args),
+        Subcommand::Tokens => cmd_tokens(&args),
+        Subcommand::Ast => cmd_ast(&args),
+        Subcommand::Llvm => cmd_llvm(&args),
+    };
+
+    process::exit(exit_code);
+}
+

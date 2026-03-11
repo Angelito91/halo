@@ -7,10 +7,6 @@ edition = "2021"
 name = "halo"
 path = "src/main.rs"
 
-[[bin]]
-name = "haloc"
-path = "src/bin/haloc.rs"
-
 [dependencies]
 inkwell = { version = "0.8.0", features = ["llvm21-1"] }
 
