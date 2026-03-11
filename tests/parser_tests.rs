@@ -145,6 +145,7 @@ fn test_global_var_initializer_is_bool_false() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)] // intentionally parsing the literal "3.14" from source
 fn test_global_var_initializer_is_float_literal() {
     let prog = parse_ok("pi = 3.14");
     match &prog.items[0] {
@@ -152,7 +153,7 @@ fn test_global_var_initializer_is_float_literal() {
             init: Some(Expression::Float(f, _)),
             ..
         } => {
-            assert!((*f - 3.14).abs() < 1e-10);
+            assert!((*f - 3.14_f64).abs() < 1e-10);
         }
         other => panic!("expected Float initialiser, got {other:?}"),
     }

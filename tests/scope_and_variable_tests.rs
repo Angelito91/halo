@@ -470,6 +470,7 @@ flag = "yes"
 }
 
 #[test]
+#[allow(clippy::approx_constant)] // intentionally parsing the literal "3.14" from source
 fn test_variable_can_change_from_int_to_float() {
     let code = "
 n = 1

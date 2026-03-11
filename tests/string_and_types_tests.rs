@@ -3,6 +3,10 @@
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
+//
+// 3.14 literals throughout this file are Halo source code snippets under test,
+// not mathematical approximations of PI — suppress the lint file-wide.
+#![allow(clippy::approx_constant)]
 
 mod common;
 

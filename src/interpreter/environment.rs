@@ -271,9 +271,9 @@ mod tests {
     #[test]
     fn test_get_ref() {
         let mut env = Environment::new();
-        env.set("pi".to_string(), Value::Float(3.14));
+        env.set("pi".to_string(), Value::Float(std::f64::consts::PI));
         let r = env.get_ref("pi").unwrap();
-        assert!(matches!(r, Value::Float(f) if (*f - 3.14).abs() < 1e-10));
+        assert!(matches!(r, Value::Float(f) if (*f - std::f64::consts::PI).abs() < 1e-10));
     }
 
     #[test]

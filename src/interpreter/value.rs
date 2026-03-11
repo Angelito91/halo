@@ -449,7 +449,7 @@ mod tests {
     #[test]
     fn test_to_int() {
         assert_eq!(Value::Number(42).to_int().unwrap(), 42);
-        assert_eq!(Value::Float(3.14).to_int().unwrap(), 3);
+        assert_eq!(Value::Float(std::f64::consts::PI).to_int().unwrap(), 3);
         assert_eq!(Value::Bool(true).to_int().unwrap(), 1);
     }
 

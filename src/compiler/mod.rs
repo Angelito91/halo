@@ -117,6 +117,7 @@ impl Compilation {
     }
 
     /// Print the LLVM IR to stdout.
+    #[allow(dead_code)]
     pub fn print_ir(&self) {
         println!(
             "{}",

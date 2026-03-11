@@ -168,9 +168,10 @@ fn test_float_division() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)] // intentionally parsing the literal "-3.14" from source
 fn test_float_unary_negation() {
     let result = eval_float("x = -3.14", "x");
-    assert!((result - (-3.14)).abs() < 1e-10);
+    assert!((result - (-3.14_f64)).abs() < 1e-10);
 }
 
 // ── Mixed integer / float promotion ──────────────────────────────────────────
