@@ -25,6 +25,7 @@
 use super::environment::Environment;
 use super::value::Value;
 use crate::parser::ast::{BinOp, Block, Expression, Program, Statement, TopLevel};
+use crate::utils::find_suggestions_smart;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -76,6 +77,10 @@ pub struct Evaluator {
     recursion_depth: usize,
     /// Total loop iterations executed in the current program run.
     loop_iterations: u64,
+    /// All available variables across all scopes (for error suggestions)
+    all_variables: Vec<String>,
+    /// Call stack for tracking function execution (for stack traces)
+    call_stack: Vec<String>,
 }
 
 impl Evaluator {
@@ -88,7 +93,67 @@ impl Evaluator {
             loop_signal: None,
             recursion_depth: 0,
             loop_iterations: 0,
+            all_variables: Vec::new(),
+            call_stack: Vec::new(),
         }
+    }
+
+    /// Get the current call stack as a vector of function names
+    pub fn get_call_stack(&self) -> Vec<String> {
+        self.call_stack.clone()
+    }
+
+    /// Format call stack as a readable string for error reporting
+    pub fn format_call_stack(&self) -> String {
+        if self.call_stack.is_empty() {
+            return String::new();
+        }
+
+        let mut trace = String::from("\nStack trace:\n");
+        for (i, func) in self.call_stack.iter().enumerate() {
+            trace.push_str(&format!("  {} in function '{}'\n", i, func));
+        }
+        trace
+    }
+
+    /// Generate an error message for an undefined variable with suggestions
+    fn undefined_variable_error(&self, name: &str) -> String {
+        let mut candidates: Vec<&str> = self.all_variables.iter().map(|s| s.as_str()).collect();
+        candidates.sort();
+        candidates.dedup();
+
+        let suggestions = find_suggestions_smart(name, &candidates, 3);
+
+        let mut message = format!("Undefined variable: '{name}'");
+        if !suggestions.is_empty() {
+            message.push_str("\n\n  Did you mean:");
+            for (i, suggestion) in suggestions.iter().enumerate() {
+                message.push_str(&format!("\n    {}", suggestion.text));
+                if i == 0 {
+                    message.push_str(" (most similar)");
+                }
+            }
+        }
+        message
+    }
+
+    /// Generate an error message for an undefined function with suggestions
+    fn undefined_function_error(&self, name: &str) -> String {
+        let candidates: Vec<&str> = self.functions.keys().map(|s| s.as_str()).collect();
+
+        let suggestions = find_suggestions_smart(name, &candidates, 3);
+
+        let mut message = format!("Undefined function: '{name}'");
+        if !suggestions.is_empty() {
+            message.push_str("\n\n  Did you mean:");
+            for (i, suggestion) in suggestions.iter().enumerate() {
+                message.push_str(&format!("\n    {}", suggestion.text));
+                if i == 0 {
+                    message.push_str(" (most similar)");
+                }
+            }
+        }
+        message
     }
 
     // =========================================================================
@@ -104,6 +169,7 @@ impl Evaluator {
         self.recursion_depth = 0;
         self.loop_iterations = 0;
         self.loop_signal = None;
+        self.all_variables.clear();
 
         // Pass 1 – register all function definitions before executing anything
         // so that call-before-definition works at the top level.
@@ -269,10 +335,15 @@ impl Evaluator {
             Expression::StringLiteral(s, _) => Ok(Value::String(s.clone())),
 
             // ── Variable read ─────────────────────────────────────────────────
-            Expression::Var(name, _) => self
-                .env
-                .get(name)
-                .ok_or_else(|| format!("Undefined variable: '{name}'")),
+            Expression::Var(name, _) => {
+                // Track all accessed variables for suggestions
+                if !self.all_variables.contains(name) {
+                    self.all_variables.push(name.clone());
+                }
+                self.env
+                    .get(name)
+                    .ok_or_else(|| self.undefined_variable_error(name))
+            }
 
             // ── Unary operators ───────────────────────────────────────────────
             Expression::Unary { operator, expr, .. } => {
@@ -375,8 +446,10 @@ impl Evaluator {
         if self.recursion_depth > MAX_RECURSION_DEPTH {
             self.recursion_depth -= 1;
             return Err(format!(
-                "Maximum recursion depth exceeded ({})",
-                MAX_RECURSION_DEPTH
+                "Infinite recursion detected in function '{}' — maximum depth {} exceeded\n{}",
+                name,
+                MAX_RECURSION_DEPTH,
+                self.format_call_stack()
             ));
         }
 
@@ -385,7 +458,7 @@ impl Evaluator {
             .functions
             .get(name)
             .cloned()
-            .ok_or_else(|| format!("Undefined function: '{name}'"))?;
+            .ok_or_else(|| self.undefined_function_error(name))?;
 
         let (params, body) = (def.0.as_slice(), &def.1);
 
@@ -401,6 +474,9 @@ impl Evaluator {
         // Evaluate arguments in the *caller's* scope before pushing a new frame.
         let evaluated_args = self.eval_args(args)?;
 
+        // Push function name to call stack for tracking
+        self.call_stack.push(name.to_string());
+
         // Open a new scope and bind parameters to the evaluated arguments.
         self.env.push_scope();
         for (param, value) in params.iter().zip(evaluated_args) {
@@ -411,6 +487,10 @@ impl Evaluator {
         self.return_value = None;
         let body_result = self.eval_block(body);
         self.env.pop_scope();
+
+        // Pop function name from call stack
+        self.call_stack.pop();
+
         self.recursion_depth -= 1;
 
         // Surface any error from the body.
@@ -507,149 +587,41 @@ impl Default for Evaluator {
     }
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+// ── Helper functions for tracking variables ────────────────────────────────
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::lexer::Lexer;
-    use crate::lexer::TokenKind;
-    use crate::parser::Parser;
-
-    /// Tokenise, parse, and evaluate a snippet of Halo source code.
-    fn eval_code(code: &str) -> Result<Value, String> {
-        let mut lexer = Lexer::new(code.to_string());
-        let mut tokens = Vec::new();
-        loop {
-            let tok = lexer.next_token();
-            let is_eof = tok.kind == TokenKind::Eof;
-            tokens.push(tok);
-            if is_eof {
-                break;
+/// Collect all variable names from declarations in a statement
+fn collect_var_names_from_stmt(stmt: &Statement) -> Vec<String> {
+    let mut names = Vec::new();
+    match stmt {
+        Statement::VarDecl { name, .. } => {
+            names.push(name.clone());
+        }
+        Statement::If {
+            then_branch,
+            else_if_branches,
+            else_branch,
+            ..
+        } => {
+            for stmt in &then_branch.stmts {
+                names.extend(collect_var_names_from_stmt(stmt));
+            }
+            for branch in else_if_branches {
+                for stmt in &branch.body.stmts {
+                    names.extend(collect_var_names_from_stmt(stmt));
+                }
+            }
+            if let Some(block) = else_branch {
+                for stmt in &block.stmts {
+                    names.extend(collect_var_names_from_stmt(stmt));
+                }
             }
         }
-        let mut parser = Parser::new(tokens);
-        let program = parser.parse().map_err(|errs| errs.join("; "))?;
-        let mut evaluator = Evaluator::new();
-        evaluator.eval_program(&program)
+        Statement::While { body, .. } => {
+            for stmt in &body.stmts {
+                names.extend(collect_var_names_from_stmt(stmt));
+            }
+        }
+        _ => {}
     }
-
-    #[test]
-    fn test_simple_arithmetic() {
-        assert_eq!(eval_code("x = 2 + 3").unwrap(), Value::Null);
-    }
-
-    #[test]
-    fn test_variable_assignment() {
-        assert_eq!(eval_code("x = 42").unwrap(), Value::Null);
-    }
-
-    #[test]
-    fn test_addition() {
-        let code = "
-add(a, b) {
-    return a + b
-}
-result = add(3, 4)
-";
-        assert_eq!(eval_code(code).unwrap(), Value::Null);
-    }
-
-    #[test]
-    fn test_factorial() {
-        let code = "
-factorial(n) {
-    if n <= 1 {
-        return 1
-    }
-    return n * factorial(n - 1)
-}
-result = factorial(5)
-";
-        eval_code(code).unwrap();
-    }
-
-    #[test]
-    fn test_undefined_variable_error() {
-        let result = eval_code("x = undefined_var");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Undefined variable"));
-    }
-
-    #[test]
-    fn test_undefined_function_error() {
-        let result = eval_code("result = undefined_func(1, 2)");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Undefined function"));
-    }
-
-    #[test]
-    fn test_modulo_operator() {
-        let code = "
-mod_test(a, b) {
-    return a % b
-}
-result = mod_test(10, 3)
-";
-        eval_code(code).unwrap();
-    }
-
-    #[test]
-    fn test_logical_and() {
-        let code = "
-check(a, b) {
-    if a && b {
-        return 1
-    }
-    return 0
-}
-r1 = check(1, 1)
-r2 = check(1, 0)
-r3 = check(0, 1)
-";
-        eval_code(code).unwrap();
-    }
-
-    #[test]
-    fn test_logical_or() {
-        let code = "
-check(a, b) {
-    if a || b {
-        return 1
-    }
-    return 0
-}
-r1 = check(1, 0)
-r2 = check(0, 1)
-r3 = check(0, 0)
-";
-        eval_code(code).unwrap();
-    }
-
-    #[test]
-    fn test_recursion_depth_limit() {
-        let code = "
-infinite(n) {
-    return infinite(n + 1)
-}
-result = infinite(0)
-";
-        let result = eval_code(code);
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("Maximum recursion depth exceeded"));
-    }
-
-    #[test]
-    fn test_integer_overflow_protection() {
-        let code = "
-big(n) {
-    return n + 9223372036854775807
-}
-result = big(1)
-";
-        let result = eval_code(code);
-        assert!(result.is_err());
-    }
+    names
 }

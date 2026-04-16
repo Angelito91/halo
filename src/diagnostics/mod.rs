@@ -7,19 +7,32 @@
 //! Diagnostic system for error reporting with colored output and code snippets.
 
 pub mod colors;
+pub mod error_codes;
+pub mod style_checker;
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Severity level of a diagnostic message
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiagnosticLevel {
     Error,
     Warning,
     Note,
 }
 
+impl fmt::Display for DiagnosticLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Error => write!(f, "error"),
+            Self::Warning => write!(f, "warning"),
+            Self::Note => write!(f, "note"),
+        }
+    }
+}
+
 /// Source location information for diagnostics
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiagnosticLocation {
     pub file: String,
     pub line: u32,
@@ -27,12 +40,69 @@ pub struct DiagnosticLocation {
     pub source_lines: Vec<String>,
 }
 
+/// Stack frame in a call stack trace
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StackFrame {
+    pub function: String,
+    pub file: String,
+    pub line: u32,
+    pub column: u32,
+}
+
+/// Call stack trace for runtime errors
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StackTrace {
+    pub frames: Vec<StackFrame>,
+}
+
+impl StackTrace {
+    /// Create a new empty stack trace
+    pub fn new() -> Self {
+        StackTrace { frames: Vec::new() }
+    }
+
+    /// Add a frame to the stack trace
+    pub fn push_frame(&mut self, function: String, file: String, line: u32, column: u32) {
+        self.frames.push(StackFrame {
+            function,
+            file,
+            line,
+            column,
+        });
+    }
+
+    /// Format stack trace for display
+    pub fn format_display(&self) -> String {
+        if self.frames.is_empty() {
+            return String::new();
+        }
+
+        let mut output = String::from("\nStack trace:\n");
+        for (i, frame) in self.frames.iter().enumerate() {
+            output.push_str(&format!(
+                "  {} in function '{}' at {}:{}:{}\n",
+                i, frame.function, frame.file, frame.line, frame.column
+            ));
+        }
+        output
+    }
+}
+
+impl Default for StackTrace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A diagnostic message with optional location and hints
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Diagnostic {
     pub level: DiagnosticLevel,
     pub message: String,
     pub location: Option<DiagnosticLocation>,
     pub hints: Vec<String>,
+    pub stack_trace: Option<StackTrace>,
+    pub error_code: Option<String>,
 }
 
 impl Diagnostic {
@@ -43,6 +113,8 @@ impl Diagnostic {
             message: message.into(),
             location: None,
             hints: Vec::new(),
+            stack_trace: None,
+            error_code: None,
         }
     }
 
@@ -53,6 +125,8 @@ impl Diagnostic {
             message: message.into(),
             location: None,
             hints: Vec::new(),
+            stack_trace: None,
+            error_code: None,
         }
     }
 
@@ -63,6 +137,8 @@ impl Diagnostic {
             message: message.into(),
             location: None,
             hints: Vec::new(),
+            stack_trace: None,
+            error_code: None,
         }
     }
 
@@ -84,15 +160,57 @@ impl Diagnostic {
         self
     }
 
+    /// Add error code to diagnostic
+    pub fn with_error_code(mut self, code: impl Into<String>) -> Self {
+        self.error_code = Some(code.into());
+        self
+    }
+
+    /// Add stack trace to diagnostic
+    pub fn with_stack_trace(mut self, trace: StackTrace) -> Self {
+        self.stack_trace = Some(trace);
+        self
+    }
+
+    /// Export diagnostic to JSON string
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+
+    /// Export diagnostic from JSON string
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
     /// Format and write the diagnostic to any writer
     pub fn print(&self, out: &mut dyn fmt::Write) -> fmt::Result {
-        // Header with level
+        // Header with level and error code
         match self.level {
             DiagnosticLevel::Error => {
-                writeln!(out, "{}: {}", colors::error("error"), self.message)?;
+                if let Some(code) = &self.error_code {
+                    writeln!(
+                        out,
+                        "{}[{}]: {}",
+                        colors::error("error"),
+                        code,
+                        self.message
+                    )?;
+                } else {
+                    writeln!(out, "{}: {}", colors::error("error"), self.message)?;
+                }
             }
             DiagnosticLevel::Warning => {
-                writeln!(out, "{}: {}", colors::warning("warning"), self.message)?;
+                if let Some(code) = &self.error_code {
+                    writeln!(
+                        out,
+                        "{}[{}]: {}",
+                        colors::warning("warning"),
+                        code,
+                        self.message
+                    )?;
+                } else {
+                    writeln!(out, "{}: {}", colors::warning("warning"), self.message)?;
+                }
             }
             DiagnosticLevel::Note => {
                 writeln!(out, "{}: {}", colors::info("note"), self.message)?;
@@ -146,6 +264,12 @@ impl Diagnostic {
             }
         }
 
+        // Stack trace if present
+        if let Some(trace) = &self.stack_trace {
+            writeln!(out)?;
+            write!(out, "{}", trace.format_display())?;
+        }
+
         Ok(())
     }
 
@@ -187,6 +311,93 @@ pub fn location_from_source(
         line,
         column,
         source_lines: extract_source_lines(source, line, context_lines),
+    }
+}
+
+/// Collection of diagnostics for a compilation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiagnosticCollection {
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+impl DiagnosticCollection {
+    /// Create a new empty collection
+    pub fn new() -> Self {
+        DiagnosticCollection {
+            diagnostics: Vec::new(),
+        }
+    }
+
+    /// Add a diagnostic to the collection
+    pub fn push(&mut self, diagnostic: Diagnostic) {
+        self.diagnostics.push(diagnostic);
+    }
+
+    /// Export all diagnostics to JSON
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+
+    /// Import diagnostics from JSON
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Get all errors
+    pub fn errors(&self) -> Vec<&Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|d| d.level == DiagnosticLevel::Error)
+            .collect()
+    }
+
+    /// Get all warnings
+    pub fn warnings(&self) -> Vec<&Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|d| d.level == DiagnosticLevel::Warning)
+            .collect()
+    }
+
+    /// Check if there are any errors
+    pub fn has_errors(&self) -> bool {
+        self.diagnostics
+            .iter()
+            .any(|d| d.level == DiagnosticLevel::Error)
+    }
+
+    /// Get count of errors and warnings
+    pub fn count_issues(&self) -> (usize, usize) {
+        let errors = self.errors().len();
+        let warnings = self.warnings().len();
+        (errors, warnings)
+    }
+
+    /// Print summary of all diagnostics
+    pub fn print_summary(&self) {
+        let (errors, warnings) = self.count_issues();
+        println!();
+        if errors > 0 || warnings > 0 {
+            println!(
+                "{}",
+                colors::error(&format!(
+                    "✗ {} error{}, {} warning{}",
+                    errors,
+                    if errors == 1 { "" } else { "s" },
+                    warnings,
+                    if warnings == 1 { "" } else { "s" }
+                ))
+            );
+        } else {
+            println!("{}", colors::highlight("✓ No issues found"));
+        }
+        println!();
+    }
+}
+
+impl Default for DiagnosticCollection {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

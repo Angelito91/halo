@@ -16,4 +16,7 @@ pub use diagnostics::colors;
 pub use interpreter::Evaluator;
 pub use lexer::Lexer;
 pub use parser::Parser;
-pub use utils::{CompilationStatistics, Timer};
+pub use utils::{
+    find_suggestions, find_suggestions_adaptive, find_suggestions_smart, CompilationStatistics,
+    Suggestion, Timer,
+};
