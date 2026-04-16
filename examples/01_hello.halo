@@ -1,26 +1,207 @@
 // Halo Programming Language
-// Example 01: Hello & Basic Arithmetic
+// Example 01: Hello World & Basic Arithmetic
 
-add(a, b) {
-    return a + b
+// ──────────────────────────────────────────────────────────────────────────
+// 1. THE SIMPLEST PROGRAM: Hello World
+// ──────────────────────────────────────────────────────────────────────────
+
+print("Hello, Halo!")
+print("Welcome to the Halo Programming Language")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 2. BASIC VARIABLES
+// ──────────────────────────────────────────────────────────────────────────
+
+// Create and print variables
+name = "Halo"
+version = 0.2
+year = 2024
+
+print("Language: " + name)
+print("Version: " + str(version))
+print("Year: " + str(year))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 3. BASIC ARITHMETIC
+// ──────────────────────────────────────────────────────────────────────────
+
+// Addition
+a = 10
+b = 5
+sum = a + b
+print("10 + 5 = " + str(sum))
+
+// Subtraction
+diff = a - b
+print("10 - 5 = " + str(diff))
+
+// Multiplication
+prod = a * b
+print("10 * 5 = " + str(prod))
+
+// Division (integer)
+quotient = a / b
+print("10 / 5 = " + str(quotient))
+
+// Modulo (remainder)
+remainder = 17 % 5
+print("17 % 5 = " + str(remainder))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 4. FUNCTIONS: Reusable Code
+// ──────────────────────────────────────────────────────────────────────────
+
+// Function: Add two numbers
+add(x, y) {
+    return x + y
 }
 
-sub(a, b) {
-    return a - b
+// Function: Subtract two numbers
+subtract(x, y) {
+    return x - y
 }
 
-mul(a, b) {
-    return a * b
+// Function: Multiply two numbers
+multiply(x, y) {
+    return x * y
 }
 
-// 10 + 5 = 15
-print(add(10, 5))
+// Function: Divide two numbers
+divide(x, y) {
+    return x / y
+}
 
-// 20 - 8 = 12
-print(sub(20, 8))
+// Function: Find maximum of two numbers
+max(x, y) {
+    if x > y {
+        return x
+    }
+    return y
+}
 
-// 6 * 7 = 42
-print(mul(6, 7))
+// Function: Find minimum of two numbers
+min(x, y) {
+    if x < y {
+        return x
+    }
+    return y
+}
 
-// chained calls: (2 + 3) * 4 = 20
-print(mul(add(2, 3), 4))
+// ──────────────────────────────────────────────────────────────────────────
+// 5. USING OUR FUNCTIONS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== Function Results ===")
+
+print("add(20, 8) = " + str(add(20, 8)))
+print("subtract(20, 8) = " + str(subtract(20, 8)))
+print("multiply(6, 7) = " + str(multiply(6, 7)))
+print("divide(30, 6) = " + str(divide(30, 6)))
+print("max(15, 42) = " + str(max(15, 42)))
+print("min(15, 42) = " + str(min(15, 42)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 6. CHAINING FUNCTION CALLS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== Chained Calls ===")
+
+// (2 + 3) * 4 = 20
+result1 = multiply(add(2, 3), 4)
+print("(2 + 3) * 4 = " + str(result1))
+
+// max(10, 20) + min(10, 20) = 30
+result2 = add(max(10, 20), min(10, 20))
+print("max(10, 20) + min(10, 20) = " + str(result2))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 7. DIFFERENT DATA TYPES
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== Data Types ===")
+
+// Numbers (integers)
+print("Integer: " + str(42))
+
+// Floats (decimals)
+pi = 3.14159
+print("Float: " + str(pi))
+
+// Booleans
+is_correct = true
+print("Boolean: " + str(is_correct))
+
+// Strings
+message = "Halo is cool!"
+print("String: " + message)
+
+// ──────────────────────────────────────────────────────────────────────────
+// 8. TYPE CONVERSION
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== Type Conversion ===")
+
+// Convert number to float
+num_as_float = float(42)
+print("42 as float: " + str(num_as_float))
+
+// Convert float to number
+float_as_num = int(3.99)
+print("3.99 as int: " + str(float_as_num))
+
+// Convert to string
+num_as_string = str(100)
+print("100 as string: " + num_as_string)
+
+// ──────────────────────────────────────────────────────────────────────────
+// 9. STRING OPERATIONS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== String Operations ===")
+
+greeting = "Hello"
+target = "Halo"
+full_greeting = greeting + ", " + target + "!"
+print(full_greeting)
+
+// String repetition
+dots = "." * 5
+print("Dots: " + dots)
+
+// String length
+text = "Halo"
+text_length = len(text)
+print("Length of '" + text + "': " + str(text_length))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 10. WORKING WITH ABSOLUTE VALUES
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== Absolute Values ===")
+
+print("abs(-42) = " + str(abs(-42)))
+print("abs(3.14) = " + str(abs(-3.14)))
+print("abs(0) = " + str(abs(0)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// SUMMARY
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("===========================================")
+print("You've learned the basics of Halo!")
+print("===========================================")
+print("✓ Variables")
+print("✓ Arithmetic operations")
+print("✓ Functions")
+print("✓ Data types")
+print("✓ Type conversion")
+print("✓ String operations")
+print("")
+print("Ready for the next example? Try: 02_conditionals.halo")

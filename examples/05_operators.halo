@@ -1,43 +1,407 @@
 // Halo Programming Language
-// Example 05: Variables & Logical Operators
+// Example 05: Operators - Complete Guide
 
-is_even(n) {
-    if n % 2 == 0 {
-        return 1
+// ──────────────────────────────────────────────────────────────────────────
+// 1. ARITHMETIC OPERATORS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 1. ARITHMETIC OPERATORS ===")
+print("")
+
+// Addition (+)
+print("--- Addition (+) ---")
+a = 10
+b = 3
+print(str(a) + " + " + str(b) + " = " + str(a + b))
+print("5.5 + 2.5 = " + str(5.5 + 2.5))
+
+// Subtraction (-)
+print("")
+print("--- Subtraction (-) ---")
+print(str(a) + " - " + str(b) + " = " + str(a - b))
+print("10.5 - 3.2 = " + str(10.5 - 3.2))
+
+// Multiplication (*)
+print("")
+print("--- Multiplication (*) ---")
+print(str(a) + " * " + str(b) + " = " + str(a * b))
+print("3.5 * 2.0 = " + str(3.5 * 2.0))
+
+// Division (/) - Integer division if both are integers
+print("")
+print("--- Division (/) ---")
+print("Integer division: 10 / 3 = " + str(10 / 3))
+print("Float division: 10.0 / 3 = " + str(10.0 / 3))
+print("Float division: 10 / 3.0 = " + str(10 / 3.0))
+
+// Modulo (%) - Remainder after division
+print("")
+print("--- Modulo (%) - Remainder ---")
+print("10 % 3 = " + str(10 % 3))
+print("20 % 7 = " + str(20 % 7))
+print("15 % 5 = " + str(15 % 5))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 2. UNARY OPERATORS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 2. UNARY OPERATORS ===")
+print("")
+
+// Unary minus (negation)
+print("--- Unary Minus (-x) ---")
+x = 42
+print("x = " + str(x))
+print("-x = " + str(-x))
+print("-(-x) = " + str(-(-x)))
+
+// Unary NOT (!)
+print("")
+print("--- Logical NOT (!) ---")
+print("!true = " + str(!true))
+print("!false = " + str(!false))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 3. STRING OPERATIONS WITH OPERATORS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 3. STRING OPERATIONS ===")
+print("")
+
+// String concatenation with +
+print("--- String Concatenation (+) ---")
+first = "Hello"
+second = "World"
+print(first + " " + second)
+print("2024 is in " + str(2024))
+
+// String repetition with *
+print("")
+print("--- String Repetition (*) ---")
+star = "*"
+print("Row 1: " + (star * 1))
+print("Row 2: " + (star * 2))
+print("Row 3: " + (star * 3))
+print("Row 4: " + (star * 4))
+print("Row 5: " + (star * 5))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 4. COMPARISON OPERATORS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 4. COMPARISON OPERATORS ===")
+print("")
+print("All comparison operators return true or false")
+print("")
+
+// Equal (==)
+print("--- Equal (==) ---")
+print("5 == 5: " + str(5 == 5))
+print("5 == 10: " + str(5 == 10))
+print("5.0 == 5: " + str(5.0 == 5))
+print('"hello" == "hello": ' + str("hello" == "hello"))
+
+// Not equal (!=)
+print("")
+print("--- Not Equal (!=) ---")
+print("5 != 10: " + str(5 != 10))
+print("5 != 5: " + str(5 != 5))
+
+// Less than (<)
+print("")
+print("--- Less Than (<) ---")
+print("3 < 10: " + str(3 < 10))
+print("10 < 3: " + str(10 < 3))
+print("10 < 10: " + str(10 < 10))
+
+// Greater than (>)
+print("")
+print("--- Greater Than (>) ---")
+print("10 > 3: " + str(10 > 3))
+print("3 > 10: " + str(3 > 10))
+print("10 > 10: " + str(10 > 10))
+
+// Less than or equal (<=)
+print("")
+print("--- Less Than or Equal (<=) ---")
+print("5 <= 10: " + str(5 <= 10))
+print("10 <= 10: " + str(10 <= 10))
+print("15 <= 10: " + str(15 <= 10))
+
+// Greater than or equal (>=)
+print("")
+print("--- Greater Than or Equal (>=) ---")
+print("10 >= 5: " + str(10 >= 5))
+print("10 >= 10: " + str(10 >= 10))
+print("5 >= 10: " + str(5 >= 10))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 5. LOGICAL OPERATORS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 5. LOGICAL OPERATORS ===")
+print("")
+
+// Logical AND (&&)
+print("--- Logical AND (&&) ---")
+print("Both must be true for result to be true")
+print("true && true: " + str(true && true))
+print("true && false: " + str(true && false))
+print("false && false: " + str(false && false))
+
+// Using in conditions
+print("")
+print("Practical use - Checking range [1, 100]:")
+in_range(n) {
+    if n >= 1 && n <= 100 {
+        return true
     }
-    return 0
+    return false
+}
+print("50 in [1, 100]? " + str(in_range(50)))
+print("150 in [1, 100]? " + str(in_range(150)))
+
+// Logical OR (||)
+print("")
+print("--- Logical OR (||) ---")
+print("At least one must be true for result to be true")
+print("true || true: " + str(true || true))
+print("true || false: " + str(true || false))
+print("false || false: " + str(false || false))
+
+// Using in conditions
+print("")
+print("Practical use - Checking if it's weekend:")
+is_weekend(day) {
+    if day == "Saturday" || day == "Sunday" {
+        return true
+    }
+    return false
+}
+print("Is Saturday weekend? " + str(is_weekend("Saturday")))
+print("Is Monday weekend? " + str(is_weekend("Monday")))
+
+// Logical NOT (!)
+print("")
+print("--- Logical NOT (!) ---")
+print("!true: " + str(!true))
+print("!false: " + str(!false))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 6. SHORT-CIRCUIT EVALUATION
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 6. SHORT-CIRCUIT EVALUATION ===")
+print("")
+print("Halo uses short-circuit evaluation for && and ||")
+print("")
+
+print("--- AND (&&) Short-circuit ---")
+print("If first operand is false, second is NOT evaluated")
+print("false && (any expression) = false (without evaluating)")
+print("")
+
+print("--- OR (||) Short-circuit ---")
+print("If first operand is true, second is NOT evaluated")
+print("true || (any expression) = true (without evaluating)")
+print("")
+
+// Example: This won't cause error because of short-circuit
+result = false && (10 / 0)
+print("false && (10 / 0) = " + str(result) + " (no error!)")
+
+result2 = true || (10 / 0)
+print("true || (10 / 0) = " + str(result2) + " (no error!)")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 7. OPERATOR PRECEDENCE (Order of Operations)
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 7. OPERATOR PRECEDENCE ===")
+print("")
+print("Highest to Lowest Priority:")
+print("  1. - (unary), ! (unary)")
+print("  2. *, /, %")
+print("  3. +, -")
+print("  4. <, >, <=, >=")
+print("  5. ==, !=")
+print("  6. &&")
+print("  7. ||")
+print("")
+
+// Without parentheses
+print("--- Examples ---")
+print("2 + 3 * 4 = " + str(2 + 3 * 4) + " (multiply first)")
+print("10 - 6 / 2 = " + str(10 - 6 / 2) + " (divide first)")
+print("2 * 3 + 4 * 5 = " + str(2 * 3 + 4 * 5))
+
+// With parentheses (overrides precedence)
+print("")
+print("--- With Parentheses ---")
+print("(2 + 3) * 4 = " + str((2 + 3) * 4) + " (addition first)")
+print("(10 - 6) / 2 = " + str((10 - 6) / 2) + " (subtraction first)")
+
+// Logical precedence
+print("")
+print("--- Logical Precedence ---")
+print("true || false && false = " + str(true || false && false) + " (AND before OR)")
+print("(true || false) && false = " + str((true || false) && false) + " (with parens)")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 8. PRACTICAL EXAMPLES
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 8. PRACTICAL EXAMPLES ===")
+print("")
+
+// Example 1: Check if year is leap year
+print("--- Example 1: Leap Year ---")
+is_leap_year(year) {
+    if year % 400 == 0 {
+        return true
+    } else if year % 100 == 0 {
+        return false
+    } else if year % 4 == 0 {
+        return true
+    } else {
+        return false
+    }
+}
+print("2024 is leap year? " + str(is_leap_year(2024)))
+print("2023 is leap year? " + str(is_leap_year(2023)))
+print("2000 is leap year? " + str(is_leap_year(2000)))
+
+// Example 2: Grade based on percentage
+print("")
+print("--- Example 2: Grade Conversion ---")
+get_grade(percentage) {
+    if percentage >= 90 {
+        return "A"
+    } else if percentage >= 80 {
+        return "B"
+    } else if percentage >= 70 {
+        return "C"
+    } else if percentage >= 60 {
+        return "D"
+    } else {
+        return "F"
+    }
+}
+print("85% = Grade " + get_grade(85))
+print("92% = Grade " + get_grade(92))
+print("55% = Grade " + get_grade(55))
+
+// Example 3: Validate password strength
+print("")
+print("--- Example 3: Password Strength ---")
+is_strong_password(pwd) {
+    long_enough = len(pwd) >= 8
+    has_upper = pwd != str(pwd)
+    return long_enough && has_upper
 }
 
-in_range(n, low, high) {
-    if n >= low && n <= high {
-        return 1
-    }
-    return 0
+// Example 4: Check valid triangle
+print("")
+print("--- Example 4: Valid Triangle ---")
+is_valid_triangle(a, b, c) {
+    return a + b > c && a + c > b && b + c > a
 }
+print("Triangle (3,4,5)? " + str(is_valid_triangle(3, 4, 5)))
+print("Triangle (1,1,10)? " + str(is_valid_triangle(1, 1, 10)))
+print("Triangle (5,5,5)? " + str(is_valid_triangle(5, 5, 5)))
 
-abs_val(n) {
-    if n < 0 {
-        return 0 - n
-    }
-    return n
+// Example 5: Complex conditions
+print("")
+print("--- Example 5: Complex Conditions ---")
+is_eligible_for_discount(age, is_student, purchase_amount) {
+    senior_discount = age >= 65
+    student_discount = is_student && age < 25
+    bulk_discount = purchase_amount >= 100
+    return senior_discount || student_discount || bulk_discount
 }
+print("65 year old? " + str(is_eligible_for_discount(65, false, 50)))
+print("20 year old student? " + str(is_eligible_for_discount(20, true, 30)))
+print("30 year old, $150 purchase? " + str(is_eligible_for_discount(30, false, 150)))
+print("30 year old, $50 purchase? " + str(is_eligible_for_discount(30, false, 50)))
 
-// Test is_even
-print(is_even(4))
-print(is_even(7))
-print(is_even(0))
+// ──────────────────────────────────────────────────────────────────────────
+// 9. OPERATOR COMBINATIONS
+// ──────────────────────────────────────────────────────────────────────────
 
-// Test in_range
-print(in_range(5, 1, 10))
-print(in_range(15, 1, 10))
+print("")
+print("=== 9. OPERATOR COMBINATIONS ===")
+print("")
 
-// Test abs_val
-print(abs_val(9))
-print(abs_val(0 - 9))
+x = 10
+y = 3
 
-// Inline expressions
-x = 3
-y = 7
-print(x + y)
-print(x * y)
-print(y - x)
+print("Starting with x = " + str(x) + ", y = " + str(y))
+print("")
+
+// Arithmetic combinations
+print("--- Arithmetic ---")
+print("x + y * 2 = " + str(x + y * 2))
+print("(x + y) * 2 = " + str((x + y) * 2))
+print("x / y + 1 = " + str(x / y + 1))
+
+// Comparison combinations
+print("")
+print("--- Comparisons ---")
+print("x > y && x < 20 = " + str(x > y && x < 20))
+print("x == 10 || x == 20 = " + str(x == 10 || x == 20))
+print("!(x < 5) = " + str(!(x < 5)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 10. SUMMARY TABLE OF ALL OPERATORS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== SUMMARY TABLE ===")
+print("")
+print("Category      | Operator | Example       | Result")
+print("─────────────────────────────────────────────────")
+print("Arithmetic    | +        | 5 + 3         | 8")
+print("              | -        | 5 - 3         | 2")
+print("              | *        | 5 * 3         | 15")
+print("              | /        | 5 / 2         | 2")
+print("              | %        | 5 % 2         | 1")
+print("─────────────────────────────────────────────────")
+print("Comparison    | ==       | 5 == 5        | true")
+print("              | !=       | 5 != 3        | true")
+print("              | <        | 5 < 10        | true")
+print("              | >        | 5 > 3         | true")
+print("              | <=       | 5 <= 5        | true")
+print("              | >=       | 5 >= 3        | true")
+print("─────────────────────────────────────────────────")
+print("Logical       | &&       | true && true  | true")
+print("              | ||       | false || true | true")
+print("              | !        | !false        | true")
+print("─────────────────────────────────────────────────")
+print("String        | +        | 'a' + 'b'     | 'ab'")
+print("              | *        | 'ab' * 3      | 'ababab'")
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// SUMMARY
+// ──────────────────────────────────────────────────────────────────────────
+
+print("===========================================")
+print("You've mastered OPERATORS in Halo!")
+print("===========================================")
+print("✓ Arithmetic operators (+, -, *, /, %)")
+print("✓ Unary operators (-, !)")
+print("✓ String operations (+, *)")
+print("✓ Comparison operators (==, !=, <, >, <=, >=)")
+print("✓ Logical operators (&&, ||, !)")
+print("✓ Short-circuit evaluation")
+print("✓ Operator precedence")
+print("✓ Practical applications")
+print("")
+print("Ready for more? Try: 06_loops_advanced.halo")

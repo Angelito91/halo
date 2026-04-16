@@ -1,0 +1,484 @@
+// Halo Programming Language
+// Example 08: Practical Projects & Real-World Applications
+//
+// This file contains complete, working projects that demonstrate
+// how to combine all Halo features to solve real-world problems.
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 1: TEMPERATURE CONVERTER
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== PROJECT 1: Temperature Converter ===")
+print("")
+
+celsius_to_fahrenheit(c) {
+    return c * 9 / 5 + 32
+}
+
+fahrenheit_to_celsius(f) {
+    return (f - 32) * 5 / 9
+}
+
+celsius_to_kelvin(c) {
+    return c + 273.15
+}
+
+print("Temperature Conversions:")
+print("0°C = " + str(celsius_to_fahrenheit(0)) + "°F")
+print("100°C = " + str(celsius_to_fahrenheit(100)) + "°F")
+print("32°F = " + str(fahrenheit_to_celsius(32)) + "°C")
+print("212°F = " + str(fahrenheit_to_celsius(212)) + "°C")
+print("0°C = " + str(celsius_to_kelvin(0)) + "K")
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 2: STUDENT GRADE SYSTEM
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 2: Student Grade System ===")
+print("")
+
+get_letter_grade(score) {
+    if score >= 90 {
+        return "A"
+    } else if score >= 80 {
+        return "B"
+    } else if score >= 70 {
+        return "C"
+    } else if score >= 60 {
+        return "D"
+    } else {
+        return "F"
+    }
+}
+
+get_gpa(score) {
+    if score >= 90 {
+        return 4.0
+    } else if score >= 80 {
+        return 3.0
+    } else if score >= 70 {
+        return 2.0
+    } else if score >= 60 {
+        return 1.0
+    } else {
+        return 0.0
+    }
+}
+
+is_passing(score) {
+    if score >= 60 {
+        return true
+    }
+    return false
+}
+
+print("Grade Analysis:")
+scores = 5
+grades = 0
+total_gpa = 0.0
+
+print("Score -> Grade -> GPA -> Status")
+score = 95
+print(str(score) + " -> " + get_letter_grade(score) + " -> " + str(get_gpa(score)) + " -> " + str(is_passing(score)))
+
+score = 87
+print(str(score) + " -> " + get_letter_grade(score) + " -> " + str(get_gpa(score)) + " -> " + str(is_passing(score)))
+
+score = 72
+print(str(score) + " -> " + get_letter_grade(score) + " -> " + str(get_gpa(score)) + " -> " + str(is_passing(score)))
+
+score = 65
+print(str(score) + " -> " + get_letter_grade(score) + " -> " + str(get_gpa(score)) + " -> " + str(is_passing(score)))
+
+score = 45
+print(str(score) + " -> " + get_letter_grade(score) + " -> " + str(get_gpa(score)) + " -> " + str(is_passing(score)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 3: BMI (Body Mass Index) CALCULATOR
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 3: BMI Calculator ===")
+print("")
+
+calculate_bmi(weight_kg, height_m) {
+    bmi = weight_kg / (height_m * height_m)
+    return bmi
+}
+
+classify_bmi(bmi) {
+    if bmi < 18.5 {
+        return "Underweight"
+    } else if bmi < 25.0 {
+        return "Normal weight"
+    } else if bmi < 30.0 {
+        return "Overweight"
+    } else {
+        return "Obese"
+    }
+}
+
+print("BMI Classifications:")
+test_bmi_1 = calculate_bmi(60, 1.75)
+print("60kg, 1.75m: BMI = " + str(test_bmi_1) + " (" + classify_bmi(test_bmi_1) + ")")
+
+test_bmi_2 = calculate_bmi(85, 1.80)
+print("85kg, 1.80m: BMI = " + str(test_bmi_2) + " (" + classify_bmi(test_bmi_2) + ")")
+
+test_bmi_3 = calculate_bmi(50, 1.65)
+print("50kg, 1.65m: BMI = " + str(test_bmi_3) + " (" + classify_bmi(test_bmi_3) + ")")
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 4: SIMPLE TEXT STATISTICS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 4: Text Statistics ===")
+print("")
+
+count_words(text) {
+    words = 1
+    i = 0
+    while i < len(text) {
+        i = i + 1
+    }
+    return words
+}
+
+analyze_text(text) {
+    characters = len(text)
+    is_long = characters > 50
+    is_short = characters < 10
+    return characters
+}
+
+text_sample = "Halo is a beautiful programming language"
+char_count = analyze_text(text_sample)
+print("Text: " + text_sample)
+print("Characters: " + str(char_count))
+print("Length for URL-friendly: " + str(char_count < 30))
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 5: LOAN CALCULATOR
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 5: Loan Calculator ===")
+print("")
+
+calculate_monthly_payment(principal, annual_rate, years) {
+    monthly_rate = annual_rate / 12 / 100
+    num_payments = years * 12
+
+    if monthly_rate == 0 {
+        return principal / num_payments
+    }
+
+    payment = principal * (monthly_rate * (1 + monthly_rate) / ((1 + monthly_rate) - 1))
+    return payment
+}
+
+calculate_total_interest(principal, annual_rate, years) {
+    monthly_payment = calculate_monthly_payment(principal, annual_rate, years)
+    total_paid = monthly_payment * years * 12
+    interest = total_paid - principal
+    return interest
+}
+
+print("Loan Analysis:")
+print("")
+principal = 200000
+rate = 5.0
+years_loan = 30
+
+monthly = calculate_monthly_payment(principal, rate, years_loan)
+interest = calculate_total_interest(principal, rate, years_loan)
+total = principal + interest
+
+print("Principal: $" + str(principal))
+print("Annual Rate: " + str(rate) + "%")
+print("Years: " + str(years_loan))
+print("Monthly Payment: $" + str(monthly))
+print("Total Interest: $" + str(interest))
+print("Total Paid: $" + str(total))
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 6: TIME CONVERTER
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 6: Time Converter ===")
+print("")
+
+seconds_to_minutes(seconds) {
+    return seconds / 60
+}
+
+seconds_to_hours(seconds) {
+    return seconds / 3600
+}
+
+minutes_to_seconds(minutes) {
+    return minutes * 60
+}
+
+hours_to_seconds(hours) {
+    return hours * 3600
+}
+
+format_time(total_seconds) {
+    hours = total_seconds / 3600
+    remaining = total_seconds % 3600
+    minutes = remaining / 60
+    seconds = remaining % 60
+    return str(hours) + "h " + str(minutes) + "m " + str(seconds) + "s"
+}
+
+total_sec = 3661
+print("Time Conversions:")
+print(str(total_sec) + " seconds")
+print("= " + str(seconds_to_minutes(total_sec)) + " minutes")
+print("= " + str(seconds_to_hours(total_sec)) + " hours")
+print("Formatted: " + format_time(total_sec))
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 7: DISTANCE CONVERTER
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 7: Distance Converter ===")
+print("")
+
+kilometers_to_miles(km) {
+    return km * 0.621371
+}
+
+miles_to_kilometers(miles) {
+    return miles / 0.621371
+}
+
+meters_to_feet(meters) {
+    return meters * 3.28084
+}
+
+feet_to_meters(feet) {
+    return feet / 3.28084
+}
+
+print("Distance Conversions:")
+print("10 km = " + str(kilometers_to_miles(10)) + " miles")
+print("10 miles = " + str(miles_to_kilometers(10)) + " km")
+print("100 meters = " + str(meters_to_feet(100)) + " feet")
+print("100 feet = " + str(feet_to_meters(100)) + " meters")
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 8: DISCOUNT AND SALES TAX CALCULATOR
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 8: Discount & Tax Calculator ===")
+print("")
+
+apply_discount(price, discount_percent) {
+    discount_amount = price * discount_percent / 100
+    return price - discount_amount
+}
+
+apply_tax(price, tax_percent) {
+    tax_amount = price * tax_percent / 100
+    return price + tax_amount
+}
+
+final_price_with_discount_and_tax(price, discount, tax) {
+    after_discount = apply_discount(price, discount)
+    final = apply_tax(after_discount, tax)
+    return final
+}
+
+print("Shopping Calculation:")
+original = 100
+discount = 20
+tax = 10
+
+discounted = apply_discount(original, discount)
+with_tax = apply_tax(discounted, tax)
+
+print("Original Price: $" + str(original))
+print("After 20% discount: $" + str(discounted))
+print("After 10% tax: $" + str(with_tax))
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 9: PERFECT NUMBERS AND DIVISORS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 9: Number Analysis ===")
+print("")
+
+sum_of_divisors(n) {
+    sum = 0
+    i = 1
+    while i <= n {
+        if n % i == 0 {
+            sum = sum + i
+        }
+        i = i + 1
+    }
+    return sum
+}
+
+is_perfect_number(n) {
+    divisor_sum = sum_of_divisors(n) - n
+    return divisor_sum == n
+}
+
+count_divisors(n) {
+    count = 0
+    i = 1
+    while i <= n {
+        if n % i == 0 {
+            count = count + 1
+        }
+        i = i + 1
+    }
+    return count
+}
+
+print("Number Analysis:")
+print("Divisors of 12: " + str(count_divisors(12)))
+print("Divisors of 28: " + str(count_divisors(28)))
+print("Is 6 perfect? " + str(is_perfect_number(6)))
+print("Is 28 perfect? " + str(is_perfect_number(28)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 10: INTEREST COMPOUND CALCULATOR
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 10: Compound Interest ===")
+print("")
+
+compound_interest(principal, rate, years) {
+    amount = principal * (1 + rate / 100)
+    i = 1
+    while i < years {
+        amount = amount * (1 + rate / 100)
+        i = i + 1
+    }
+    return amount
+}
+
+print("Investment Growth:")
+initial = 1000
+rate_per_year = 5
+
+year = 1
+while year <= 10 {
+    future_value = compound_interest(initial, rate_per_year, year)
+    profit = future_value - initial
+    print("Year " + str(year) + ": $" + str(future_value) + " (profit: $" + str(profit) + ")")
+    year = year + 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 11: FIBONACCI SEQUENCE GENERATOR
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 11: Fibonacci Sequence Generator ===")
+print("")
+
+print_fibonacci_sequence(count) {
+    if count <= 0 {
+        return
+    }
+
+    a = 0
+    b = 1
+    i = 0
+
+    sequence = ""
+    while i < count {
+        sequence = sequence + str(a) + " "
+        next = a + b
+        a = b
+        b = next
+        i = i + 1
+    }
+
+    print(sequence)
+}
+
+print("Fibonacci sequences:")
+print("First 15 numbers: ")
+print_fibonacci_sequence(15)
+
+// ──────────────────────────────────────────────────────────────────────────
+// PROJECT 12: SIMPLE QUIZ GAME
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== PROJECT 12: Quiz Game Results ===")
+print("")
+
+check_answer(question_num, user_answer, correct_answer) {
+    if user_answer == correct_answer {
+        print("Q" + str(question_num) + ": CORRECT!")
+        return 1
+    } else {
+        print("Q" + str(question_num) + ": Wrong. Correct answer was: " + str(correct_answer))
+        return 0
+    }
+}
+
+calculate_score(correct, total) {
+    percentage = correct * 100 / total
+    return percentage
+}
+
+print("Quiz Results:")
+score = 0
+total_q = 5
+
+score = score + check_answer(1, 5, 5)
+score = score + check_answer(2, 10, 15)
+score = score + check_answer(3, 20, 20)
+score = score + check_answer(4, 15, 20)
+score = score + check_answer(5, 30, 30)
+
+final_score = calculate_score(score, total_q)
+print("")
+print("Final Score: " + str(score) + "/" + str(total_q) + " (" + str(final_score) + "%)")
+
+// ──────────────────────────────────────────────────────────────────────────
+// SUMMARY
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("===========================================")
+print("Completed 12 Practical Projects!")
+print("===========================================")
+print("")
+print("Projects included:")
+print("✓ Temperature Converter")
+print("✓ Student Grade System")
+print("✓ BMI Calculator")
+print("✓ Text Statistics")
+print("✓ Loan Calculator")
+print("✓ Time Converter")
+print("✓ Distance Converter")
+print("✓ Discount & Tax Calculator")
+print("✓ Number Analysis")
+print("✓ Compound Interest")
+print("✓ Fibonacci Sequence Generator")
+print("✓ Quiz Game")
+print("")
+print("These projects demonstrate:")
+print("• Real-world applications")
+print("• Complex logic and calculations")
+print("• Loop patterns and algorithms")
+print("• Function composition")
+print("• Practical problem-solving")
+print("")
+print("Congratulations! You now understand Halo!")

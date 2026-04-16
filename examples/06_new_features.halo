@@ -1,70 +1,480 @@
-// Halo Language - Test: 4 new fixed features
-// 1. String literals in LLVM compiler
-// 2. break / continue
-// 3. else if direct in parser
-// 4. if / while at top-level
+// Halo Programming Language
+// Example 06: Loops & Control Flow - Advanced Patterns
 
-// ─── 1. String literals ───────────────────────────────────────────────────────
-print("Hello, Halo!")
-print("Strings work in the compiler")
+// ──────────────────────────────────────────────────────────────────────────
+// 1. BASIC WHILE LOOP
+// ──────────────────────────────────────────────────────────────────────────
 
-// ─── 2. break / continue ─────────────────────────────────────────────────────
+print("=== 1. BASIC WHILE LOOP ===")
+print("")
 
-// break: stop at 5
-i = 0
-while i < 10 {
+print("--- Counting from 1 to 5 ---")
+i = 1
+while i <= 5 {
+    print(i)
     i = i + 1
-    if i == 5 {
+}
+
+print("")
+print("--- Countdown from 10 to 1 ---")
+countdown = 10
+while countdown >= 1 {
+    print(countdown)
+    countdown = countdown - 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 2. BREAK: Exit a Loop Early
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 2. BREAK: Exit Loop Early ===")
+print("")
+
+print("--- Stop when we reach 5 ---")
+num = 0
+while num < 100 {
+    if num == 5 {
+        print("Found 5! Breaking...")
         break
     }
+    print(num)
+    num = num + 1
 }
-print("break stopped at:")
-print(i)
+print("Loop ended at: " + str(num))
 
-// continue: skip even numbers, print odds 1..9
-j = 0
-while j < 10 {
-    j = j + 1
-    if j % 2 == 0 {
+// Practical example: Find a value in sequence
+print("")
+print("--- Find first number divisible by 7 ---")
+n = 1
+while n <= 100 {
+    if n % 7 == 0 {
+        print("Found: " + str(n))
+        break
+    }
+    n = n + 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 3. CONTINUE: Skip to Next Iteration
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 3. CONTINUE: Skip Iteration ===")
+print("")
+
+print("--- Print only odd numbers 1-10 ---")
+x = 0
+while x < 10 {
+    x = x + 1
+    if x % 2 == 0 {
         continue
     }
-    print(j)
+    print(x)
 }
 
-// ─── 3. else if ───────────────────────────────────────────────────────────────
-grade(score) {
-    if score >= 90 {
-        print("A")
-    } else if score >= 80 {
-        print("B")
-    } else if score >= 70 {
-        print("C")
-    } else if score >= 60 {
-        print("D")
-    } else {
-        print("F")
+print("")
+print("--- Print numbers except multiples of 3 ---")
+y = 0
+while y < 20 {
+    y = y + 1
+    if y % 3 == 0 {
+        continue
+    }
+    print(y)
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 4. LOOP PATTERNS: Sum and Accumulation
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 4. LOOP PATTERNS: Accumulation ===")
+print("")
+
+// Sum of numbers
+print("--- Sum 1 to 10 ---")
+total = 0
+i = 1
+while i <= 10 {
+    total = total + i
+    i = i + 1
+}
+print("Sum = " + str(total))
+
+// Product
+print("")
+print("--- Product 1 to 5 (factorial-like) ---")
+product = 1
+i = 1
+while i <= 5 {
+    product = product * i
+    i = i + 1
+}
+print("Product = " + str(product))
+
+// Count occurrences
+print("")
+print("--- Count multiples of 3 from 1-30 ---")
+count = 0
+i = 1
+while i <= 30 {
+    if i % 3 == 0 {
+        count = count + 1
+    }
+    i = i + 1
+}
+print("Count = " + str(count))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 5. NESTED LOOPS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 5. NESTED LOOPS ===")
+print("")
+
+print("--- Multiplication Table (3x3) ---")
+i = 1
+while i <= 3 {
+    j = 1
+    row = ""
+    while j <= 3 {
+        row = row + str(i * j) + " "
+        j = j + 1
+    }
+    print(row)
+    i = i + 1
+}
+
+print("")
+print("--- Pattern: Pyramid ---")
+row_num = 1
+while row_num <= 5 {
+    stars = ""
+    col = 1
+    while col <= row_num {
+        stars = stars + "*"
+        col = col + 1
+    }
+    print(stars)
+    row_num = row_num + 1
+}
+
+print("")
+print("--- Pattern: Diamond ---")
+size = 4
+i = 1
+while i <= size {
+    spaces = ""
+    s = 1
+    while s < i {
+        spaces = spaces + " "
+        s = s + 1
+    }
+    stars = ""
+    st = 1
+    while st <= 2 * i - 1 {
+        stars = stars + "*"
+        st = st + 1
+    }
+    print(spaces + stars)
+    i = i + 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 6. NESTED LOOPS WITH BREAK
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 6. NESTED LOOPS WITH BREAK ===")
+print("")
+
+print("--- Find pair that sums to target ---")
+target = 10
+found = false
+i = 1
+while i <= 20 {
+    j = 1
+    while j <= 20 {
+        if i + j == target {
+            print("Found: " + str(i) + " + " + str(j) + " = " + str(target))
+            found = true
+            break
+        }
+        j = j + 1
+    }
+    if found {
+        break
+    }
+    i = i + 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 7. PRACTICAL FUNCTION: Print a Table
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 7. PRACTICAL: Multiplication Table Generator ===")
+print("")
+
+print_multiplication_table(n) {
+    print("Multiplication Table (" + str(n) + "x" + str(n) + "):")
+    i = 1
+    while i <= n {
+        row = ""
+        j = 1
+        while j <= n {
+            product = i * j
+            row = row + str(product) + " "
+            j = j + 1
+        }
+        print(row)
+        i = i + 1
     }
 }
 
-grade(95)
-grade(83)
-grade(72)
-grade(61)
-grade(45)
+print_multiplication_table(5)
 
-// ─── 4. if / while at top-level ──────────────────────────────────────────────
-x = 7
+// ──────────────────────────────────────────────────────────────────────────
+// 8. PRACTICAL FUNCTION: Validate Input
+// ──────────────────────────────────────────────────────────────────────────
 
-if x > 5 {
-    print("x is greater than 5")
-} else {
-    print("x is not greater than 5")
+print("")
+print("=== 8. PRACTICAL: Input Validation ===")
+print("")
+
+is_all_digits(str_val) {
+    i = 0
+    while i < len(str_val) {
+        char = str(i)
+        i = i + 1
+    }
+    return true
 }
 
-count = 1
-while count <= 3 {
-    print(count)
-    count = count + 1
+is_positive_number(n) {
+    return n > 0
 }
 
-print("All features OK")
+validate_age(age) {
+    if age < 0 {
+        return "Invalid: negative age"
+    } else if age < 18 {
+        return "Valid: minor (" + str(age) + ")"
+    } else if age < 65 {
+        return "Valid: adult (" + str(age) + ")"
+    } else {
+        return "Valid: senior (" + str(age) + ")"
+    }
+}
+
+print(validate_age(-5))
+print(validate_age(15))
+print(validate_age(30))
+print(validate_age(75))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 9. LOOP WITH CONDITIONS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 9. LOOPS WITH COMPLEX CONDITIONS ===")
+print("")
+
+print("--- Print Fibonacci until > 100 ---")
+a = 0
+b = 1
+while b <= 100 {
+    print(b)
+    next = a + b
+    a = b
+    b = next
+}
+
+print("")
+print("--- Print powers of 2 up to 1000 ---")
+power = 1
+while power <= 1000 {
+    print(power)
+    power = power * 2
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 10. GCD (Greatest Common Divisor) USING LOOP
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 10. PRACTICAL: GCD Algorithm ===")
+print("")
+
+gcd(a, b) {
+    while b != 0 {
+        temp = b
+        b = a % b
+        a = temp
+    }
+    return a
+}
+
+print("GCD(48, 18) = " + str(gcd(48, 18)))
+print("GCD(100, 50) = " + str(gcd(100, 50)))
+print("GCD(17, 13) = " + str(gcd(17, 13)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 11. DIGIT SUM USING LOOPS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 11. PRACTICAL: Sum of Digits ===")
+print("")
+
+sum_of_digits(n) {
+    sum = 0
+    while n > 0 {
+        digit = n % 10
+        sum = sum + digit
+        n = n / 10
+    }
+    return sum
+}
+
+print("Sum of digits in 12345 = " + str(sum_of_digits(12345)))
+print("Sum of digits in 999 = " + str(sum_of_digits(999)))
+print("Sum of digits in 1 = " + str(sum_of_digits(1)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 12. REVERSE A NUMBER USING LOOP
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 12. PRACTICAL: Reverse Number ===")
+print("")
+
+reverse_number(n) {
+    reversed = 0
+    while n > 0 {
+        digit = n % 10
+        reversed = reversed * 10 + digit
+        n = n / 10
+    }
+    return reversed
+}
+
+print("Reverse of 12345 = " + str(reverse_number(12345)))
+print("Reverse of 9876 = " + str(reverse_number(9876)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 13. LOOPS EDGE CASES
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 13. LOOP EDGE CASES ===")
+print("")
+
+print("--- Empty loop (condition false from start) ---")
+i = 10
+while i < 5 {
+    print("This won't print")
+    i = i + 1
+}
+print("Skipped the empty loop")
+
+print("")
+print("--- Loop that executes once ---")
+j = 5
+while j < 10 {
+    print("j = " + str(j))
+    j = 100
+}
+
+print("")
+print("--- Early exit with break ---")
+k = 0
+while k < 100 {
+    if k == 3 {
+        break
+    }
+    print("k = " + str(k))
+    k = k + 1
+}
+print("Broke out at k = " + str(k))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 14. PRACTICAL: Simple Games/Algorithms
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 14. PRACTICAL: Guess the Pattern ===")
+print("")
+
+print("--- Prime numbers 1-20 ---")
+is_prime(n) {
+    if n < 2 {
+        return false
+    }
+    if n == 2 {
+        return true
+    }
+    if n % 2 == 0 {
+        return false
+    }
+    i = 3
+    while i * i <= n {
+        if n % i == 0 {
+            return false
+        }
+        i = i + 2
+    }
+    return true
+}
+
+num = 1
+while num <= 20 {
+    if is_prime(num) {
+        print(num)
+    }
+    num = num + 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 15. PERFORMANCE: Loop Optimization
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 15. LOOP PERFORMANCE TIPS ===")
+print("")
+print("✓ Keep loop body simple and efficient")
+print("✓ Minimize function calls inside loops")
+print("✓ Use break to exit early when possible")
+print("✓ Use continue to skip unnecessary work")
+print("✓ Avoid nested loops when possible")
+print("")
+print("Example: Instead of nested loops, use direct calculation:")
+
+sum_squares_direct = 0
+i = 1
+while i <= 10 {
+    sum_squares_direct = sum_squares_direct + i * i
+    i = i + 1
+}
+print("Sum of squares 1-10 = " + str(sum_squares_direct))
+
+// ──────────────────────────────────────────────────────────────────────────
+// SUMMARY
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("===========================================")
+print("You've mastered LOOPS & CONTROL FLOW!")
+print("===========================================")
+print("✓ While loops")
+print("✓ Break statement")
+print("✓ Continue statement")
+print("✓ Nested loops")
+print("✓ Loop patterns (sum, product, count)")
+print("✓ Practical algorithms (GCD, prime check, etc.)")
+print("✓ Loop optimization")
+print("")
+print("Ready for functions and recursion?")
+print("Try: 03_factorial.halo or 04_fibonacci.halo")

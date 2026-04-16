@@ -1,13 +1,202 @@
 // Halo Programming Language
-// Example 03: Factorial (Recursion)
+// Example 03: Factorial - Understanding Recursion
+
+// ──────────────────────────────────────────────────────────────────────────
+// 1. WHAT IS FACTORIAL?
+// ──────────────────────────────────────────────────────────────────────────
+// Factorial of n (written as n!) is the product of all positive integers
+// from 1 to n.
+//
+// Mathematical definition:
+//   0! = 1 (by definition)
+//   1! = 1
+//   2! = 2 × 1 = 2
+//   3! = 3 × 2 × 1 = 6
+//   4! = 4 × 3 × 2 × 1 = 24
+//   5! = 5 × 4 × 3 × 2 × 1 = 120
+//   n! = n × (n-1)!
+//
+// Recursion means a function calls itself to solve smaller versions
+// of the same problem.
+
+print("=== FACTORIAL: Understanding Recursion ===")
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 2. SIMPLE ITERATIVE FACTORIAL (using loops)
+// ──────────────────────────────────────────────────────────────────────────
+
+print("--- Method 1: ITERATIVE (using while loop) ---")
+
+factorial_iterative(n) {
+    if n < 0 {
+        return 0
+    }
+    result = 1
+    i = 1
+    while i <= n {
+        result = result * i
+        i = i + 1
+    }
+    return result
+}
+
+print("5! = " + str(factorial_iterative(5)))
+print("10! = " + str(factorial_iterative(10)))
+print("0! = " + str(factorial_iterative(0)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 3. RECURSIVE FACTORIAL (function calls itself)
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("--- Method 2: RECURSIVE (function calls itself) ---")
+print("")
+print("How recursion works:")
+print("factorial(5) = 5 * factorial(4)")
+print("factorial(4) = 4 * factorial(3)")
+print("factorial(3) = 3 * factorial(2)")
+print("factorial(2) = 2 * factorial(1)")
+print("factorial(1) = 1  ← BASE CASE: stops here!")
+print("")
+print("Then it goes back up:")
+print("factorial(2) = 2 * 1 = 2")
+print("factorial(3) = 3 * 2 = 6")
+print("factorial(4) = 4 * 6 = 24")
+print("factorial(5) = 5 * 24 = 120")
+print("")
 
 factorial(n) {
+    // BASE CASE: when to stop recursing
     if n <= 1 {
         return 1
     }
+    // RECURSIVE CASE: call itself with a smaller problem
     return n * factorial(n - 1)
 }
 
-print(factorial(1))
-print(factorial(5))
-print(factorial(10))
+print("Results using recursive factorial:")
+print("1! = " + str(factorial(1)))
+print("2! = " + str(factorial(2)))
+print("3! = " + str(factorial(3)))
+print("4! = " + str(factorial(4)))
+print("5! = " + str(factorial(5)))
+print("10! = " + str(factorial(10)))
+print("15! = " + str(factorial(15)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 4. STEP-BY-STEP TRACING
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("--- Step-by-step trace of factorial(4) ---")
+print("")
+
+trace_factorial(n, depth) {
+    indent = "  " * depth
+    print(indent + "→ factorial(" + str(n) + ") called")
+
+    if n <= 1 {
+        print(indent + "← BASE CASE reached, returning 1")
+        return 1
+    }
+
+    result = n * trace_factorial(n - 1, depth + 1)
+    print(indent + "← factorial(" + str(n) + ") = " + str(n) + " * result = " + str(result))
+    return result
+}
+
+final = trace_factorial(4, 0)
+print("")
+print("Final result: 4! = " + str(final))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 5. COMPARING PERFORMANCE
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("--- Comparison: Iterative vs Recursive ---")
+
+test_values = 1
+while test_values <= 12 {
+    iter_result = factorial_iterative(test_values)
+    rec_result = factorial(test_values)
+
+    match = ""
+    if iter_result == rec_result {
+        match = " ✓"
+    }
+
+    print(str(test_values) + "! = " + str(rec_result) + match)
+    test_values = test_values + 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 6. INTERESTING FACTORIALS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("--- Fun Factorials ---")
+
+print("Factorials grow very fast!")
+print("")
+
+n = 1
+while n <= 20 {
+    f = factorial(n)
+    print(str(n) + "! = " + str(f))
+    n = n + 1
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 7. WHY USE RECURSION?
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== Why Recursion? ===")
+print("")
+print("✓ Easier to understand for naturally recursive problems")
+print("✓ Mirrors the mathematical definition")
+print("✓ Can be more elegant and concise")
+print("✓ Natural for divide-and-conquer algorithms")
+print("")
+print("✗ Can be slower than iterative (more function calls)")
+print("✗ Uses more memory (each call needs stack space)")
+print("✗ Can hit recursion depth limit (max 500 in Halo)")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 8. KEY CONCEPTS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== Key Concepts in Recursion ===")
+print("")
+print("1. BASE CASE: The condition that stops recursion")
+print("   Example: if n <= 1 { return 1 }")
+print("")
+print("2. RECURSIVE CASE: The function calls itself")
+print("   Example: return n * factorial(n - 1)")
+print("")
+print("3. PROGRESS: Each recursive call must get closer to the base case")
+print("   Example: n becomes smaller each time (n-1)")
+print("")
+print("Without a base case:")
+print("  → Infinite recursion!")
+print("  → Stack overflow!")
+print("  → Error in Halo: 'Maximum recursion depth exceeded'")
+
+// ──────────────────────────────────────────────────────────────────────────
+// SUMMARY
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("===========================================")
+print("You've learned FACTORIAL and RECURSION!")
+print("===========================================")
+print("✓ What factorial means")
+print("✓ Iterative vs Recursive approaches")
+print("✓ How recursion works")
+print("✓ Base case and recursive case")
+print("✓ When to use recursion")
+print("")
+print("Ready for the next example? Try: 04_fibonacci.halo")

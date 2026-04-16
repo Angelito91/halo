@@ -1,8 +1,0 @@
-// Halo Programming Language
-// Example: Basic Function and Output
-
-add(a, b) {
-    return a + b
-}
-
-print(add(3, 5))

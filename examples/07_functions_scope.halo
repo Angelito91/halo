@@ -1,0 +1,514 @@
+// Halo Programming Language
+// Example 07: Functions, Scope & Variables - Complete Guide
+
+// ──────────────────────────────────────────────────────────────────────────
+// 1. BASIC FUNCTION DEFINITION
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 1. BASIC FUNCTION DEFINITION ===")
+print("")
+
+// Function with no parameters
+greet() {
+    print("Hello from Halo!")
+}
+
+greet()
+
+// Function with parameters
+add(a, b) {
+    return a + b
+}
+
+print("add(5, 3) = " + str(add(5, 3)))
+
+// Function with multiple statements
+multiply(x, y) {
+    print("Multiplying " + str(x) + " and " + str(y))
+    result = x * y
+    print("Result: " + str(result))
+    return result
+}
+
+multiply(4, 7)
+
+// ──────────────────────────────────────────────────────────────────────────
+// 2. RETURN VALUES
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 2. RETURN VALUES ===")
+print("")
+
+// Function with explicit return
+absolute_value(n) {
+    if n < 0 {
+        return 0 - n
+    }
+    return n
+}
+
+print("abs(-42) = " + str(absolute_value(-42)))
+print("abs(42) = " + str(absolute_value(42)))
+
+// Function returning different types
+describe_number(n) {
+    if n < 0 {
+        return "negative"
+    } else if n == 0 {
+        return "zero"
+    } else if n < 10 {
+        return "small"
+    } else {
+        return "large"
+    }
+}
+
+print("describe_number(5) = " + describe_number(5))
+print("describe_number(100) = " + describe_number(100))
+
+// Function returning boolean
+is_valid(n) {
+    if n >= 0 && n <= 100 {
+        return true
+    }
+    return false
+}
+
+print("is_valid(50) = " + str(is_valid(50)))
+print("is_valid(150) = " + str(is_valid(150)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 3. GLOBAL VS LOCAL SCOPE
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 3. GLOBAL VS LOCAL SCOPE ===")
+print("")
+
+// Global variable
+global_counter = 0
+
+// Function that uses global variable
+increment_global() {
+    global_counter = global_counter + 1
+    return global_counter
+}
+
+print("Global counter: " + str(increment_global()))
+print("Global counter: " + str(increment_global()))
+print("Global counter: " + str(increment_global()))
+print("Value of global_counter: " + str(global_counter))
+
+// Function with local variable
+create_local() {
+    local_var = 999
+    print("Inside function: local_var = " + str(local_var))
+    return local_var
+}
+
+result = create_local()
+print("Result returned: " + str(result))
+
+// This would cause error:
+// print(local_var)  // Error: Undefined variable: 'local_var'
+
+// ──────────────────────────────────────────────────────────────────────────
+// 4. VARIABLE SHADOWING
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 4. VARIABLE SHADOWING ===")
+print("")
+
+x = 100
+print("Global x = " + str(x))
+
+shadow_test() {
+    x = 50
+    print("Local x inside function = " + str(x))
+    return x
+}
+
+print("After function call, global x = " + str(x))
+shadow_test()
+print("Global x unchanged = " + str(x))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 5. PARAMETERS ARE PASSED BY VALUE
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 5. PARAMETERS ARE PASSED BY VALUE ===")
+print("")
+
+modify_param(value) {
+    print("Received: " + str(value))
+    value = 999
+    print("Modified to: " + str(value))
+    return value
+}
+
+original = 42
+print("Before call: original = " + str(original))
+result = modify_param(original)
+print("After call: original = " + str(original) + " (unchanged!)")
+print("Return value: " + str(result))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 6. FUNCTION ARITY (Number of Parameters)
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 6. FUNCTION ARITY ===")
+print("")
+
+no_params() {
+    return "I take 0 parameters"
+}
+
+one_param(a) {
+    return "I take 1 parameter: " + str(a)
+}
+
+two_params(a, b) {
+    return "I take 2 parameters: " + str(a) + " and " + str(b)
+}
+
+three_params(a, b, c) {
+    return str(a) + " + " + str(b) + " + " + str(c) + " = " + str(a + b + c)
+}
+
+print(no_params())
+print(one_param(42))
+print(two_params(10, 20))
+print(three_params(5, 10, 15))
+
+// Calling with wrong number of parameters causes error:
+// print(two_params(1))  // Error: expects 2 args, got 1
+
+// ──────────────────────────────────────────────────────────────────────────
+// 7. CALL-BEFORE-DEFINITION
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 7. CALL-BEFORE-DEFINITION ===")
+print("")
+print("You can call functions before they're defined!")
+print("")
+
+// This works even though called_early is defined AFTER
+result1 = called_early(10)
+print("Result: " + str(result1))
+
+called_early(n) {
+    return n * 2
+}
+
+// Can be called again
+result2 = called_early(25)
+print("Result: " + str(result2))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 8. FUNCTION COMPOSITION
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 8. FUNCTION COMPOSITION ===")
+print("")
+
+square(n) {
+    return n * n
+}
+
+double(n) {
+    return n * 2
+}
+
+add_one(n) {
+    return n + 1
+}
+
+// Compose functions: square(double(add_one(5)))
+value = 5
+print("Starting with: " + str(value))
+
+step1 = add_one(value)
+print("After add_one: " + str(step1))
+
+step2 = double(step1)
+print("After double: " + str(step2))
+
+step3 = square(step2)
+print("After square: " + str(step3))
+
+// Or in one line:
+result = square(double(add_one(5)))
+print("Direct composition: " + str(result))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 9. SCOPE WITH IF AND WHILE BLOCKS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 9. SCOPE WITH if AND while BLOCKS ===")
+print("")
+
+scope_test() {
+    print("Entering function")
+
+    if true {
+        if_var = 42
+        print("Set if_var inside if: " + str(if_var))
+    }
+
+    // if_var is still visible! (no new scope for if block)
+    print("if_var outside if: " + str(if_var))
+
+    i = 0
+    while i < 3 {
+        loop_var = i * 10
+        print("loop_var in while: " + str(loop_var))
+        i = i + 1
+    }
+
+    // loop_var is still visible!
+    print("loop_var outside while: " + str(loop_var))
+}
+
+scope_test()
+
+// ──────────────────────────────────────────────────────────────────────────
+// 10. PRACTICAL: CALCULATOR FUNCTIONS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 10. PRACTICAL: Calculator Functions ===")
+print("")
+
+add_nums(a, b) {
+    return a + b
+}
+
+subtract_nums(a, b) {
+    return a - b
+}
+
+multiply_nums(a, b) {
+    return a * b
+}
+
+divide_nums(a, b) {
+    if b == 0 {
+        return 0
+    }
+    return a / b
+}
+
+power(base, exp) {
+    result = 1
+    i = 0
+    while i < exp {
+        result = result * base
+        i = i + 1
+    }
+    return result
+}
+
+x = 20
+y = 5
+
+print("Calculator Test:")
+print(str(x) + " + " + str(y) + " = " + str(add_nums(x, y)))
+print(str(x) + " - " + str(y) + " = " + str(subtract_nums(x, y)))
+print(str(x) + " * " + str(y) + " = " + str(multiply_nums(x, y)))
+print(str(x) + " / " + str(y) + " = " + str(divide_nums(x, y)))
+print(str(x) + " ^ " + str(y) + " = " + str(power(x, y)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 11. PRACTICAL: STRING UTILITIES
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 11. PRACTICAL: String Utilities ===")
+print("")
+
+repeat_string(s, times) {
+    result = ""
+    i = 0
+    while i < times {
+        result = result + s
+        i = i + 1
+    }
+    return result
+}
+
+contains_substring(text, substring) {
+    return text == text
+}
+
+format_greeting(name) {
+    greeting = "Hello, " + name + "!"
+    return greeting
+}
+
+make_header(text) {
+    line = repeat_string("=", len(text) + 4)
+    return line + "\n" + "| " + text + " |" + "\n" + line
+}
+
+print(repeat_string("*", 10))
+print(format_greeting("Alice"))
+print(format_greeting("Bob"))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 12. PRACTICAL: VALIDATION FUNCTIONS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 12. PRACTICAL: Validation Functions ===")
+print("")
+
+is_positive(n) {
+    if n > 0 {
+        return true
+    }
+    return false
+}
+
+is_even(n) {
+    if n % 2 == 0 {
+        return true
+    }
+    return false
+}
+
+is_in_range(n, min, max) {
+    if n >= min && n <= max {
+        return true
+    }
+    return false
+}
+
+is_leap_year(year) {
+    if year % 400 == 0 {
+        return true
+    }
+    if year % 100 == 0 {
+        return false
+    }
+    if year % 4 == 0 {
+        return true
+    }
+    return false
+}
+
+print("Validation tests:")
+print("Is 42 positive? " + str(is_positive(42)))
+print("Is -5 positive? " + str(is_positive(-5)))
+print("Is 4 even? " + str(is_even(4)))
+print("Is 7 even? " + str(is_even(7)))
+print("Is 50 in [0, 100]? " + str(is_in_range(50, 0, 100)))
+print("Is 150 in [0, 100]? " + str(is_in_range(150, 0, 100)))
+print("Is 2024 a leap year? " + str(is_leap_year(2024)))
+print("Is 2023 a leap year? " + str(is_leap_year(2023)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 13. PRACTICAL: STATISTICS FUNCTIONS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 13. PRACTICAL: Statistics Functions ===")
+print("")
+
+max_two(a, b) {
+    if a > b {
+        return a
+    }
+    return b
+}
+
+min_two(a, b) {
+    if a < b {
+        return a
+    }
+    return b
+}
+
+clamp(value, min, max) {
+    if value < min {
+        return min
+    }
+    if value > max {
+        return max
+    }
+    return value
+}
+
+average_two(a, b) {
+    return (a + b) / 2
+}
+
+print("Statistics:")
+print("max(100, 50) = " + str(max_two(100, 50)))
+print("min(100, 50) = " + str(min_two(100, 50)))
+print("clamp(150, 0, 100) = " + str(clamp(150, 0, 100)))
+print("clamp(-10, 0, 100) = " + str(clamp(-10, 0, 100)))
+print("clamp(50, 0, 100) = " + str(clamp(50, 0, 100)))
+print("average(10, 20) = " + str(average_two(10, 20)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 14. UNDERSTANDING FUNCTION STACK
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 14. UNDERSTANDING FUNCTION CALLS ===")
+print("")
+
+trace_calls(n) {
+    print("→ trace_calls(" + str(n) + ") started")
+
+    if n <= 0 {
+        print("← trace_calls(0) ending")
+        return 0
+    }
+
+    result = n + trace_calls(n - 1)
+    print("← trace_calls(" + str(n) + ") = " + str(result))
+    return result
+}
+
+print("Sum 1+2+3+4+5:")
+final = trace_calls(5)
+print("Final result: " + str(final))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 15. KEY CONCEPTS SUMMARY
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("===========================================")
+print("You've mastered FUNCTIONS & SCOPE!")
+print("===========================================")
+print("")
+print("KEY CONCEPTS:")
+print("✓ Function definition and calling")
+print("✓ Parameters and return values")
+print("✓ Global scope (visible everywhere)")
+print("✓ Local scope (visible in function)")
+print("✓ Variable shadowing")
+print("✓ Pass by value")
+print("✓ Function arity (parameter count)")
+print("✓ Call-before-definition")
+print("✓ Function composition")
+print("✓ if/while don't create new scope")
+print("")
+print("BEST PRACTICES:")
+print("✓ Keep functions small and focused")
+print("✓ Use meaningful parameter names")
+print("✓ Return early when possible")
+print("✓ Validate inputs in functions")
+print("✓ Document what functions do")
+print("✓ Avoid global state when possible")
+print("")
+print("Ready for more? Try other examples!")

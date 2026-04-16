@@ -1,42 +1,335 @@
 // Halo Programming Language
-// Example 02: Conditionals
+// Example 02: Conditionals - if / else if / else
 
+// ──────────────────────────────────────────────────────────────────────────
+// 1. SIMPLE if/else
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 1. SIMPLE if/else ===")
+
+// Example: Check if a number is positive
 is_positive(n) {
     if n > 0 {
-        return 1
+        return true
     }
-    return 0
+    return false
 }
 
-max(a, b) {
+print("Is 5 positive? " + str(is_positive(5)))
+print("Is -3 positive? " + str(is_positive(-3)))
+print("Is 0 positive? " + str(is_positive(0)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 2. if/else if/else CHAINS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 2. if/else if/else CHAINS ===")
+
+// Classify a number into categories
+classify_number(n) {
+    if n < 0 {
+        return "negative"
+    } else if n == 0 {
+        return "zero"
+    } else if n < 10 {
+        return "small positive"
+    } else if n < 100 {
+        return "medium positive"
+    } else {
+        return "large positive"
+    }
+}
+
+print("Classify -5: " + classify_number(-5))
+print("Classify 0: " + classify_number(0))
+print("Classify 3: " + classify_number(3))
+print("Classify 42: " + classify_number(42))
+print("Classify 1000: " + classify_number(1000))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 3. GRADE CLASSIFICATION (Real-world example)
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 3. GRADE CLASSIFICATION ===")
+
+get_grade(score) {
+    if score >= 90 {
+        return "A"
+    } else if score >= 80 {
+        return "B"
+    } else if score >= 70 {
+        return "C"
+    } else if score >= 60 {
+        return "D"
+    } else {
+        return "F"
+    }
+}
+
+print("Score 95 -> Grade: " + get_grade(95))
+print("Score 87 -> Grade: " + get_grade(87))
+print("Score 75 -> Grade: " + get_grade(75))
+print("Score 62 -> Grade: " + get_grade(62))
+print("Score 45 -> Grade: " + get_grade(45))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 4. COMPARISON OPERATORS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 4. COMPARISON OPERATORS ===")
+
+// Greater than (>)
+print("10 > 5: " + str(10 > 5))
+print("5 > 10: " + str(5 > 10))
+
+// Less than (<)
+print("5 < 10: " + str(5 < 10))
+print("10 < 5: " + str(10 < 5))
+
+// Equal (==)
+print("5 == 5: " + str(5 == 5))
+print("5 == 10: " + str(5 == 10))
+
+// Not equal (!=)
+print("5 != 10: " + str(5 != 10))
+print("5 != 5: " + str(5 != 5))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 5. LOGICAL OPERATORS: && (AND), || (OR), ! (NOT)
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 5. LOGICAL OPERATORS ===")
+
+// AND (&&): Both conditions must be true
+in_range(n, low, high) {
+    if n >= low && n <= high {
+        return true
+    }
+    return false
+}
+
+print("Is 5 in range [1, 10]? " + str(in_range(5, 1, 10)))
+print("Is 15 in range [1, 10]? " + str(in_range(15, 1, 10)))
+print("Is -1 in range [1, 10]? " + str(in_range(-1, 1, 10)))
+
+// OR (||): At least one condition must be true
+is_weekend_or_holiday(day, is_holiday) {
+    if day == "Saturday" || day == "Sunday" || is_holiday {
+        return true
+    }
+    return false
+}
+
+print("Saturday is weekend? " + str(is_weekend_or_holiday("Saturday", false)))
+print("Monday + holiday? " + str(is_weekend_or_holiday("Monday", true)))
+print("Monday, no holiday? " + str(is_weekend_or_holiday("Monday", false)))
+
+// NOT (!): Negates a boolean
+is_not_positive(n) {
+    if !is_positive(n) {
+        return true
+    }
+    return false
+}
+
+print("Is -5 not positive? " + str(is_not_positive(-5)))
+print("Is 5 not positive? " + str(is_not_positive(5)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 6. NESTED CONDITIONALS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 6. NESTED CONDITIONALS ===")
+
+// Determine if a year is a leap year
+is_leap_year(year) {
+    if year % 4 == 0 {
+        if year % 100 == 0 {
+            if year % 400 == 0 {
+                return true
+            }
+            return false
+        }
+        return true
+    }
+    return false
+}
+
+print("Is 2024 a leap year? " + str(is_leap_year(2024)))
+print("Is 2023 a leap year? " + str(is_leap_year(2023)))
+print("Is 2000 a leap year? " + str(is_leap_year(2000)))
+print("Is 1900 a leap year? " + str(is_leap_year(1900)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 7. MAX AND MIN FUNCTIONS
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 7. MAX AND MIN FUNCTIONS ===")
+
+max_of_two(a, b) {
     if a > b {
         return a
     }
     return b
 }
 
-classify(n) {
-    if n < 0 {
-        print(0)
+min_of_two(a, b) {
+    if a < b {
+        return a
     }
-    if n == 0 {
-        print(1)
-    }
+    return b
+}
+
+max_of_three(a, b, c) {
+    return max_of_two(max_of_two(a, b), c)
+}
+
+min_of_three(a, b, c) {
+    return min_of_two(min_of_two(a, b), c)
+}
+
+print("max(10, 20) = " + str(max_of_two(10, 20)))
+print("min(10, 20) = " + str(min_of_two(10, 20)))
+print("max(5, 15, 10) = " + str(max_of_three(5, 15, 10)))
+print("min(5, 15, 10) = " + str(min_of_three(5, 15, 10)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 8. SIGN OF A NUMBER
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 8. SIGN OF A NUMBER ===")
+
+sign(n) {
     if n > 0 {
-        print(2)
+        return 1
+    } else if n < 0 {
+        return -1
+    } else {
+        return 0
     }
 }
 
-// Test is_positive
-print(is_positive(10))
-print(is_positive(-5))
-print(is_positive(0))
+print("sign(42) = " + str(sign(42)))
+print("sign(-17) = " + str(sign(-17)))
+print("sign(0) = " + str(sign(0)))
 
-// Test max
-print(max(3, 7))
-print(max(100, 42))
+// ──────────────────────────────────────────────────────────────────────────
+// 9. EVEN AND ODD NUMBERS
+// ──────────────────────────────────────────────────────────────────────────
 
-// Test classify
-classify(-3)
-classify(0)
-classify(8)
+print("")
+print("=== 9. EVEN AND ODD NUMBERS ===")
+
+is_even(n) {
+    if n % 2 == 0 {
+        return true
+    }
+    return false
+}
+
+is_odd(n) {
+    if !is_even(n) {
+        return true
+    }
+    return false
+}
+
+print("Is 4 even? " + str(is_even(4)))
+print("Is 7 even? " + str(is_even(7)))
+print("Is 4 odd? " + str(is_odd(4)))
+print("Is 7 odd? " + str(is_odd(7)))
+
+// ──────────────────────────────────────────────────────────────────────────
+// 10. TRUTHY AND FALSY VALUES
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 10. TRUTHY AND FALSY VALUES ===")
+
+// Numbers: 0 is falsy, everything else is truthy
+if 0 {
+    print("0 is truthy")
+} else {
+    print("0 is falsy")
+}
+
+if 1 {
+    print("1 is truthy")
+} else {
+    print("1 is falsy")
+}
+
+// Strings: empty string is falsy, non-empty is truthy
+if "" {
+    print("Empty string is truthy")
+} else {
+    print("Empty string is falsy")
+}
+
+if "hello" {
+    print("Non-empty string is truthy")
+} else {
+    print("Non-empty string is falsy")
+}
+
+// Booleans
+if true {
+    print("true is truthy")
+}
+
+if false {
+    print("false is truthy")
+} else {
+    print("false is falsy")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 11. PRIORITY CLASSIFICATION SYSTEM (Complex example)
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("=== 11. PRIORITY CLASSIFICATION ===")
+
+get_priority(age, has_disability, has_companion) {
+    if has_disability {
+        return "HIGH"
+    } else if age >= 65 {
+        return "HIGH"
+    } else if age < 12 && has_companion {
+        return "MEDIUM"
+    } else if age < 12 {
+        return "LOW"
+    } else {
+        return "NORMAL"
+    }
+}
+
+print("65 years old: " + get_priority(65, false, false))
+print("With disability: " + get_priority(30, true, false))
+print("Child with parent: " + get_priority(8, false, true))
+print("Child alone: " + get_priority(8, false, false))
+print("30 years old, normal: " + get_priority(30, false, false))
+
+// ──────────────────────────────────────────────────────────────────────────
+// SUMMARY
+// ──────────────────────────────────────────────────────────────────────────
+
+print("")
+print("===========================================")
+print("You've mastered conditionals in Halo!")
+print("===========================================")
+print("✓ if / else statements")
+print("✓ else if chains")
+print("✓ Comparison operators")
+print("✓ Logical operators (&&, ||, !)")
+print("✓ Nested conditionals")
+print("✓ Truthy and falsy values")
+print("")
+print("Ready for the next example? Try: 03_factorial.halo")
