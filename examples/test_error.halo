@@ -1,0 +1,42 @@
+// Halo Programming Language - Test Error Cases
+// This file contains intentional syntax errors to test the diagnostic system
+
+// Error 1: Missing closing parenthesis in function parameters
+fn_broken_params(x, y {
+    return x + y
+}
+
+// Error 2: Missing closing brace
+broken_brace(a, b) {
+    if a > b {
+        return a
+    return b
+
+// Error 3: Using undefined variable
+undefined_var() {
+    return unknown_variable + 5
+}
+
+// Error 4: Wrong operator precedence without parentheses (not an error, just showing precedence)
+precedence_test(x) {
+    return x * 2 + 3
+}
+
+// Error 5: Missing closing brace in if statement
+missing_if_brace(n) {
+    if n > 0 {
+        print(n)
+    else {
+        print(0)
+}
+
+// Error 6: Invalid token
+invalid_token(x) {
+    y = x @ 2
+    return y
+}
+
+// Error 7: Function call with wrong number of arguments (this might not cause parse error)
+// will_fail() {
+//     print(add(1))  // add expects 2 args
+// }

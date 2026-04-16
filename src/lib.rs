@@ -5,11 +5,15 @@
 // SPDX-License-Identifier: MPL-2.0
 
 pub mod compiler;
+pub mod diagnostics;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+pub mod utils;
 
 pub use compiler::CodeGenerator;
+pub use diagnostics::colors;
 pub use interpreter::Evaluator;
 pub use lexer::Lexer;
 pub use parser::Parser;
+pub use utils::{CompilationStatistics, Timer};

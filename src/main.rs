@@ -9,11 +9,14 @@ use std::path::Path;
 use std::process;
 
 mod compiler;
+mod diagnostics;
 mod interpreter;
 mod lexer;
 mod parser;
+mod utils;
 
 use compiler::{Compilation, OptLevel};
+use diagnostics::{colors, location_from_source, CompilationStats, Diagnostic};
 use interpreter::Evaluator;
 use lexer::{Lexer, TokenKind};
 use parser::Parser;
@@ -385,8 +388,50 @@ fn tokenize(source: &str) -> Vec<lexer::Token> {
 }
 
 /// Parse a token stream into a [`Program`] AST.
-fn parse_tokens(tokens: Vec<lexer::Token>) -> Result<parser::ast::Program, Vec<String>> {
-    Parser::new(tokens).parse()
+/// Takes source code for better error context and snippets.
+fn parse_tokens(
+    tokens: Vec<lexer::Token>,
+    source: &str,
+    file: &str,
+) -> Result<parser::ast::Program, Vec<Diagnostic>> {
+    match Parser::new(tokens).parse() {
+        Ok(program) => Ok(program),
+        Err(error_strings) => {
+            let diagnostics = error_strings
+                .iter()
+                .map(|err| {
+                    // Extract line and column from error message
+                    // Format: "Error at LINE:COLUMN: MESSAGE"
+
+                    // Try to parse "Error at LINE:COLUMN:" pattern
+                    if let Some(at_idx) = err.find("at ") {
+                        let rest = &err[at_idx + 3..];
+                        let parts: Vec<&str> = rest.split(':').collect();
+
+                        // We expect at least: ["LINE", "COLUMN", "rest of message"]
+                        if parts.len() >= 3 {
+                            if let (Ok(line_num), Ok(col_num)) = (
+                                parts[0].trim().parse::<u32>(),
+                                parts[1].trim().parse::<u32>(),
+                            ) {
+                                let location =
+                                    location_from_source(file, source, line_num, col_num, 1);
+
+                                // Extract just the message part (everything after the second colon)
+                                let message = parts[2..].join(":").trim().to_string();
+
+                                return Diagnostic::error(message).with_location(location);
+                            }
+                        }
+                    }
+
+                    // Fallback: return the error as-is
+                    Diagnostic::error(err)
+                })
+                .collect();
+            Err(diagnostics)
+        }
+    }
 }
 
 /// Evaluate a [`Program`] with the tree-walking interpreter.
@@ -441,12 +486,12 @@ fn cmd_run(args: &Args) -> i32 {
         println!("📝 Parsing…");
     }
 
-    let program = match parse_tokens(tokens) {
+    let program = match parse_tokens(tokens, &source, &args.file) {
         Ok(p) => p,
-        Err(errors) => {
-            eprintln!("❌ Parse error(s):");
-            for e in &errors {
-                eprintln!("   {e}");
+        Err(diagnostics) => {
+            eprintln!();
+            for diag in &diagnostics {
+                eprintln!("{}", diag.to_string_formatted());
             }
             return 1;
         }
@@ -467,7 +512,9 @@ fn cmd_run(args: &Args) -> i32 {
             0
         }
         Err(e) => {
-            eprintln!("❌ Runtime error: {e}");
+            eprintln!();
+            let diag = Diagnostic::error(format!("Runtime error: {}", e));
+            eprintln!("{}", diag.to_string_formatted());
             1
         }
     }
@@ -501,26 +548,41 @@ fn cmd_build(args: &Args) -> i32 {
         eprintln!("🔍 Tokenising…");
     }
     let tokens = tokenize(&source);
+    let token_count = tokens.len();
     if args.verbose {
-        eprintln!("✅ {} tokens\n", tokens.len());
+        eprintln!("✅ {} tokens\n", token_count);
     }
 
     // ── Parse ─────────────────────────────────────────────────────────────────
     if args.verbose {
         eprintln!("📝 Parsing…");
     }
-    let program = match parse_tokens(tokens) {
+    let program = match parse_tokens(tokens, &source, &args.file) {
         Ok(p) => p,
-        Err(errors) => {
-            eprintln!("❌ Parse error(s):");
-            for e in &errors {
-                eprintln!("   {e}");
+        Err(diagnostics) => {
+            eprintln!();
+            for diag in &diagnostics {
+                eprintln!("{}", diag.to_string_formatted());
             }
             return 1;
         }
     };
+
+    let item_count = program.items.len();
+    let ast_node_count = program.items.len();
+    let mut function_count = 0;
+    let mut variable_count = 0;
+
+    for item in &program.items {
+        match item {
+            parser::ast::TopLevel::Function { .. } => function_count += 1,
+            parser::ast::TopLevel::GlobalVar { .. } => variable_count += 1,
+            _ => {}
+        }
+    }
+
     if args.verbose {
-        eprintln!("✅ {} top-level item(s)\n", program.items.len());
+        eprintln!("✅ {} top-level item(s)\n", item_count);
     }
 
     // ── Codegen ───────────────────────────────────────────────────────────────
@@ -580,6 +642,17 @@ fn cmd_build(args: &Args) -> i32 {
 
     if args.verbose {
         eprintln!("✅ Binary → {bin_path}\n");
+
+        // Print compilation statistics
+        let stats = CompilationStats {
+            tokens: token_count,
+            ast_nodes: ast_node_count,
+            functions: function_count,
+            variables: variable_count,
+            lines_of_code: source.lines().count(),
+        };
+        stats.print_summary();
+
         eprintln!("╔════════════════════════════════════════╗");
         eprintln!("║      ✅ Build successful!              ║");
         eprintln!("╚════════════════════════════════════════╝");
@@ -696,19 +769,28 @@ fn cmd_check(args: &Args) -> i32 {
 
     let tokens = tokenize(&source);
 
-    match parse_tokens(tokens) {
+    match parse_tokens(tokens, &source, &args.file) {
         Ok(program) => {
             println!(
-                "✅ {} — OK ({} top-level item(s))",
-                args.file,
-                program.items.len()
+                "{}  {} — {} {}",
+                colors::success("✅"),
+                colors::highlight(&args.file),
+                colors::success("OK"),
+                colors::muted(&format!("({} top-level item(s))", program.items.len()))
             );
             0
         }
-        Err(errors) => {
-            eprintln!("❌ {} — {} error(s):", args.file, errors.len());
-            for e in &errors {
-                eprintln!("   {e}");
+        Err(diagnostics) => {
+            eprintln!(
+                "{}  {} — {} {}",
+                colors::error("❌"),
+                colors::highlight(&args.file),
+                colors::error(&format!("{} error(s)", diagnostics.len())),
+                colors::muted(":")
+            );
+            eprintln!();
+            for diag in &diagnostics {
+                eprintln!("{}", diag.to_string_formatted());
             }
             1
         }
@@ -735,28 +817,29 @@ fn cmd_tokens(args: &Args) -> i32 {
     for (i, tok) in tokens.iter().enumerate() {
         match tok.kind {
             TokenKind::Eof => {
-                println!("{i:4}  EOF");
+                println!("{i:4}  {}", colors::muted("EOF"));
             }
             TokenKind::Newline => {
                 println!(
-                    "{i:4}  NEWLINE                     {}:{}",
-                    tok.position.line, tok.position.column
+                    "{:4}  {:<20}          {}",
+                    i,
+                    colors::highlight("NEWLINE"),
+                    colors::muted(&format!("{}:{}", tok.position.line, tok.position.column))
                 );
             }
             _ => {
                 println!(
-                    "{i:4}  {:<20} {:>10}    {}:{}",
-                    format!("{:?}", tok.kind),
-                    format!("'{}'", tok.lexeme),
-                    tok.position.line,
-                    tok.position.column
+                    "{i:4}  {:<20} {:>10}    {}",
+                    colors::info(&format!("{:?}", tok.kind)),
+                    colors::success(&format!("'{}'", tok.lexeme)),
+                    colors::muted(&format!("{}:{}", tok.position.line, tok.position.column))
                 );
             }
         }
     }
 
     println!();
-    println!("{} token(s)", tokens.len());
+    println!("{} token(s)", colors::highlight(&tokens.len().to_string()));
     0
 }
 
@@ -772,12 +855,12 @@ fn cmd_ast(args: &Args) -> i32 {
 
     let tokens = tokenize(&source);
 
-    let program = match parse_tokens(tokens) {
+    let program = match parse_tokens(tokens, &source, &args.file) {
         Ok(p) => p,
-        Err(errors) => {
-            eprintln!("❌ Parse error(s):");
-            for e in &errors {
-                eprintln!("   {e}");
+        Err(diagnostics) => {
+            eprintln!();
+            for diag in &diagnostics {
+                eprintln!("{}", diag.to_string_formatted());
             }
             return 1;
         }
@@ -792,37 +875,81 @@ fn cmd_ast(args: &Args) -> i32 {
     println!();
 
     for (i, item) in program.items.iter().enumerate() {
-        println!("[{i}] {item_kind}", item_kind = toplevel_kind(item));
+        println!(
+            "{}  {}",
+            colors::highlight(&format!("[{i}]")),
+            colors::info(toplevel_kind(item))
+        );
         match item {
             parser::ast::TopLevel::Function {
                 name, params, body, ..
             } => {
-                println!("    name   : {name}");
+                println!(
+                    "    {}  : {}",
+                    colors::success("name"),
+                    colors::highlight(name)
+                );
                 if params.is_empty() {
-                    println!("    params : (none)");
+                    println!(
+                        "    {}  : {}",
+                        colors::success("params"),
+                        colors::muted("(none)")
+                    );
                 } else {
-                    println!("    params : {}", params.join(", "));
+                    println!(
+                        "    {}  : {}",
+                        colors::success("params"),
+                        colors::highlight(&params.join(", "))
+                    );
                 }
-                println!("    body   : {} statement(s)", body.stmts.len());
+                println!(
+                    "    {}  : {} {}",
+                    colors::success("body"),
+                    colors::highlight(&body.stmts.len().to_string()),
+                    colors::muted("statement(s)")
+                );
                 for (j, stmt) in body.stmts.iter().enumerate() {
-                    println!("      [{j}] {stmt}");
+                    println!(
+                        "      {}  {}",
+                        colors::muted(&format!("[{j}]")),
+                        colors::success(&stmt.to_string())
+                    );
                 }
             }
             parser::ast::TopLevel::GlobalVar { name, init, .. } => {
-                println!("    name   : {name}");
+                println!(
+                    "    {}  : {}",
+                    colors::success("name"),
+                    colors::highlight(name)
+                );
                 match init {
-                    Some(expr) => println!("    init   : {expr}"),
-                    None => println!("    init   : (none)"),
+                    Some(expr) => println!(
+                        "    {}  : {}",
+                        colors::success("init"),
+                        colors::highlight(&expr.to_string())
+                    ),
+                    None => println!(
+                        "    {}  : {}",
+                        colors::success("init"),
+                        colors::muted("(none)")
+                    ),
                 }
             }
             parser::ast::TopLevel::Stmt { stmt, .. } => {
-                println!("    stmt   : {stmt}");
+                println!(
+                    "    {}  : {}",
+                    colors::success("stmt"),
+                    colors::highlight(&stmt.to_string())
+                );
             }
         }
         println!();
     }
 
-    println!("{} top-level item(s)", program.items.len());
+    println!(
+        "{} top-level item(s)",
+        colors::highlight(&program.items.len().to_string())
+    );
     0
 }
 
@@ -852,12 +979,12 @@ fn cmd_llvm(args: &Args) -> i32 {
     if args.verbose {
         eprintln!("📝 Parsing…");
     }
-    let program = match parse_tokens(tokens) {
+    let program = match parse_tokens(tokens, &source, &args.file) {
         Ok(p) => p,
-        Err(errors) => {
-            eprintln!("❌ Parse error(s):");
-            for e in &errors {
-                eprintln!("   {e}");
+        Err(diagnostics) => {
+            eprintln!();
+            for diag in &diagnostics {
+                eprintln!("{}", diag.to_string_formatted());
             }
             return 1;
         }
