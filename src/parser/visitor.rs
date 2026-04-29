@@ -92,6 +92,15 @@ pub trait ASTVisitor {
                     self.visit_expression(a);
                 }
             }
+            Expression::ArrayLiteral { elements, .. } => {
+                for elem in elements {
+                    self.visit_expression(elem);
+                }
+            }
+            Expression::Index { array, index, .. } => {
+                self.visit_expression(array);
+                self.visit_expression(index);
+            }
         }
     }
 }

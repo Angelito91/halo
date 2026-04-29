@@ -827,6 +827,16 @@ impl<'ctx> CodeGenerator<'ctx> {
 
             // ── Function calls ───────────────────────────────────────────────
             Expression::Call { name, args, .. } => self.generate_call(name, args),
+
+            // ── Array literal ────────────────────────────────────────────────
+            Expression::ArrayLiteral { .. } => {
+                Err("Array literals are not yet supported in compiled mode".to_string())
+            }
+
+            // ── Array indexing ───────────────────────────────────────────────
+            Expression::Index { .. } => {
+                Err("Array indexing is not yet supported in compiled mode".to_string())
+            }
         }
     }
 

@@ -25,6 +25,7 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     String(String),
+    Array(Vec<Value>),
     Null,
 }
 
@@ -43,6 +44,7 @@ impl Value {
             // that might trigger a floating-point unit stall.
             Value::Float(f) => f.to_bits() != 0,
             Value::String(s) => !s.is_empty(),
+            Value::Array(arr) => !arr.is_empty(),
             _ => true,
         }
     }
@@ -82,6 +84,17 @@ impl Value {
         }
     }
 
+    /// Extract the inner array if this is an `Array`, otherwise `None`.
+    #[allow(dead_code)]
+    #[inline]
+    pub fn as_array(&self) -> Option<&Vec<Value>> {
+        if let Value::Array(arr) = self {
+            Some(arr)
+        } else {
+            None
+        }
+    }
+
     // ── Type tag (no allocation) ─────────────────────────────────────────────
 
     /// Return the type name as a static string slice — no allocation.
@@ -92,6 +105,7 @@ impl Value {
             Value::Float(_) => "float",
             Value::Bool(_) => "bool",
             Value::String(_) => "string",
+            Value::Array(_) => "array",
             Value::Null => "null",
         }
     }
@@ -351,6 +365,7 @@ impl Value {
             Value::String(s) => s
                 .parse::<f64>()
                 .map_err(|_| format!("Cannot convert '{}' to number", s)),
+            Value::Array(_) => Err("Cannot convert array to number".to_string()),
             Value::Null => Err("Cannot convert null to number".to_string()),
         }
     }
@@ -364,6 +379,7 @@ impl Value {
             Value::String(s) => s
                 .parse::<i64>()
                 .map_err(|_| format!("Cannot convert '{}' to integer", s)),
+            Value::Array(_) => Err("Cannot convert array to integer".to_string()),
             Value::Null => Err("Cannot convert null to integer".to_string()),
         }
     }
@@ -381,6 +397,10 @@ impl Value {
             }
             Value::Bool(b) => b.to_string(),
             Value::String(s) => s.clone(),
+            Value::Array(arr) => {
+                let items: Vec<String> = arr.iter().map(|v| v.to_string_value()).collect();
+                format!("[{}]", items.join(", "))
+            }
             Value::Null => "null".to_string(),
         }
     }

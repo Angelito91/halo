@@ -98,6 +98,15 @@ pub enum Expression {
         args: Vec<Expression>,
         pos: Position,
     },
+    ArrayLiteral {
+        elements: Vec<Expression>,
+        pos: Position,
+    },
+    Index {
+        array: Box<Expression>,
+        index: Box<Expression>,
+        pos: Position,
+    },
 }
 
 impl fmt::Display for Expression {
@@ -125,6 +134,19 @@ impl fmt::Display for Expression {
                 }
                 write!(f, ")")
             }
+            Expression::ArrayLiteral { elements, .. } => {
+                write!(f, "[")?;
+                for (i, elem) in elements.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", elem)?;
+                }
+                write!(f, "]")
+            }
+            Expression::Index { array, index, .. } => {
+                write!(f, "{}[{}]", array, index)
+            }
         }
     }
 }
@@ -141,6 +163,8 @@ impl Expression {
             Expression::Binary { pos, .. } => *pos,
             Expression::Assign { pos, .. } => *pos,
             Expression::Call { pos, .. } => *pos,
+            Expression::ArrayLiteral { pos, .. } => *pos,
+            Expression::Index { pos, .. } => *pos,
         }
     }
 }

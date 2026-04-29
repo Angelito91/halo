@@ -507,11 +507,11 @@ count_odds(10)
 #[test]
 fn test_return_exits_before_rest_of_body() {
     let code = "
-first(n) {
+getFirst(n) {
     return n
     unreachable = 999
 }
-first(42)
+getFirst(42)
 ";
     assert_eq!(eval_last_number(code), 42);
 }

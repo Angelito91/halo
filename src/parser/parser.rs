@@ -540,8 +540,29 @@ impl Parser {
                 pos,
             })
         } else {
-            self.parse_primary()
+            self.parse_postfix()
         }
+    }
+
+    fn parse_postfix(&mut self) -> Option<Expression> {
+        let mut expr = self.parse_primary()?;
+
+        loop {
+            if self.advance_if(TokenKind::LeftBracket) {
+                let index = self.parse_expression()?;
+                let pos = expr.pos();
+                self.consume(TokenKind::RightBracket, "Expected ']' after array index")?;
+                expr = Expression::Index {
+                    array: Box::new(expr),
+                    index: Box::new(index),
+                    pos,
+                };
+            } else {
+                break;
+            }
+        }
+
+        Some(expr)
     }
 
     fn parse_primary(&mut self) -> Option<Expression> {
@@ -599,6 +620,21 @@ impl Parser {
             }
 
             return Some(Expression::Var(name, id_pos));
+        }
+
+        if self.advance_if(TokenKind::LeftBracket) {
+            let pos = self.previous().position;
+            let mut elements = Vec::new();
+            if !self.check(TokenKind::RightBracket) {
+                loop {
+                    elements.push(self.parse_expression()?);
+                    if !self.advance_if(TokenKind::Comma) {
+                        break;
+                    }
+                }
+            }
+            self.consume(TokenKind::RightBracket, "Expected ']' after array elements")?;
+            return Some(Expression::ArrayLiteral { elements, pos });
         }
 
         if self.advance_if(TokenKind::LeftParen) {
