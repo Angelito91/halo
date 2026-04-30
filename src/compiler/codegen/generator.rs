@@ -124,13 +124,7 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     /// Run LLVM optimisation passes on the module.
-    ///
-    /// `level` maps directly to the `-O` flag:
-    ///   0 = no opts, 1 = -O1, 2 = -O2, 3 = -O3, s = size
-    ///
-    /// The pass pipeline used here is equivalent to `opt -O2`:
-    ///   mem2reg → instcombine → reassociate → gvn → simplifycfg →
-    ///   sccp → dce → inline → loop-unroll
+    /// `level` maps to `-O` flags: 0 = no opts, 1 = -O1, 2 = -O2, 3 = -O3
     pub fn optimise(&self, level: u32) -> Result<(), String> {
         // Initialise the native target so TargetMachine can be created.
         Target::initialize_native(&InitializationConfig::default())
@@ -173,7 +167,6 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     /// Write LLVM IR text to a `.ll` file.
-    #[allow(dead_code)]
     pub fn emit_llvm(&self, filename: &str) -> Result<(), String> {
         self.module
             .print_to_file(filename)
@@ -181,7 +174,6 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     /// Compile directly to a native object file (bypasses clang).
-    #[allow(dead_code)]
     pub fn emit_object(&self, filename: &str) -> Result<(), String> {
         Target::initialize_native(&InitializationConfig::default())
             .map_err(|e| format!("Failed to initialise native target: {}", e))?;

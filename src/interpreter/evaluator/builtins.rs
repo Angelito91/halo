@@ -1,4 +1,8 @@
-// Built-in functions for Halo interpreter
+// The Halo Programming Language
+// Version: 0.2.0
+// Author: Angel A. Portuondo H.
+// License: MPL 2.0
+// SPDX-License-Identifier: MPL-2.0
 
 use super::super::value::Value;
 use super::core::Evaluator;
@@ -60,8 +64,6 @@ pub fn try_eval_builtin(
     Ok(Some(result))
 }
 
-// ── Built-in helpers ──────────────────────────────────────────────────────
-
 /// `print(v1, v2, …)` — prints each argument on its own line.
 fn builtin_print(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
     for arg in args {
@@ -72,9 +74,8 @@ fn builtin_print(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value
 }
 
 /// Helper for built-ins that accept exactly one argument.
-///
-/// Evaluates the single argument, then calls `f` with the resulting
-/// [`Value`].  Returns an arity error if the argument count is wrong.
+/// Evaluates the single argument, then calls `f` with the resulting Value.
+/// Returns an arity error if the argument count is wrong.
 fn builtin_single_arg(
     evaluator: &mut Evaluator,
     name: &str,

@@ -22,17 +22,10 @@ use std::cmp::Ordering;
 ///
 /// # Returns
 /// The Levenshtein distance (0 = identical, higher = more different)
-///
-/// # Example
-/// ```ignore
-/// assert_eq!(levenshtein_distance("kitten", "sitting"), 3);
-/// assert_eq!(levenshtein_distance("hello", "hello"), 0);
-/// ```
 pub fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     let len1 = s1.len();
     let len2 = s2.len();
 
-    // Handle empty strings
     if len1 == 0 {
         return len2;
     }
@@ -122,13 +115,6 @@ impl PartialOrd for Suggestion {
 ///
 /// # Returns
 /// Vector of suggestions sorted by distance (closest first)
-///
-/// # Example
-/// ```ignore
-/// let candidates = vec!["add", "subtract", "multiply"];
-/// let suggestions = find_suggestions("ad", &candidates, 3, 2);
-/// assert_eq!(suggestions[0].text, "add");
-/// ```
 pub fn find_suggestions(
     typo: &str,
     candidates: &[&str],
@@ -194,7 +180,6 @@ pub fn find_suggestions_smart(
 ///
 /// # Returns
 /// Vector of suggestions sorted by distance (closest first)
-#[allow(dead_code)]
 pub fn find_suggestions_adaptive(
     typo: &str,
     candidates: &[&str],

@@ -1,4 +1,8 @@
-// Array and string methods for Halo interpreter
+// The Halo Programming Language
+// Version: 0.2.0
+// Author: Angel A. Portuondo H.
+// License: MPL 2.0
+// SPDX-License-Identifier: MPL-2.0
 
 use super::super::value::Value;
 use super::core::Evaluator;

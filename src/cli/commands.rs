@@ -1,4 +1,8 @@
-// ── Subcommand handlers ────────────────────────────────────────────────────────────
+// The Halo Programming Language
+// Version: 0.2.0
+// Author: Angel A. Portuondo H.
+// License: MPL 2.0
+// SPDX-License-Identifier: MPL-2.0
 
 use crate::cli::args::Args;
 use crate::cli::helpers::{evaluate, file_stem, parse_tokens, read_source, run_command, tokenize};
@@ -7,7 +11,6 @@ use crate::diagnostics::{colors, CompilationStats, Diagnostic};
 use std::fs;
 use std::process;
 
-/// `halo run <file>` — interpret the source file.
 pub fn cmd_run(args: &Args) -> i32 {
     let source = match read_source(&args.file) {
         Ok(s) => s,
@@ -63,11 +66,6 @@ pub fn cmd_run(args: &Args) -> i32 {
     }
 }
 
-/// `halo build <file>` — compile to a native binary via LLVM.
-///
-/// Supports two toolchains:
-///   - `clang`  (default): `clang <file.ll> -o <out>`
-///   - `llc`             : `llc <file.ll> -o <file.s>` → `cc <file.s> -o <out>`
 pub fn cmd_build(args: &Args) -> i32 {
     let source = match read_source(&args.file) {
         Ok(s) => s,
@@ -86,7 +84,6 @@ pub fn cmd_build(args: &Args) -> i32 {
         eprintln!("🔧 Toolchain : {}", args.toolchain.name());
     }
 
-    // ── Lex ───────────────────────────────────────────────────────────────────
     if args.verbose {
         eprintln!("🔍 Tokenising…");
     }
@@ -96,7 +93,6 @@ pub fn cmd_build(args: &Args) -> i32 {
         eprintln!("✅ {} tokens\n", token_count);
     }
 
-    // ── Parse ─────────────────────────────────────────────────────────────────
     if args.verbose {
         eprintln!("📝 Parsing…");
     }
@@ -128,7 +124,6 @@ pub fn cmd_build(args: &Args) -> i32 {
         eprintln!("✅ {} top-level item(s)\n", item_count);
     }
 
-    // ── Codegen ───────────────────────────────────────────────────────────────
     let stem = file_stem(&args.file);
     let bin_path = args.output.as_deref().unwrap_or(stem).to_string();
     let ll_path = format!("{stem}.ll");
@@ -145,7 +140,6 @@ pub fn cmd_build(args: &Args) -> i32 {
         eprintln!("✅ LLVM IR ready\n");
     }
 
-    // ── Optimise ──────────────────────────────────────────────────────────────
     if args.opt_level != crate::compiler::OptLevel::O0 {
         if args.verbose {
             eprintln!("⚡ Optimising (O{})…", args.opt_level.as_u32());
@@ -159,7 +153,6 @@ pub fn cmd_build(args: &Args) -> i32 {
         }
     }
 
-    // ── Emit .ll ──────────────────────────────────────────────────────────────
     if let Err(e) = comp.emit_llvm(&ll_path) {
         eprintln!("❌ Failed to write LLVM IR: {e}");
         return 1;
@@ -168,13 +161,11 @@ pub fn cmd_build(args: &Args) -> i32 {
         eprintln!("💾 LLVM IR saved to: {ll_path}\n");
     }
 
-    // ── Link ───────────────────────────────────────────────────────────────────────────────────────────
     let link_ok = match args.toolchain {
         crate::cli::args::Toolchain::Clang => link_with_clang(&ll_path, &bin_path, args),
         crate::cli::args::Toolchain::Llc => link_with_llc(&ll_path, &bin_path, args),
     };
 
-    // ── Clean up intermediate .ll ─────────────────────────────────────────────
     if !args.emit_llvm {
         let _ = fs::remove_file(&ll_path);
     }
@@ -186,7 +177,6 @@ pub fn cmd_build(args: &Args) -> i32 {
     if args.verbose {
         eprintln!("✅ Binary → {bin_path}\n");
 
-        // Print compilation statistics
         let stats = CompilationStats {
             tokens: token_count,
             ast_nodes: ast_node_count,
@@ -203,7 +193,6 @@ pub fn cmd_build(args: &Args) -> i32 {
         println!("✅ {bin_path}");
     }
 
-    // ── Optional: run immediately ─────────────────────────────────────────────
     if args.run_after_build {
         if args.verbose {
             eprintln!("\n🚀 Running ./{bin_path}");
@@ -217,7 +206,6 @@ pub fn cmd_build(args: &Args) -> i32 {
                 process::exit(1);
             });
 
-        // Remove temporary binary if the user did not specify an explicit output.
         if args.output.is_none() {
             let _ = fs::remove_file(&bin_path);
         }
@@ -233,7 +221,6 @@ pub fn cmd_build(args: &Args) -> i32 {
     0
 }
 
-/// Link using `clang <ll_path> -o <bin_path>` (default toolchain).
 pub fn link_with_clang(ll_path: &str, bin_path: &str, args: &Args) -> bool {
     if args.verbose {
         eprintln!("🔨 Linking with clang…");
@@ -254,13 +241,10 @@ pub fn link_with_clang(ll_path: &str, bin_path: &str, args: &Args) -> bool {
 }
 
 /// Link using `llc` (IR → assembly) then `cc` (assembly → binary).
-///
-/// This is the former `haloc` toolchain, now available as
-/// `halo build --toolchain llc`.
+/// This is the former `haloc` toolchain, now available as `halo build --toolchain llc`.
 pub fn link_with_llc(ll_path: &str, bin_path: &str, args: &Args) -> bool {
     let asm_path = format!("{bin_path}.s");
 
-    // ── Step A: llc — IR → assembly ───────────────────────────────────────────
     if args.verbose {
         eprintln!("🔨 Compiling IR to assembly (llc)…");
     }
@@ -268,7 +252,7 @@ pub fn link_with_llc(ll_path: &str, bin_path: &str, args: &Args) -> bool {
     let mut llc = process::Command::new("llc");
     llc.arg(ll_path).arg("-o").arg(&asm_path);
     if args.opt_level != crate::compiler::OptLevel::O0 {
-        llc.arg(args.opt_level.clang_flag()); // llc accepts -O0 .. -O3 too
+        llc.arg(args.opt_level.clang_flag());
     }
 
     if !run_command(llc, "llc", args.verbose) {
@@ -281,7 +265,6 @@ pub fn link_with_llc(ll_path: &str, bin_path: &str, args: &Args) -> bool {
         eprintln!("🔗 Linking with cc…");
     }
 
-    // ── Step B: cc — assembly → executable ────────────────────────────────────
     let mut cc = process::Command::new("cc");
     cc.arg(&asm_path).arg("-o").arg(bin_path);
 
@@ -291,7 +274,6 @@ pub fn link_with_llc(ll_path: &str, bin_path: &str, args: &Args) -> bool {
         return false;
     }
 
-    // Always remove the intermediate assembly file.
     let _ = fs::remove_file(&asm_path);
 
     if args.verbose {
@@ -300,7 +282,6 @@ pub fn link_with_llc(ll_path: &str, bin_path: &str, args: &Args) -> bool {
     true
 }
 
-/// `halo check <file>` — lex + parse, report errors, exit 0 if clean.
 pub fn cmd_check(args: &Args) -> i32 {
     let source = match read_source(&args.file) {
         Ok(s) => s,
@@ -340,7 +321,6 @@ pub fn cmd_check(args: &Args) -> i32 {
     }
 }
 
-/// `halo tokens <file>` — print the token stream and exit.
 pub fn cmd_tokens(args: &Args) -> i32 {
     let source = match read_source(&args.file) {
         Ok(s) => s,
@@ -387,7 +367,6 @@ pub fn cmd_tokens(args: &Args) -> i32 {
     0
 }
 
-/// `halo ast <file>` — print the Abstract Syntax Tree and exit.
 pub fn cmd_ast(args: &Args) -> i32 {
     let source = match read_source(&args.file) {
         Ok(s) => s,
@@ -505,7 +484,6 @@ pub fn toplevel_kind(item: &crate::parser::ast::TopLevel) -> &'static str {
     }
 }
 
-/// `halo llvm <file>` — emit LLVM IR to a `.ll` file.
 pub fn cmd_llvm(args: &Args) -> i32 {
     let source = match read_source(&args.file) {
         Ok(s) => s,

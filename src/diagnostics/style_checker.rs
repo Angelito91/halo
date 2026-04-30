@@ -11,7 +11,6 @@ use crate::parser::ast::{Program, Statement, TopLevel};
 
 /// Style violation detected in code
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct StyleViolation {
     pub code: ErrorCode,
     pub line: u32,
@@ -22,7 +21,6 @@ pub struct StyleViolation {
 
 /// Configuration for style checking
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct StyleConfig {
     /// Maximum line length (default: 100)
     pub max_line_length: usize,
@@ -49,13 +47,11 @@ impl Default for StyleConfig {
 }
 
 /// Style checker for Halo programs
-#[allow(dead_code)]
 pub struct StyleChecker {
     config: StyleConfig,
     pub violations: Vec<StyleViolation>,
 }
 
-#[allow(dead_code)]
 impl StyleChecker {
     /// Create a new style checker with default config
     pub fn new() -> Self {

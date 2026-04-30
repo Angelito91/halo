@@ -6,7 +6,6 @@
 //
 // NOTE: This visitor pattern is currently not used in the interpreter.
 // It's kept for potential future use in optimization passes, linting, or analysis tools.
-// To use this, enable the visitor module exports in parser/mod.rs
 
 use crate::parser::ast::{Block, Expression, IndexType, Program, Statement, TopLevel};
 

@@ -51,9 +51,7 @@ impl Parser {
         }
     }
 
-    // =========================================================================
     // Top-level rules
-    // =========================================================================
 
     fn parse_program(&mut self) -> Program {
         let mut items = Vec::new();
@@ -225,9 +223,7 @@ impl Parser {
         Some(TopLevel::Stmt { stmt, pos })
     }
 
-    // =========================================================================
     // Block and statement rules
-    // =========================================================================
 
     fn parse_block(&mut self) -> Block {
         let pos = self.previous().position;
@@ -386,13 +382,8 @@ impl Parser {
         self.parse_expression().map(Statement::Expr)
     }
 
-    // =========================================================================
-    // Expression rules  (Pratt / precedence-climbing style)
-    //
-    // Precedence, lowest → highest:
-    //   logical-or  →  logical-and  →  equality  →  comparison
-    //   →  term  →  factor  →  unary  →  primary
-    // =========================================================================
+    // Expression rules (Pratt / precedence-climbing style)
+    // Precedence: logical-or → logical-and → equality → comparison → term → factor → unary → primary
 
     fn parse_expression(&mut self) -> Option<Expression> {
         self.parse_logical_or()
@@ -728,12 +719,8 @@ impl Parser {
         None
     }
 
-    // =========================================================================
     // Cursor helpers
-    // =========================================================================
 
-    /// Consume the current token and return it if its kind matches `kind`;
-    /// otherwise record an error and return `None`.
     fn consume(&mut self, kind: TokenKind, message: &str) -> Option<&Token> {
         if self.check(kind) {
             Some(self.advance())
@@ -743,9 +730,6 @@ impl Parser {
         }
     }
 
-    /// Advance past the current token if its kind matches `kind`.
-    /// Returns `true` when a token was consumed (replaces the old
-    /// `match_token` name, which was ambiguous with the `match` keyword).
     fn advance_if(&mut self, kind: TokenKind) -> bool {
         if self.check(kind) {
             self.advance();
@@ -755,13 +739,10 @@ impl Parser {
         }
     }
 
-    /// Return `true` when the current token has the given `kind`.
-    /// Always returns `false` at EOF to avoid out-of-bounds access.
     fn check(&self, kind: TokenKind) -> bool {
         !self.is_at_end() && self.peek().kind == kind
     }
 
-    /// Advance the cursor by one and return a reference to the consumed token.
     fn advance(&mut self) -> &Token {
         if !self.is_at_end() {
             self.cursor += 1;
@@ -769,30 +750,22 @@ impl Parser {
         self.previous()
     }
 
-    /// Skip zero or more consecutive `Newline` tokens.
     fn skip_newlines(&mut self) {
         while self.advance_if(TokenKind::Newline) {}
     }
 
-    /// `true` when the current token is [`TokenKind::Eof`].
     fn is_at_end(&self) -> bool {
         self.peek().kind == TokenKind::Eof
     }
 
-    /// The token at the current cursor position without consuming it.
     fn peek(&self) -> &Token {
         &self.tokens[self.cursor]
     }
 
-    /// The most recently consumed token.
-    ///
-    /// # Panics
-    /// Panics if called before any token has been consumed (cursor == 0).
     fn previous(&self) -> &Token {
         &self.tokens[self.cursor - 1]
     }
 
-    /// Record a syntax error at the current token's position.
     fn error(&mut self, message: &str) {
         let tok = self.peek();
         self.errors.push(format!(

@@ -52,7 +52,6 @@ impl fmt::Display for ErrorSeverity {
 
 /// Enumeration of all error codes in the application
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[allow(dead_code)]
 pub enum ErrorCode {
     // Parser errors (E001-E010)
     /// Expected ')' after parameters
@@ -99,21 +98,21 @@ pub enum ErrorCode {
     TypeInferenceFailed,
 
     // Runtime errors (E021-E030)
-    /// Undefined variable
+    /// Variable used before definition
     UndefinedVariable,
-    /// Undefined function
+    /// Function called before definition
     UndefinedFunction,
-    /// Variable already defined
+    /// Variable declared twice
     VariableAlreadyDefined,
-    /// Function already defined
+    /// Function declared twice
     FunctionAlreadyDefined,
     /// Infinite recursion detected
     InfiniteRecursion,
-    /// Stack overflow
+    /// Stack overflow during execution
     StackOverflow,
     /// Null pointer dereference
     NullPointerDeref,
-    /// Out of bounds access
+    /// Array access out of bounds
     OutOfBoundsAccess,
     /// Invalid function call
     InvalidFunctionCall,
@@ -121,34 +120,31 @@ pub enum ErrorCode {
     DivisionByZero,
 
     // Warnings (E031-E040)
-    /// Unused variable
+    /// Variable declared but never used
     UnusedVariable,
-    /// Unused function
+    /// Function defined but never called
     UnusedFunction,
-    /// Unused import
+    /// Import statement unused
     UnusedImport,
-    /// Unreachable code
+    /// Code unreachable after return
     UnreachableCode,
-    /// Variable shadowing
+    /// Variable shadows outer scope
     VariableShadowing,
-    /// Function shadowing
+    /// Function shadows outer scope
     FunctionShadowing,
-    /// Deprecated feature
+    /// Use of deprecated feature
     DeprecatedFeature,
-    /// Performance issue
+    /// Potential performance issue
     PerformanceIssue,
-    /// Style guide violation
+    /// Code style violation
     StyleViolation,
     /// Possible logic error
     PossibleLogicError,
 }
 
 impl ErrorCode {
-    /// Get the numeric code as a string (e.g., "E001")
-    #[allow(dead_code)]
     pub fn code(&self) -> &'static str {
         match self {
-            // Parser errors
             ErrorCode::ExpectedCloseParen => "E001",
             ErrorCode::ExpectedCloseBrace => "E002",
             ErrorCode::ExpectedCloseBracket => "E003",
@@ -160,7 +156,6 @@ impl ErrorCode {
             ErrorCode::InvalidAssignment => "E009",
             ErrorCode::UnexpectedEOF => "E010",
 
-            // Type errors
             ErrorCode::TypeMismatch => "E011",
             ErrorCode::UndefinedType => "E012",
             ErrorCode::InvalidTypeConversion => "E013",
@@ -172,7 +167,6 @@ impl ErrorCode {
             ErrorCode::GenericTypeMismatch => "E019",
             ErrorCode::TypeInferenceFailed => "E020",
 
-            // Runtime errors
             ErrorCode::UndefinedVariable => "E021",
             ErrorCode::UndefinedFunction => "E022",
             ErrorCode::VariableAlreadyDefined => "E023",
@@ -184,246 +178,222 @@ impl ErrorCode {
             ErrorCode::InvalidFunctionCall => "E029",
             ErrorCode::DivisionByZero => "E030",
 
-            // Warnings
-            ErrorCode::UnusedVariable => "E031",
-            ErrorCode::UnusedFunction => "E032",
-            ErrorCode::UnusedImport => "E033",
-            ErrorCode::UnreachableCode => "E034",
-            ErrorCode::VariableShadowing => "E035",
-            ErrorCode::FunctionShadowing => "E036",
-            ErrorCode::DeprecatedFeature => "E037",
-            ErrorCode::PerformanceIssue => "E038",
-            ErrorCode::StyleViolation => "E039",
-            ErrorCode::PossibleLogicError => "E040",
+            ErrorCode::UnusedVariable => "W031",
+            ErrorCode::UnusedFunction => "W032",
+            ErrorCode::UnusedImport => "W033",
+            ErrorCode::UnreachableCode => "W034",
+            ErrorCode::VariableShadowing => "W035",
+            ErrorCode::FunctionShadowing => "W036",
+            ErrorCode::DeprecatedFeature => "W037",
+            ErrorCode::PerformanceIssue => "W038",
+            ErrorCode::StyleViolation => "W039",
+            ErrorCode::PossibleLogicError => "W040",
         }
     }
 
-    /// Get the short description of the error
-    #[allow(dead_code)]
     pub fn description(&self) -> &'static str {
         match self {
-            // Parser errors
-            ErrorCode::ExpectedCloseParen => "Expected ')' after parameters",
-            ErrorCode::ExpectedCloseBrace => "Expected '}' after block",
-            ErrorCode::ExpectedCloseBracket => "Expected ']' after array elements",
+            ErrorCode::ExpectedCloseParen => "Expected closing parenthesis ')'",
+            ErrorCode::ExpectedCloseBrace => "Expected closing brace '}'",
+            ErrorCode::ExpectedCloseBracket => "Expected closing bracket ']'",
             ErrorCode::UnexpectedToken => "Unexpected token in expression",
             ErrorCode::InvalidFunctionDef => "Invalid function definition syntax",
-            ErrorCode::InvalidVariableDecl => "Invalid variable declaration syntax",
+            ErrorCode::InvalidVariableDecl => "Invalid variable declaration",
             ErrorCode::ExpectedIdentifier => "Expected identifier",
             ErrorCode::ExpectedExpression => "Expected expression",
             ErrorCode::InvalidAssignment => "Invalid assignment",
-            ErrorCode::UnexpectedEOF => "Unexpected end of input",
+            ErrorCode::UnexpectedEOF => "Unexpected end of file",
 
-            // Type errors
             ErrorCode::TypeMismatch => "Type mismatch in operation",
-            ErrorCode::UndefinedType => "Undefined type reference",
-            ErrorCode::InvalidTypeConversion => "Cannot convert between types",
+            ErrorCode::UndefinedType => "Undefined type",
+            ErrorCode::InvalidTypeConversion => "Cannot convert between these types",
             ErrorCode::IncompatibleFunctionArgs => "Incompatible function arguments",
-            ErrorCode::ReturnTypeMismatch => "Return type mismatch",
-            ErrorCode::InvalidOperationForType => "Invalid operation for this type",
-            ErrorCode::MissingTypeAnnotation => "Type annotation is required",
-            ErrorCode::RecursiveTypeDefinition => "Recursive type definition",
+            ErrorCode::ReturnTypeMismatch => "Return type does not match function signature",
+            ErrorCode::InvalidOperationForType => "Operation is invalid for this type",
+            ErrorCode::MissingTypeAnnotation => "Type annotation required",
+            ErrorCode::RecursiveTypeDefinition => "Type definition is recursive",
             ErrorCode::GenericTypeMismatch => "Generic type parameter mismatch",
             ErrorCode::TypeInferenceFailed => "Type inference failed",
 
-            // Runtime errors
             ErrorCode::UndefinedVariable => "Variable is not defined",
             ErrorCode::UndefinedFunction => "Function is not defined",
             ErrorCode::VariableAlreadyDefined => "Variable is already defined",
             ErrorCode::FunctionAlreadyDefined => "Function is already defined",
             ErrorCode::InfiniteRecursion => "Infinite recursion detected",
-            ErrorCode::StackOverflow => "Stack overflow",
-            ErrorCode::NullPointerDeref => "Attempted null pointer dereference",
+            ErrorCode::StackOverflow => "Stack overflow during execution",
+            ErrorCode::NullPointerDeref => "Null pointer dereference",
             ErrorCode::OutOfBoundsAccess => "Array access out of bounds",
             ErrorCode::InvalidFunctionCall => "Invalid function call",
             ErrorCode::DivisionByZero => "Division by zero",
 
-            // Warnings
-            ErrorCode::UnusedVariable => "Variable is not used",
-            ErrorCode::UnusedFunction => "Function is not used",
+            ErrorCode::UnusedVariable => "Variable is declared but not used",
+            ErrorCode::UnusedFunction => "Function is declared but not used",
             ErrorCode::UnusedImport => "Import is not used",
-            ErrorCode::UnreachableCode => "Unreachable code detected",
-            ErrorCode::VariableShadowing => "Variable shadows previous definition",
-            ErrorCode::FunctionShadowing => "Function shadows previous definition",
-            ErrorCode::DeprecatedFeature => "Deprecated feature used",
+            ErrorCode::UnreachableCode => "Code is unreachable",
+            ErrorCode::VariableShadowing => "Variable shadows outer scope",
+            ErrorCode::FunctionShadowing => "Function shadows outer scope",
+            ErrorCode::DeprecatedFeature => "Deprecated feature",
             ErrorCode::PerformanceIssue => "Potential performance issue",
-            ErrorCode::StyleViolation => "Style guide violation",
+            ErrorCode::StyleViolation => "Code style violation",
             ErrorCode::PossibleLogicError => "Possible logic error",
         }
     }
 
-    /// Get helpful suggestions for fixing the error
-    #[allow(dead_code)]
     pub fn suggestions(&self) -> Vec<&'static str> {
         match self {
-            // Parser errors
-            ErrorCode::ExpectedCloseParen => vec![
-                "Check that all opening parentheses have matching closing parentheses",
-                "Verify function parameter lists are properly closed",
-            ],
-            ErrorCode::ExpectedCloseBrace => vec![
-                "Check that all opening braces have matching closing braces",
-                "Verify block structure is correct",
-            ],
-            ErrorCode::ExpectedCloseBracket => vec![
-                "Check that all opening brackets have matching closing brackets",
-                "Verify array syntax is correct",
-            ],
-            ErrorCode::UnexpectedToken => vec![
-                "Review the context where this token appears",
-                "Check for syntax errors near this position",
-            ],
-            ErrorCode::InvalidFunctionDef => vec![
-                "Use the correct function definition syntax: fn name(params) -> Type { body }",
-                "Ensure function name is a valid identifier",
-            ],
-            ErrorCode::InvalidVariableDecl => vec![
-                "Use the correct variable declaration syntax: let name: Type = value;",
-                "Ensure variable name is a valid identifier",
-            ],
-            ErrorCode::ExpectedIdentifier => vec![
-                "An identifier must start with a letter or underscore",
-                "Identifiers can contain letters, numbers, and underscores",
-            ],
-            ErrorCode::ExpectedExpression => vec![
-                "An expression was expected at this location",
-                "Check for missing operators or operands",
-            ],
-            ErrorCode::InvalidAssignment => vec![
-                "Assignment target must be a valid lvalue (variable)",
-                "Check the left side of the assignment operator",
-            ],
-            ErrorCode::UnexpectedEOF => vec![
-                "The input ended unexpectedly",
-                "Check for unclosed brackets, braces, or parentheses",
-            ],
-
-            // Type errors
-            ErrorCode::TypeMismatch => vec![
-                "Ensure both operands have compatible types",
-                "Use explicit type conversion if needed",
-            ],
-            ErrorCode::UndefinedType => vec![
-                "Check that the type name is spelled correctly",
-                "Ensure the type is imported or defined",
-            ],
-            ErrorCode::InvalidTypeConversion => vec![
-                "These types cannot be converted automatically",
-                "Use explicit conversion or a different approach",
-            ],
-            ErrorCode::IncompatibleFunctionArgs => vec![
-                "Check that function arguments match the parameter types",
-                "Verify the number of arguments is correct",
-            ],
-            ErrorCode::ReturnTypeMismatch => vec![
-                "The return type does not match the function signature",
-                "Check all return statements in the function",
-            ],
-            ErrorCode::InvalidOperationForType => vec![
-                "This operation is not supported for this type",
-                "Choose a different operation or convert the type",
-            ],
-            ErrorCode::MissingTypeAnnotation => vec![
-                "Explicitly specify the type for this value",
-                "The type cannot be inferred from context",
-            ],
-            ErrorCode::RecursiveTypeDefinition => vec![
-                "A type cannot contain itself directly",
-                "Use indirection (references) if you need recursive structures",
-            ],
-            ErrorCode::GenericTypeMismatch => vec![
-                "Generic type parameters must be compatible",
-                "Check the type arguments passed to the generic",
-            ],
-            ErrorCode::TypeInferenceFailed => vec![
-                "Provide an explicit type annotation",
-                "Ensure there is enough context for type inference",
-            ],
-
-            // Runtime errors
-            ErrorCode::UndefinedVariable => vec![
-                "Check that the variable is defined before use",
-                "Verify the variable name is spelled correctly",
-            ],
-            ErrorCode::UndefinedFunction => vec![
-                "Check that the function is defined before use",
-                "Verify the function name is spelled correctly",
-            ],
-            ErrorCode::VariableAlreadyDefined => vec![
-                "Use a different variable name",
-                "Or remove the duplicate definition",
-            ],
-            ErrorCode::FunctionAlreadyDefined => vec![
-                "Use a different function name",
-                "Or remove the duplicate definition",
-            ],
-            ErrorCode::InfiniteRecursion => vec![
-                "Ensure the recursive function has a base case",
-                "Verify the recursion terminates",
-            ],
-            ErrorCode::StackOverflow => {
-                vec!["Reduce recursion depth", "Increase stack size if possible"]
+            ErrorCode::ExpectedCloseParen => {
+                vec!["Make sure all opening parentheses '(' are closed with ')'"]
             }
-            ErrorCode::NullPointerDeref => vec![
-                "Check for null values before dereferencing",
-                "Use null-safe operations when available",
-            ],
-            ErrorCode::OutOfBoundsAccess => vec![
-                "Verify array indices are within bounds",
-                "Use array length checks before access",
-            ],
-            ErrorCode::InvalidFunctionCall => vec![
-                "Check function signature and arguments",
-                "Ensure the function is properly defined",
-            ],
-            ErrorCode::DivisionByZero => vec![
-                "Check divisor is not zero before dividing",
-                "Add validation or error handling",
-            ],
+            ErrorCode::ExpectedCloseBrace => {
+                vec!["Make sure all opening braces '{' are closed with '}'"]
+            }
+            ErrorCode::ExpectedCloseBracket => {
+                vec!["Make sure all opening brackets '[' are closed with ']'"]
+            }
+            ErrorCode::UnexpectedToken => {
+                vec![
+                    "Check syntax around this token",
+                    "Ensure proper operator usage",
+                ]
+            }
+            ErrorCode::InvalidFunctionDef => {
+                vec![
+                    "Function definition syntax: fn name(params) -> ReturnType { body }",
+                    "Check parameter types and return type annotation",
+                ]
+            }
+            ErrorCode::InvalidVariableDecl => {
+                vec![
+                    "Variable declaration syntax: let name: Type = value;",
+                    "Provide proper type annotation",
+                ]
+            }
+            ErrorCode::ExpectedIdentifier => {
+                vec!["An identifier is required at this location"]
+            }
+            ErrorCode::ExpectedExpression => {
+                vec!["An expression is required at this location"]
+            }
+            ErrorCode::InvalidAssignment => {
+                vec!["Assignment target must be a variable"]
+            }
+            ErrorCode::UnexpectedEOF => {
+                vec![
+                    "File ended unexpectedly",
+                    "Check for unclosed blocks or expressions",
+                ]
+            }
 
-            // Warnings
-            ErrorCode::UnusedVariable => vec![
-                "Remove the variable if not needed",
-                "Or use it in the code",
-                "Prefix with _ if intentionally unused",
-            ],
-            ErrorCode::UnusedFunction => vec![
-                "Remove the function if not needed",
-                "Or ensure it is called somewhere",
-            ],
-            ErrorCode::UnusedImport => vec!["Remove the import if not needed"],
-            ErrorCode::UnreachableCode => vec![
-                "This code is never executed",
-                "Check for early returns or unconditional branches",
-            ],
-            ErrorCode::VariableShadowing => vec![
-                "Rename the variable to avoid shadowing",
-                "Or remove the inner definition",
-            ],
-            ErrorCode::FunctionShadowing => vec![
-                "Rename the function to avoid shadowing",
-                "Or remove the inner definition",
-            ],
-            ErrorCode::DeprecatedFeature => vec![
-                "Use the recommended alternative",
-                "See documentation for migration guide",
-            ],
-            ErrorCode::PerformanceIssue => vec![
-                "Consider optimizing this code",
-                "Profile to identify performance bottlenecks",
-            ],
-            ErrorCode::StyleViolation => vec![
-                "Follow the project's style guidelines",
-                "See STYLE.md for conventions",
-            ],
-            ErrorCode::PossibleLogicError => vec![
-                "Review this code for correctness",
-                "Add tests to verify expected behavior",
-            ],
+            ErrorCode::TypeMismatch => {
+                vec![
+                    "Ensure types on both sides of the operation match",
+                    "Consider type conversion if appropriate",
+                ]
+            }
+            ErrorCode::UndefinedType => {
+                vec![
+                    "Type must be defined before use",
+                    "Check spelling and imports",
+                ]
+            }
+            ErrorCode::InvalidTypeConversion => {
+                vec![
+                    "These types cannot be converted",
+                    "Use an explicit cast if supported",
+                ]
+            }
+            ErrorCode::IncompatibleFunctionArgs => {
+                vec!["Check argument types match function parameters"]
+            }
+            ErrorCode::ReturnTypeMismatch => {
+                vec!["Returned value does not match declared return type"]
+            }
+            ErrorCode::InvalidOperationForType => {
+                vec!["This operation is not supported for this type"]
+            }
+            ErrorCode::MissingTypeAnnotation => {
+                vec!["Provide explicit type annotation"]
+            }
+            ErrorCode::RecursiveTypeDefinition => {
+                vec![
+                    "Type definition contains a cycle",
+                    "Use generics or references to break cycle",
+                ]
+            }
+            ErrorCode::GenericTypeMismatch => {
+                vec!["Generic type parameters do not match"]
+            }
+            ErrorCode::TypeInferenceFailed => {
+                vec!["Provide explicit type annotation to help type inference"]
+            }
+
+            ErrorCode::UndefinedVariable => {
+                vec!["Variable must be defined before use", "Check spelling"]
+            }
+            ErrorCode::UndefinedFunction => {
+                vec![
+                    "Function must be defined before use",
+                    "Check spelling and imports",
+                ]
+            }
+            ErrorCode::VariableAlreadyDefined => {
+                vec!["Use a different variable name or remove the duplicate declaration"]
+            }
+            ErrorCode::FunctionAlreadyDefined => {
+                vec!["Use a different function name or remove the duplicate definition"]
+            }
+            ErrorCode::InfiniteRecursion => {
+                vec!["Ensure recursive calls have a base case"]
+            }
+            ErrorCode::StackOverflow => {
+                vec!["Reduce recursion depth or increase stack size"]
+            }
+            ErrorCode::NullPointerDeref => {
+                vec!["Check that pointer is not null before dereferencing"]
+            }
+            ErrorCode::OutOfBoundsAccess => {
+                vec!["Ensure array index is within valid bounds"]
+            }
+            ErrorCode::InvalidFunctionCall => {
+                vec!["Check function name, arguments, and argument types"]
+            }
+            ErrorCode::DivisionByZero => {
+                vec!["Ensure divisor is not zero"]
+            }
+
+            ErrorCode::UnusedVariable => {
+                vec!["Remove unused variable or use it in code"]
+            }
+            ErrorCode::UnusedFunction => {
+                vec!["Remove unused function or call it from somewhere"]
+            }
+            ErrorCode::UnusedImport => {
+                vec!["Remove unused import statement"]
+            }
+            ErrorCode::UnreachableCode => {
+                vec!["Remove unreachable code or adjust control flow"]
+            }
+            ErrorCode::VariableShadowing => {
+                vec!["Consider using different variable names to avoid shadowing"]
+            }
+            ErrorCode::FunctionShadowing => {
+                vec!["Consider using different function names to avoid shadowing"]
+            }
+            ErrorCode::DeprecatedFeature => {
+                vec!["Use the recommended alternative"]
+            }
+            ErrorCode::PerformanceIssue => {
+                vec!["Consider optimizing this code"]
+            }
+            ErrorCode::StyleViolation => {
+                vec!["Follow the project's code style guidelines"]
+            }
+            ErrorCode::PossibleLogicError => {
+                vec!["Review logic to ensure correctness"]
+            }
         }
     }
 
-    /// Get the category of this error code
     pub fn category(&self) -> ErrorCategory {
         match self {
             ErrorCode::ExpectedCloseParen
@@ -472,24 +442,17 @@ impl ErrorCode {
         }
     }
 
-    /// Get the severity level of this error code
     pub fn severity(&self) -> ErrorSeverity {
         match self.category() {
-            ErrorCategory::Parse | ErrorCategory::Type | ErrorCategory::Runtime => {
-                ErrorSeverity::Error
-            }
             ErrorCategory::Warning => ErrorSeverity::Warning,
+            _ => ErrorSeverity::Error,
         }
     }
 
-    /// Check if this error code is a warning
-    #[allow(dead_code)]
     pub fn is_warning(&self) -> bool {
         self.severity() == ErrorSeverity::Warning
     }
 
-    /// Check if this error code is an error
-    #[allow(dead_code)]
     pub fn is_error(&self) -> bool {
         self.severity() == ErrorSeverity::Error
     }
@@ -497,12 +460,6 @@ impl ErrorCode {
 
 impl fmt::Display for ErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}[{}]: {}",
-            self.severity(),
-            self.code(),
-            self.description()
-        )
+        write!(f, "[{}] {}", self.code(), self.description())
     }
 }

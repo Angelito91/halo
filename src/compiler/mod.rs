@@ -58,11 +58,9 @@ impl OptLevel {
 //
 // ─────────────────────────────────────────────────────────────────────────────
 pub struct Compilation {
-    // SAFETY: `module` borrows from `context`, so it must be dropped first.
-    // The field declaration order guarantees that in Rust (fields are dropped
-    // in declaration order, reversed — i.e. last declared is dropped first).
-    // We therefore declare `module` before `context` so that `module` is
-    // dropped before `context`.
+    /// SAFETY: `module` borrows from `context`, so it must be dropped first.
+    /// Field declaration order guarantees this in Rust (fields are dropped
+    /// in declaration order, reversed).
     module: Option<Module<'static>>,
     context: Box<Context>,
 }
@@ -70,17 +68,9 @@ pub struct Compilation {
 impl Compilation {
     /// Create a new compilation unit with the given module name.
     pub fn new(module_name: &str) -> Self {
-        // Leak the context so we can hand out `'static` references.
-        // The Box is stored so we can reclaim it on Drop.
         let context = Box::new(Context::create());
-
-        // SAFETY: We extend the lifetime to `'static` because both `context`
-        // and `module` live inside this struct and are dropped together in the
-        // correct order (module before context, guaranteed by field order and
-        // Rust's drop order).
         let ctx_ref: &'static Context = unsafe { &*(&*context as *const Context) };
         let module = ctx_ref.create_module(module_name);
-
         Compilation {
             module: Some(module),
             context,
@@ -111,13 +101,11 @@ impl Compilation {
     }
 
     /// Emit a native object file directly (no clang needed for this step).
-    #[allow(dead_code)]
     pub fn emit_object(&mut self, filename: &str) -> Result<(), String> {
         self.codegen().emit_object(filename)
     }
 
     /// Print the LLVM IR to stdout.
-    #[allow(dead_code)]
     pub fn print_ir(&self) {
         println!(
             "{}",

@@ -7,26 +7,18 @@
 use crate::lexer::token::{Token, TokenKind};
 use crate::parser::ast::Position;
 
-/// Converts a flat string of Halo source code into a sequence of [`Token`]s.
+/// Converts Halo source code into a sequence of [`Token`]s.
 ///
-/// The lexer is a single-pass, hand-written scanner.  It does **not** produce
-/// `Whitespace` or `Comment` tokens — those are consumed silently.  The only
-/// whitespace that reaches the parser is `Newline`, which acts as a statement
-/// terminator (Halo has no semicolons).
+/// Single-pass, hand-written scanner that does not produce `Whitespace` or `Comment` tokens.
+/// Newlines are emitted as tokens since Halo uses them as statement terminators (no semicolons).
 pub struct Lexer {
-    /// Source characters stored as a `Vec<char>` so we get O(1) indexed access
-    /// without having to deal with UTF-8 byte offsets.
     chars: Vec<char>,
-    /// Index of the *next* character to be consumed.
     cursor: usize,
-    /// Current source line (1-based).
     line: u32,
-    /// Current source column (1-based).
     column: u32,
 }
 
 impl Lexer {
-    /// Create a new `Lexer` for the given source string.
     pub fn new(source: String) -> Self {
         Self {
             chars: source.chars().collect(),
@@ -36,21 +28,15 @@ impl Lexer {
         }
     }
 
-    // ── Character navigation ──────────────────────────────────────────────────
-
-    /// The character at the current cursor position, or `None` at EOF.
     pub fn current_char(&self) -> Option<char> {
         self.chars.get(self.cursor).copied()
     }
 
-    /// The character *after* the current one, without advancing. Used for
-    /// two-character lookahead (e.g. `==`, `//`).
+    /// Lookahead for two-character tokens (e.g. `==`, `//`).
     pub fn peek_char(&self) -> Option<char> {
         self.chars.get(self.cursor + 1).copied()
     }
 
-    /// Consume and return the current character, advancing the cursor and
-    /// updating line/column tracking.  Returns `None` at EOF.
     pub fn next_char(&mut self) -> Option<char> {
         let ch = self.chars.get(self.cursor).copied()?;
         self.cursor += 1;
@@ -71,32 +57,22 @@ impl Lexer {
         }
     }
 
-    // ── Whitespace / comment skipping ─────────────────────────────────────────
-
-    /// Skip horizontal whitespace (spaces, tabs, etc.) but **not** newlines,
-    /// because `\n` is significant as a statement terminator.
+    /// Skip horizontal whitespace but not newlines (which are statement terminators).
     pub fn skip_whitespace(&mut self) {
         while matches!(self.current_char(), Some(c) if c != '\n' && c.is_whitespace()) {
             self.next_char();
         }
     }
 
-    /// Skip from the second `/` of a `//` comment to the end of the line.
-    /// The trailing `\n` is left in place so the main loop emits a `Newline`
-    /// token.
+    /// Skip from `//` to end of line, leaving `\n` for the tokenizer to emit.
     fn skip_line_comment(&mut self) {
-        // Both leading slashes have already been peeked; consume them.
-        self.next_char(); // first  /
-        self.next_char(); // second /
+        self.next_char();
+        self.next_char();
         while !matches!(self.current_char(), None | Some('\n')) {
             self.next_char();
         }
     }
 
-    // ── Keyword table ─────────────────────────────────────────────────────────
-
-    /// Map a scanned identifier string to its keyword [`TokenKind`], or
-    /// return `None` if it is a plain user identifier.
     fn keyword_kind(word: &str) -> Option<TokenKind> {
         match word {
             "if" => Some(TokenKind::If),
@@ -114,40 +90,19 @@ impl Lexer {
         }
     }
 
-    // ── Token constructors ────────────────────────────────────────────────────
-
-    /// Emit a single-character token, consuming that character.
     fn single_char_token(&mut self, kind: TokenKind, ch: char) -> Token {
         let pos = self.current_position();
         self.next_char();
         Token::new(kind, ch.to_string(), pos)
     }
 
-    /// Emit a two-character token (e.g. `==`).  Both characters must already
-    /// have been consumed by the caller.
     fn two_char_token(kind: TokenKind, lexeme: &'static str, pos: Position) -> Token {
         Token::new(kind, lexeme.to_string(), pos)
     }
 
-    // ── String literal scanner ────────────────────────────────────────────────
-
-    /// Scan a double-quoted string literal.  The opening `"` must have been
-    /// consumed before calling this method.
-    ///
-    /// Supported escape sequences:
-    ///
-    /// | Escape | Meaning         |
-    /// |--------|-----------------|
-    /// | `\\`   | Backslash       |
-    /// | `\"`   | Double quote    |
-    /// | `\n`   | Line feed       |
-    /// | `\t`   | Horizontal tab  |
-    /// | `\r`   | Carriage return |
-    ///
-    /// Any other `\x` sequence is passed through unchanged (`\x`).
-    ///
-    /// An unterminated string (EOF before the closing `"`) produces a
-    /// [`TokenKind::Unknown`] token so the parser can emit a helpful error.
+    /// Scan a double-quoted string literal. The opening `"` must be consumed beforehand.
+    /// Supports standard escape sequences: `\\`, `\"`, `\n`, `\t`, `\r`.
+    /// Unterminated strings produce an `Unknown` token for parser error reporting.
     fn scan_string_literal(&mut self, start_pos: Position) -> Token {
         let mut value = String::new();
 
@@ -162,7 +117,7 @@ impl Lexer {
                 }
 
                 Some('\\') => {
-                    self.next_char(); // consume backslash
+                    self.next_char();
                     let escaped = match self.current_char() {
                         Some('\\') => '\\',
                         Some('"') => '"',
@@ -176,14 +131,12 @@ impl Lexer {
                             value.push(c);
                             continue;
                         }
-                        // EOF directly after backslash.
                         None => break,
                     };
                     self.next_char();
                     value.push(escaped);
                 }
 
-                // Embedded newline — include it verbatim and keep scanning.
                 Some('\n') => {
                     self.next_char();
                     value.push('\n');
@@ -199,16 +152,8 @@ impl Lexer {
         Token::new(TokenKind::StringLit, value, start_pos)
     }
 
-    // ── Main tokenizer ────────────────────────────────────────────────────────
-
-    /// Scan and return the next token from the source.
-    ///
-    /// Whitespace (except newlines) and line comments are consumed silently
-    /// before each token is produced.  Call this in a loop until
-    /// [`TokenKind::Eof`] is returned.
+    /// Scan and return the next token. Call in a loop until [`TokenKind::Eof`].
     pub fn next_token(&mut self) -> Token {
-        // Consume any horizontal whitespace and `//` comments before deciding
-        // what token to emit next.
         loop {
             self.skip_whitespace();
             if self.current_char() == Some('/') && self.peek_char() == Some('/') {
@@ -221,21 +166,17 @@ impl Lexer {
         let pos = self.current_position();
 
         match self.current_char() {
-            // ── End of file ───────────────────────────────────────────────────
             None => Token::new(TokenKind::Eof, String::new(), pos),
 
-            // ── Identifiers and keywords ──────────────────────────────────────
             Some(c) if c.is_alphabetic() || c == '_' => {
                 let mut ident = String::new();
                 while matches!(self.current_char(), Some(c) if c.is_alphanumeric() || c == '_') {
-                    // SAFETY: we just matched Some(c), so next_char() is Some.
                     ident.push(self.next_char().unwrap());
                 }
                 let kind = Self::keyword_kind(&ident).unwrap_or(TokenKind::Identifier);
                 Token::new(kind, ident, pos)
             }
 
-            // ── Numeric literals (integer and float) ──────────────────────────
             Some(c) if c.is_ascii_digit() => {
                 let mut num = String::new();
                 let mut has_dot = false;
@@ -245,10 +186,6 @@ impl Lexer {
                             num.push(d);
                             self.next_char();
                         }
-                        // A `.` introduces the fractional part only when:
-                        //   • we haven't seen a dot yet, and
-                        //   • the character after the dot is also a digit
-                        //     (to avoid consuming method-call dots like `x.len()`).
                         Some('.')
                             if !has_dot && self.peek_char().is_some_and(|p| p.is_ascii_digit()) =>
                         {
@@ -262,13 +199,11 @@ impl Lexer {
                 Token::new(TokenKind::Number, num, pos)
             }
 
-            // ── String literals ───────────────────────────────────────────────
             Some('"') => {
                 self.next_char(); // consume opening `"`
                 self.scan_string_literal(pos)
             }
 
-            // ── Two-character operators ───────────────────────────────────────
             Some('=') => {
                 self.next_char();
                 if self.current_char() == Some('=') {
@@ -324,7 +259,6 @@ impl Lexer {
                 }
             }
 
-            // ── Single-character tokens ───────────────────────────────────────
             Some('+') => self.single_char_token(TokenKind::Plus, '+'),
             Some('-') => self.single_char_token(TokenKind::Minus, '-'),
             Some('*') => self.single_char_token(TokenKind::Star, '*'),
@@ -340,13 +274,11 @@ impl Lexer {
             Some(',') => self.single_char_token(TokenKind::Comma, ','),
             Some('.') => self.single_char_token(TokenKind::Dot, '.'),
 
-            // ── Newline — statement terminator ────────────────────────────────
             Some('\n') => {
                 self.next_char();
                 Token::new(TokenKind::Newline, "\n".to_string(), pos)
             }
 
-            // ── Unrecognised character ────────────────────────────────────────
             Some(c) => {
                 self.next_char();
                 Token::new(TokenKind::Unknown, c.to_string(), pos)

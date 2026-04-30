@@ -109,7 +109,6 @@ impl Diagnostic {
     }
 
     /// Create a new warning diagnostic
-    #[allow(dead_code)]
     pub fn warning(message: impl Into<String>) -> Self {
         Diagnostic {
             level: DiagnosticLevel::Warning,
@@ -122,7 +121,6 @@ impl Diagnostic {
     }
 
     /// Create a new note diagnostic
-    #[allow(dead_code)]
     pub fn note(message: impl Into<String>) -> Self {
         Diagnostic {
             level: DiagnosticLevel::Note,
@@ -141,48 +139,41 @@ impl Diagnostic {
     }
 
     /// Add a single hint/suggestion
-    #[allow(dead_code)]
     pub fn with_hint(mut self, hint: impl Into<String>) -> Self {
         self.hints.push(hint.into());
         self
     }
 
     /// Add multiple hints/suggestions
-    #[allow(dead_code)]
     pub fn with_hints(mut self, hints: Vec<String>) -> Self {
         self.hints.extend(hints);
         self
     }
 
     /// Add error code to diagnostic
-    #[allow(dead_code)]
     pub fn with_error_code(mut self, code: impl Into<String>) -> Self {
         self.error_code = Some(code.into());
         self
     }
 
     /// Add stack trace to diagnostic
-    #[allow(dead_code)]
     pub fn with_stack_trace(mut self, trace: StackTrace) -> Self {
         self.stack_trace = Some(trace);
         self
     }
 
     /// Export diagnostic to JSON string
-    #[allow(dead_code)]
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
     }
 
-    /// Export diagnostic from JSON string
-    #[allow(dead_code)]
+    /// Import diagnostic from JSON string
     pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(json)
     }
 
     /// Format and write the diagnostic to any writer
     pub fn print(&self, out: &mut dyn fmt::Write) -> fmt::Result {
-        // Header with level and error code
         match self.level {
             DiagnosticLevel::Error => {
                 if let Some(code) = &self.error_code {
@@ -243,7 +234,6 @@ impl Diagnostic {
                         line
                     )?;
 
-                    // Print error indicator on the error line
                     if is_error_line && loc.column > 0 {
                         let col_pos = (loc.column as usize).saturating_sub(1);
                         let spaces = " ".repeat(col_pos);
@@ -314,12 +304,10 @@ pub fn location_from_source(
 
 /// Collection of diagnostics for a compilation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub struct DiagnosticCollection {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-#[allow(dead_code)]
 impl DiagnosticCollection {
     /// Create a new empty collection
     pub fn new() -> Self {

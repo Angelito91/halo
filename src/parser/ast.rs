@@ -6,14 +6,12 @@
 
 use std::fmt;
 
-// ===== Position =====
 #[derive(Debug, Clone, Copy)]
 pub struct Position {
     pub line: u32,
     pub column: u32,
 }
 
-// ===== Block =====
 #[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<Statement>,
@@ -27,7 +25,6 @@ impl Block {
     }
 }
 
-// ===== IndexType =====
 /// Represents different types of array indexing/slicing operations.
 #[derive(Debug, Clone)]
 pub enum IndexType {
@@ -35,14 +32,11 @@ pub enum IndexType {
     Single(Box<Expression>),
     /// Slice access: arr[1:4], arr[..3], arr[2..], etc.
     Slice {
-        /// Start index (None means 0)
         start: Option<Box<Expression>>,
-        /// End index (None means array length)
         end: Option<Box<Expression>>,
     },
 }
 
-// ===== BinOp =====
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinOp {
     Add,
@@ -82,14 +76,12 @@ impl fmt::Display for BinOp {
     }
 }
 
-// ===== Expression =====
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum Expression {
     Number(i64, Position),
     Float(f64, Position),
     Bool(bool, Position),
-    /// String literal: "hello"
     StringLiteral(String, Position),
     Var(String, Position),
     Unary {
@@ -230,20 +222,16 @@ impl Expression {
     }
 }
 
-// ===== ElseIf branch =====
 /// A single `else if <cond> { ... }` clause.
 #[derive(Debug, Clone)]
 pub struct ElseIfBranch {
     pub cond: Expression,
     pub body: Block,
-    /// Source position of the `else if` keyword.
-    /// Currently unused by the evaluator but retained for future
-    /// tooling (linters, error reporting, source maps).
+    /// Source position of the `else if` keyword (retained for future tooling).
     #[allow(dead_code)]
     pub pos: Position,
 }
 
-// ===== Statement =====
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expr(Expression),
@@ -255,7 +243,6 @@ pub enum Statement {
     If {
         cond: Expression,
         then_branch: Block,
-        /// Zero or more `else if` clauses, in order.
         else_if_branches: Vec<ElseIfBranch>,
         else_branch: Option<Block>,
         pos: Position,
@@ -350,7 +337,6 @@ impl Statement {
     }
 }
 
-// ===== TopLevel =====
 #[derive(Debug, Clone)]
 pub enum TopLevel {
     Function {
@@ -380,7 +366,6 @@ impl TopLevel {
     }
 }
 
-// ===== Program =====
 #[derive(Debug, Clone)]
 pub struct Program {
     pub items: Vec<TopLevel>,

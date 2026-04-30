@@ -1,6 +1,16 @@
-// ── UI Output Functions ──────────────────────────────────────────────────────
+// The Halo Programming Language
+// Version: 0.2.0
+// Author: Angel A. Portuondo H.
+// License: MPL 2.0
+// SPDX-License-Identifier: MPL-2.0
 
+use crate::diagnostics::{location_from_source, Diagnostic};
+use crate::interpreter::Evaluator;
+use crate::lexer::{Lexer, TokenKind};
+use crate::parser::Parser;
 use crate::utils::{BANNER, VERSION};
+use std::fs;
+use std::path::Path;
 
 pub fn print_version() {
     println!("{BANNER} v{VERSION}");
@@ -89,21 +99,10 @@ pub fn print_help() {
     println!("    Project overview:   README.md");
 }
 
-// ── Pipeline helpers ──────────────────────────────────────────────────────────
-
-use crate::diagnostics::{location_from_source, Diagnostic};
-use crate::interpreter::Evaluator;
-use crate::lexer::{Lexer, TokenKind};
-use crate::parser::Parser;
-use std::fs;
-use std::path::Path;
-
-/// Read the entire contents of `path` into a `String`.
 pub fn read_source(path: &str) -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| format!("Cannot read '{path}': {e}"))
 }
 
-/// Derive the file stem from a source path (`"examples/foo.halo"` → `"foo"`).
 pub fn file_stem(path: &str) -> &str {
     Path::new(path)
         .file_stem()
@@ -111,7 +110,6 @@ pub fn file_stem(path: &str) -> &str {
         .unwrap_or("output")
 }
 
-/// Lex `source` into a token stream including the terminal `Eof` token.
 pub fn tokenize(source: &str) -> Vec<crate::lexer::Token> {
     let mut lexer = Lexer::new(source.to_string());
     std::iter::from_fn(move || {
@@ -129,8 +127,6 @@ pub fn tokenize(source: &str) -> Vec<crate::lexer::Token> {
     .collect()
 }
 
-/// Parse a token stream into a [`Program`] AST.
-/// Takes source code for better error context and snippets.
 pub fn parse_tokens(
     tokens: Vec<crate::lexer::Token>,
     source: &str,
@@ -142,15 +138,10 @@ pub fn parse_tokens(
             let diagnostics = error_strings
                 .iter()
                 .map(|err| {
-                    // Extract line and column from error message
-                    // Format: "Error at LINE:COLUMN: MESSAGE"
-
-                    // Try to parse "Error at LINE:COLUMN:" pattern
                     if let Some(at_idx) = err.find("at ") {
                         let rest = &err[at_idx + 3..];
                         let parts: Vec<&str> = rest.split(':').collect();
 
-                        // We expect at least: ["LINE", "COLUMN", "rest of message"]
                         if parts.len() >= 3 {
                             if let (Ok(line_num), Ok(col_num)) = (
                                 parts[0].trim().parse::<u32>(),
@@ -158,16 +149,12 @@ pub fn parse_tokens(
                             ) {
                                 let location =
                                     location_from_source(file, source, line_num, col_num, 1);
-
-                                // Extract just the message part (everything after the second colon)
                                 let message = parts[2..].join(":").trim().to_string();
-
                                 return Diagnostic::error(message).with_location(location);
                             }
                         }
                     }
 
-                    // Fallback: return the error as-is
                     Diagnostic::error(err)
                 })
                 .collect();
@@ -176,17 +163,14 @@ pub fn parse_tokens(
     }
 }
 
-/// Evaluate a [`Program`] with the tree-walking interpreter.
 pub fn evaluate(
     program: &crate::parser::ast::Program,
 ) -> Result<crate::interpreter::Value, String> {
     Evaluator::new().eval_program(program)
 }
 
-/// Execute an external command and return success status.
 pub fn run_command(mut cmd: std::process::Command, step_name: &str, verbose: bool) -> bool {
     if verbose {
-        // Print the command being executed.
         eprintln!("   $ {:?}", cmd);
     }
     match cmd.output() {
