@@ -22,9 +22,11 @@
 //   - `recursion_depth`  – capped at `MAX_RECURSION_DEPTH`.
 //   - `loop_iterations`  – capped at `MAX_LOOP_ITERATIONS`.
 
-use super::environment::Environment;
-use super::value::Value;
-use crate::parser::ast::{BinOp, Block, Expression, Program, Statement, TopLevel};
+use super::super::environment::Environment;
+use super::super::value::Value;
+use super::builtins;
+use super::methods;
+use crate::parser::ast::{BinOp, Block, Expression, IndexType, Program, Statement, TopLevel};
 use crate::utils::find_suggestions_smart;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -47,7 +49,7 @@ const MAX_LOOP_ITERATIONS: u64 = 1_000_000;
 /// They are stored on the `Evaluator` rather than being carried in the `Result`
 /// return type so that the existing `Result<Value, String>` signature is kept.
 #[derive(Debug, Clone, PartialEq)]
-enum LoopSignal {
+pub enum LoopSignal {
     Break,
     Continue,
 }
@@ -59,28 +61,28 @@ enum LoopSignal {
 /// Storing definitions behind an `Rc` lets `eval_call` clone the handle
 /// cheaply (a single atomic increment) instead of deep-cloning the entire
 /// `Block` AST on every call.
-type FnDef = Rc<(Vec<String>, Block)>;
+pub type FnDef = Rc<(Vec<String>, Block)>;
 
 // ── Evaluator ─────────────────────────────────────────────────────────────────
 
 pub struct Evaluator {
     /// Variable bindings, organised in a stack of scopes.
-    env: Environment,
+    pub env: Environment,
     /// All user-defined functions discovered during the first pass.
-    functions: HashMap<String, FnDef>,
+    pub functions: HashMap<String, FnDef>,
     /// Holds the value produced by the most recent `return` statement until it
     /// is collected by `eval_call`.  `None` means no return is pending.
-    return_value: Option<Value>,
+    pub return_value: Option<Value>,
     /// Pending `break` or `continue` signal, cleared by the enclosing loop.
-    loop_signal: Option<LoopSignal>,
+    pub loop_signal: Option<LoopSignal>,
     /// How many user-function frames are currently on the call stack.
-    recursion_depth: usize,
+    pub recursion_depth: usize,
     /// Total loop iterations executed in the current program run.
-    loop_iterations: u64,
+    pub loop_iterations: u64,
     /// All available variables across all scopes (for error suggestions)
-    all_variables: Vec<String>,
+    pub all_variables: Vec<String>,
     /// Call stack for tracking function execution (for stack traces)
-    call_stack: Vec<String>,
+    pub call_stack: Vec<String>,
 }
 
 impl Evaluator {
@@ -99,6 +101,7 @@ impl Evaluator {
     }
 
     /// Get the current call stack as a vector of function names
+    #[allow(dead_code)]
     pub fn get_call_stack(&self) -> Vec<String> {
         self.call_stack.clone()
     }
@@ -326,7 +329,7 @@ impl Evaluator {
     // Expression evaluation
     // =========================================================================
 
-    fn eval_expr(&mut self, expr: &Expression) -> Result<Value, String> {
+    pub fn eval_expr(&mut self, expr: &Expression) -> Result<Value, String> {
         match expr {
             // ── Literals ─────────────────────────────────────────────────────
             Expression::Number(n, _) => Ok(Value::Number(*n)),
@@ -389,17 +392,149 @@ impl Evaluator {
             // ── Array indexing ────────────────────────────────────────────────
             Expression::Index { array, index, .. } => {
                 let arr_val = self.eval_expr(array)?;
+
+                match index {
+                    IndexType::Single(idx_expr) => {
+                        // Single index: arr[5]
+                        let idx_val = self.eval_expr(idx_expr)?;
+
+                        match (arr_val, idx_val) {
+                            (Value::Array(arr), Value::Number(idx)) => {
+                                if idx < 0 {
+                                    return Err(format!(
+                                        "Array index cannot be negative, got {}",
+                                        idx
+                                    ));
+                                }
+                                let idx_usize = idx as usize;
+                                arr.get(idx_usize).cloned().ok_or_else(|| {
+                                    format!(
+                                        "Array index {} out of bounds (length {})",
+                                        idx,
+                                        arr.len()
+                                    )
+                                })
+                            }
+                            (Value::Array(_), other) => Err(format!(
+                                "Array index must be a number, got '{}'",
+                                other.type_name()
+                            )),
+                            (other, _) => Err(format!(
+                                "Cannot index a value of type '{}'",
+                                other.type_name()
+                            )),
+                        }
+                    }
+                    IndexType::Slice { start, end } => {
+                        // Slice: arr[start:end]
+                        match arr_val {
+                            Value::Array(arr) => {
+                                let len = arr.len() as i64;
+
+                                // Evaluate start index (default: 0)
+                                let start_idx = if let Some(start_expr) = start {
+                                    let val = self.eval_expr(start_expr)?;
+                                    match val {
+                                        Value::Number(n) => n,
+                                        _ => {
+                                            return Err(format!(
+                                                "Slice start must be a number, got '{}'",
+                                                val.type_name()
+                                            ))
+                                        }
+                                    }
+                                } else {
+                                    0
+                                };
+
+                                // Evaluate end index (default: len)
+                                let end_idx = if let Some(end_expr) = end {
+                                    let val = self.eval_expr(end_expr)?;
+                                    match val {
+                                        Value::Number(n) => n,
+                                        _ => {
+                                            return Err(format!(
+                                                "Slice end must be a number, got '{}'",
+                                                val.type_name()
+                                            ))
+                                        }
+                                    }
+                                } else {
+                                    len
+                                };
+
+                                // Validate bounds
+                                if start_idx < 0 || start_idx > len {
+                                    return Err(format!(
+                                        "Slice start index {} out of bounds for array of length {}",
+                                        start_idx, len
+                                    ));
+                                }
+                                if end_idx < 0 || end_idx > len {
+                                    return Err(format!(
+                                        "Slice end index {} out of bounds for array of length {}",
+                                        end_idx, len
+                                    ));
+                                }
+                                if start_idx > end_idx {
+                                    return Err(format!(
+                                        "Slice start index {} cannot be greater than end index {}",
+                                        start_idx, end_idx
+                                    ));
+                                }
+
+                                // Extract slice
+                                let start_usize = start_idx as usize;
+                                let end_usize = end_idx as usize;
+                                let slice = arr[start_usize..end_usize].to_vec();
+                                Ok(Value::Array(slice))
+                            }
+                            other => Err(format!(
+                                "Cannot slice a value of type '{}'",
+                                other.type_name()
+                            )),
+                        }
+                    }
+                }
+            }
+
+            // -- Method call
+            Expression::MethodCall {
+                object,
+                method,
+                args,
+                ..
+            } => {
+                let obj_value = self.eval_expr(object)?;
+                methods::try_eval_method_call(self, &obj_value, method, args)
+            }
+
+            // -- Index assignment: arr[i] = value
+            Expression::IndexAssign {
+                array,
+                index,
+                value,
+                ..
+            } => {
+                let arr_val = self.eval_expr(array)?;
                 let idx_val = self.eval_expr(index)?;
+                let new_val = self.eval_expr(value)?;
 
                 match (arr_val, idx_val) {
-                    (Value::Array(arr), Value::Number(idx)) => {
+                    (Value::Array(mut arr), Value::Number(idx)) => {
                         if idx < 0 {
                             return Err(format!("Array index cannot be negative, got {}", idx));
                         }
                         let idx_usize = idx as usize;
-                        arr.get(idx_usize).cloned().ok_or_else(|| {
-                            format!("Array index {} out of bounds (length {})", idx, arr.len())
-                        })
+                        if idx_usize >= arr.len() {
+                            return Err(format!(
+                                "Array index {} out of bounds (length {})",
+                                idx,
+                                arr.len()
+                            ));
+                        }
+                        arr[idx_usize] = new_val.clone();
+                        Ok(new_val)
                     }
                     (Value::Array(_), other) => Err(format!(
                         "Array index must be a number, got '{}'",
@@ -467,9 +602,9 @@ impl Evaluator {
     // Function call dispatch
     // =========================================================================
 
-    fn eval_call(&mut self, name: &str, args: &[Expression]) -> Result<Value, String> {
+    pub fn eval_call(&mut self, name: &str, args: &[Expression]) -> Result<Value, String> {
         // Built-ins never count towards the recursion limit.
-        if let Some(result) = self.try_eval_builtin(name, args)? {
+        if let Some(result) = builtins::try_eval_builtin(self, name, args)? {
             return Ok(result);
         }
 
@@ -535,333 +670,30 @@ impl Evaluator {
         Ok(self.return_value.take().unwrap_or(Value::Null))
     }
 
-    /// Evaluate a slice of argument expressions in the current scope, returning
-    /// the results as an owned `Vec`.  Stops and propagates the first error.
-    fn eval_args(&mut self, args: &[Expression]) -> Result<Vec<Value>, String> {
-        args.iter().map(|arg| self.eval_expr(arg)).collect()
-    }
-
-    /// Try to evaluate `name` as a built-in function.
-    ///
-    /// Returns:
-    /// - `Ok(Some(value))` — the call was handled by a built-in.
-    /// - `Ok(None)` — `name` is not a built-in; the caller should try
-    ///   user-defined functions next.
-    /// - `Err(msg)` — a built-in was matched but the call was invalid.
-    fn try_eval_builtin(
-        &mut self,
-        name: &str,
-        args: &[Expression],
-    ) -> Result<Option<Value>, String> {
-        let result = match name {
-            "print" => self.builtin_print(args)?,
-            "len" => self.builtin_single_arg(name, args, |v| match v {
-                Value::String(s) => Ok(Value::Number(s.len() as i64)),
-                Value::Number(n) => Ok(Value::Number(n.to_string().len() as i64)),
-                other => Err(format!(
-                    "len() does not support type '{}'",
-                    other.type_name()
-                )),
-            })?,
-            "str" => {
-                self.builtin_single_arg(name, args, |v| Ok(Value::String(v.to_string_value())))?
-            }
-            "int" => self.builtin_single_arg(name, args, |v| Ok(Value::Number(v.to_int()?)))?,
-            "float" => self.builtin_single_arg(name, args, |v| Ok(Value::Float(v.to_number()?)))?,
-            "abs" => self.builtin_single_arg(name, args, |v| match v {
-                Value::Number(n) => Ok(Value::Number(n.abs())),
-                Value::Float(f) => Ok(Value::Float(f.abs())),
-                other => Err(format!(
-                    "abs() does not support type '{}'",
-                    other.type_name()
-                )),
-            })?,
-            "type" => self
-                .builtin_single_arg(name, args, |v| Ok(Value::String(v.type_name().to_string())))?,
-            "push" => self.builtin_push(args)?,
-            "pop" => self.builtin_pop(args)?,
-            "first" => self.builtin_first(args)?,
-            "last" => self.builtin_last(args)?,
-            "reverse" => self.builtin_reverse(args)?,
-            "join" => self.builtin_join(args)?,
-            "contains" => self.builtin_contains(args)?,
-            "index_of" => self.builtin_index_of(args)?,
-            "sort" => self.builtin_sort(args)?,
-            // Not a built-in.
-            _ => return Ok(None),
-        };
-        Ok(Some(result))
-    }
-
-    // ── Built-in helpers ──────────────────────────────────────────────────────
-
-    /// `print(v1, v2, …)` — prints each argument on its own line.
-    fn builtin_print(&mut self, args: &[Expression]) -> Result<Value, String> {
+    pub fn eval_args(&mut self, args: &[Expression]) -> Result<Vec<Value>, String> {
+        let mut values = Vec::new();
         for arg in args {
-            let val = self.eval_expr(arg)?;
-            println!("{val}");
+            values.push(self.eval_expr(arg)?);
         }
-        Ok(Value::Null)
+        Ok(values)
     }
 
-    /// Helper for built-ins that accept exactly one argument.
-    ///
-    /// Evaluates the single argument, then calls `f` with the resulting
-    /// [`Value`].  Returns an arity error if the argument count is wrong.
-    fn builtin_single_arg(
-        &mut self,
-        name: &str,
-        args: &[Expression],
-        f: impl FnOnce(Value) -> Result<Value, String>,
-    ) -> Result<Value, String> {
-        if args.len() != 1 {
-            return Err(format!(
-                "{name}() expects exactly 1 argument, got {}",
-                args.len()
-            ));
-        }
-        let val = self.eval_expr(&args[0])?;
-        f(val)
-    }
+    /// Convert a Value back to an Expression for use in method calls.
+    /// This is a helper function to adapt between the evaluator's need to pass
+    /// values to built-in functions that expect Expression arguments.
+    pub fn value_to_expression(&self, value: &Value) -> Expression {
+        let pos = crate::parser::ast::Position { line: 0, column: 0 };
 
-    // ── Array manipulation built-ins ───────────────────────────────────────────
-
-    /// `push(array, value)` - Adds an element to the end of the array and returns the modified array.
-    fn builtin_push(&mut self, args: &[Expression]) -> Result<Value, String> {
-        if args.len() != 2 {
-            return Err(format!(
-                "push() expects exactly 2 arguments, got {}",
-                args.len()
-            ));
-        }
-        let arr_val = self.eval_expr(&args[0])?;
-        let elem = self.eval_expr(&args[1])?;
-
-        match arr_val {
-            Value::Array(mut arr) => {
-                arr.push(elem);
-                Ok(Value::Array(arr))
-            }
-            other => Err(format!(
-                "push() expects first argument to be an array, got '{}'",
-                other.type_name()
-            )),
-        }
-    }
-
-    /// `pop(array)` - Removes and returns the last element of the array (null if empty).
-    fn builtin_pop(&mut self, args: &[Expression]) -> Result<Value, String> {
-        if args.len() != 1 {
-            return Err(format!(
-                "pop() expects exactly 1 argument, got {}",
-                args.len()
-            ));
-        }
-        let arr_val = self.eval_expr(&args[0])?;
-
-        match arr_val {
-            Value::Array(mut arr) => {
-                let result = arr.pop().unwrap_or(Value::Null);
-                Ok(result)
-            }
-            other => Err(format!(
-                "pop() expects an array, got '{}'",
-                other.type_name()
-            )),
-        }
-    }
-
-    /// `first(array)` - Returns the first element of the array (null if empty).
-    fn builtin_first(&mut self, args: &[Expression]) -> Result<Value, String> {
-        if args.len() != 1 {
-            return Err(format!(
-                "first() expects exactly 1 argument, got {}",
-                args.len()
-            ));
-        }
-        let arr_val = self.eval_expr(&args[0])?;
-
-        match arr_val {
-            Value::Array(arr) => Ok(arr.first().cloned().unwrap_or(Value::Null)),
-            other => Err(format!(
-                "first() expects an array, got '{}'",
-                other.type_name()
-            )),
-        }
-    }
-
-    /// `last(array)` - Returns the last element of the array (null if empty).
-    fn builtin_last(&mut self, args: &[Expression]) -> Result<Value, String> {
-        if args.len() != 1 {
-            return Err(format!(
-                "last() expects exactly 1 argument, got {}",
-                args.len()
-            ));
-        }
-        let arr_val = self.eval_expr(&args[0])?;
-
-        match arr_val {
-            Value::Array(arr) => Ok(arr.last().cloned().unwrap_or(Value::Null)),
-            other => Err(format!(
-                "last() expects an array, got '{}'",
-                other.type_name()
-            )),
-        }
-    }
-
-    /// `reverse(array)` - Returns a new array with elements in reverse order.
-    fn builtin_reverse(&mut self, args: &[Expression]) -> Result<Value, String> {
-        if args.len() != 1 {
-            return Err(format!(
-                "reverse() expects exactly 1 argument, got {}",
-                args.len()
-            ));
-        }
-        let arr_val = self.eval_expr(&args[0])?;
-
-        match arr_val {
-            Value::Array(mut arr) => {
-                arr.reverse();
-                Ok(Value::Array(arr))
-            }
-            other => Err(format!(
-                "reverse() expects an array, got '{}'",
-                other.type_name()
-            )),
-        }
-    }
-
-    /// `join(array, separator)` - Converts array elements to a string joined by separator.
-    fn builtin_join(&mut self, args: &[Expression]) -> Result<Value, String> {
-        if args.len() != 2 {
-            return Err(format!(
-                "join() expects exactly 2 arguments, got {}",
-                args.len()
-            ));
-        }
-        let arr_val = self.eval_expr(&args[0])?;
-        let sep_val = self.eval_expr(&args[1])?;
-
-        let sep = match sep_val {
-            Value::String(s) => s,
-            other => {
-                return Err(format!(
-                    "join() expects second argument to be a string, got '{}'",
-                    other.type_name()
-                ))
-            }
-        };
-
-        match arr_val {
+        match value {
+            Value::Number(n) => Expression::Number(*n, pos),
+            Value::Float(f) => Expression::Float(*f, pos),
+            Value::Bool(b) => Expression::Bool(*b, pos),
+            Value::String(s) => Expression::StringLiteral(s.clone(), pos),
             Value::Array(arr) => {
-                let strings: Vec<String> = arr.iter().map(|v| v.to_string_value()).collect();
-                Ok(Value::String(strings.join(&sep)))
+                let elements = arr.iter().map(|v| self.value_to_expression(v)).collect();
+                Expression::ArrayLiteral { elements, pos }
             }
-            other => Err(format!(
-                "join() expects first argument to be an array, got '{}'",
-                other.type_name()
-            )),
-        }
-    }
-
-    /// `contains(array, value)` - Returns true if the array contains the value.
-    fn builtin_contains(&mut self, args: &[Expression]) -> Result<Value, String> {
-        if args.len() != 2 {
-            return Err(format!(
-                "contains() expects exactly 2 arguments, got {}",
-                args.len()
-            ));
-        }
-        let arr_val = self.eval_expr(&args[0])?;
-        let search_val = self.eval_expr(&args[1])?;
-
-        match arr_val {
-            Value::Array(arr) => {
-                let found = arr.iter().any(|v| v.equals(&search_val));
-                Ok(Value::Bool(found))
-            }
-            other => Err(format!(
-                "contains() expects first argument to be an array, got '{}'",
-                other.type_name()
-            )),
-        }
-    }
-
-    /// `index_of(array, value)` - Returns the index of the value in the array (-1 if not found).
-    fn builtin_index_of(&mut self, args: &[Expression]) -> Result<Value, String> {
-        if args.len() != 2 {
-            return Err(format!(
-                "index_of() expects exactly 2 arguments, got {}",
-                args.len()
-            ));
-        }
-        let arr_val = self.eval_expr(&args[0])?;
-        let search_val = self.eval_expr(&args[1])?;
-
-        match arr_val {
-            Value::Array(arr) => {
-                let index = arr
-                    .iter()
-                    .position(|v| v.equals(&search_val))
-                    .map(|i| i as i64)
-                    .unwrap_or(-1);
-                Ok(Value::Number(index))
-            }
-            other => Err(format!(
-                "index_of() expects first argument to be an array, got '{}'",
-                other.type_name()
-            )),
-        }
-    }
-
-    /// `sort(array)` - Returns a new array with elements sorted (only for numbers).
-    fn builtin_sort(&mut self, args: &[Expression]) -> Result<Value, String> {
-        if args.len() != 1 {
-            return Err(format!(
-                "sort() expects exactly 1 argument, got {}",
-                args.len()
-            ));
-        }
-        let arr_val = self.eval_expr(&args[0])?;
-
-        match arr_val {
-            Value::Array(mut arr) => {
-                // Validate that all elements are numbers or floats
-                for elem in &arr {
-                    match elem {
-                        Value::Number(_) | Value::Float(_) => {}
-                        other => {
-                            return Err(format!(
-                                "sort() only works with arrays of numbers, found '{}'",
-                                other.type_name()
-                            ))
-                        }
-                    }
-                }
-
-                // Sort the array
-                arr.sort_by(|a, b| {
-                    let a_num = match a {
-                        Value::Number(n) => *n as f64,
-                        Value::Float(f) => *f,
-                        _ => 0.0,
-                    };
-                    let b_num = match b {
-                        Value::Number(n) => *n as f64,
-                        Value::Float(f) => *f,
-                        _ => 0.0,
-                    };
-                    a_num
-                        .partial_cmp(&b_num)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                });
-
-                Ok(Value::Array(arr))
-            }
-            other => Err(format!(
-                "sort() expects an array, got '{}'",
-                other.type_name()
-            )),
+            Value::Null => Expression::Bool(false, pos),
         }
     }
 }
@@ -870,43 +702,4 @@ impl Default for Evaluator {
     fn default() -> Self {
         Self::new()
     }
-}
-
-// ── Helper functions for tracking variables ────────────────────────────────
-
-/// Collect all variable names from declarations in a statement
-fn collect_var_names_from_stmt(stmt: &Statement) -> Vec<String> {
-    let mut names = Vec::new();
-    match stmt {
-        Statement::VarDecl { name, .. } => {
-            names.push(name.clone());
-        }
-        Statement::If {
-            then_branch,
-            else_if_branches,
-            else_branch,
-            ..
-        } => {
-            for stmt in &then_branch.stmts {
-                names.extend(collect_var_names_from_stmt(stmt));
-            }
-            for branch in else_if_branches {
-                for stmt in &branch.body.stmts {
-                    names.extend(collect_var_names_from_stmt(stmt));
-                }
-            }
-            if let Some(block) = else_branch {
-                for stmt in &block.stmts {
-                    names.extend(collect_var_names_from_stmt(stmt));
-                }
-            }
-        }
-        Statement::While { body, .. } => {
-            for stmt in &body.stmts {
-                names.extend(collect_var_names_from_stmt(stmt));
-            }
-        }
-        _ => {}
-    }
-    names
 }

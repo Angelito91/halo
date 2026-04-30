@@ -5,7 +5,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::lexer::{Token, TokenKind};
-use crate::parser::ast::{BinOp, Block, ElseIfBranch, Expression, Program, Statement, TopLevel};
+use crate::parser::ast::{
+    BinOp, Block, ElseIfBranch, Expression, IndexType, Program, Statement, TopLevel,
+};
 
 /// Recursive-descent parser that converts a flat token stream into a typed
 /// [`Program`] AST.
@@ -549,13 +551,48 @@ impl Parser {
 
         loop {
             if self.advance_if(TokenKind::LeftBracket) {
-                let index = self.parse_expression()?;
                 let pos = expr.pos();
+                let index = self.parse_index_or_slice()?;
                 self.consume(TokenKind::RightBracket, "Expected ']' after array index")?;
                 expr = Expression::Index {
                     array: Box::new(expr),
-                    index: Box::new(index),
+                    index,
                     pos,
+                };
+            } else if self.advance_if(TokenKind::Dot) {
+                // Method call: object.method(...) or object.method
+                let method_pos = expr.pos();
+
+                if !self.check(TokenKind::Identifier) {
+                    self.error("Expected method name after dot");
+                    return None;
+                }
+
+                self.advance();
+                let method = self.previous().lexeme.clone();
+
+                let mut args = Vec::new();
+                if self.advance_if(TokenKind::LeftParen) {
+                    // Method with arguments: object.method(arg1, arg2)
+                    if !self.check(TokenKind::RightParen) {
+                        loop {
+                            args.push(self.parse_expression()?);
+                            if !self.advance_if(TokenKind::Comma) {
+                                break;
+                            }
+                        }
+                    }
+                    self.consume(TokenKind::RightParen, "Expected ')' after method arguments")?;
+                } else {
+                    // Method without arguments: object.method
+                    // This is valid - will be converted to method call with no additional args
+                }
+
+                expr = Expression::MethodCall {
+                    object: Box::new(expr),
+                    method,
+                    args,
+                    pos: method_pos,
                 };
             } else {
                 break;
@@ -563,6 +600,50 @@ impl Parser {
         }
 
         Some(expr)
+    }
+
+    /// Parse either a single index or a slice expression.
+    /// Handles:
+    /// - arr[5]       -> Single(5)
+    /// - arr[1:4]     -> Slice { start: Some(1), end: Some(4) }
+    /// - arr[..3]     -> Slice { start: None, end: Some(3) }
+    /// - arr[2..]     -> Slice { start: Some(2), end: None }
+    /// - arr[..]      -> Slice { start: None, end: None }
+    fn parse_index_or_slice(&mut self) -> Option<IndexType> {
+        // Check if we start with a colon (means no start, e.g., arr[..3])
+        if self.check(TokenKind::Colon) {
+            self.advance(); // consume the colon
+
+            // Parse end if it exists (e.g., arr[..3])
+            let end = if self.check(TokenKind::RightBracket) {
+                None
+            } else {
+                Some(Box::new(self.parse_expression()?))
+            };
+
+            return Some(IndexType::Slice { start: None, end });
+        }
+
+        // Parse first expression (could be index or slice start)
+        let first = self.parse_expression()?;
+
+        // Check if colon follows (indicating a slice)
+        if self.advance_if(TokenKind::Colon) {
+            // It's a slice: first is the start
+            let end = if self.check(TokenKind::RightBracket) {
+                None
+            } else {
+                Some(Box::new(self.parse_expression()?))
+            };
+
+            Some(IndexType::Slice {
+                start: Some(Box::new(first)),
+                end,
+            })
+        } else {
+            // It's a single index
+            Some(IndexType::Single(Box::new(first)))
+        }
     }
 
     fn parse_primary(&mut self) -> Option<Expression> {

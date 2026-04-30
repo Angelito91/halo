@@ -8,7 +8,7 @@
 // It's kept for potential future use in optimization passes, linting, or analysis tools.
 // To use this, enable the visitor module exports in parser/mod.rs
 
-use crate::parser::ast::{Block, Expression, Program, Statement, TopLevel};
+use crate::parser::ast::{Block, Expression, IndexType, Program, Statement, TopLevel};
 
 #[allow(dead_code)]
 pub trait ASTVisitor {
@@ -99,7 +99,33 @@ pub trait ASTVisitor {
             }
             Expression::Index { array, index, .. } => {
                 self.visit_expression(array);
+                match index {
+                    IndexType::Single(idx) => self.visit_expression(idx),
+                    IndexType::Slice { start, end } => {
+                        if let Some(s) = start {
+                            self.visit_expression(s);
+                        }
+                        if let Some(e) = end {
+                            self.visit_expression(e);
+                        }
+                    }
+                }
+            }
+            Expression::MethodCall { object, args, .. } => {
+                self.visit_expression(object);
+                for arg in args {
+                    self.visit_expression(arg);
+                }
+            }
+            Expression::IndexAssign {
+                array,
+                index,
+                value,
+                ..
+            } => {
+                self.visit_expression(array);
                 self.visit_expression(index);
+                self.visit_expression(value);
             }
         }
     }

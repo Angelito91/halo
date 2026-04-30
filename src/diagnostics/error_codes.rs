@@ -52,6 +52,7 @@ impl fmt::Display for ErrorSeverity {
 
 /// Enumeration of all error codes in the application
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(dead_code)]
 pub enum ErrorCode {
     // Parser errors (E001-E010)
     /// Expected ')' after parameters
@@ -144,6 +145,7 @@ pub enum ErrorCode {
 
 impl ErrorCode {
     /// Get the numeric code as a string (e.g., "E001")
+    #[allow(dead_code)]
     pub fn code(&self) -> &'static str {
         match self {
             // Parser errors
@@ -197,6 +199,7 @@ impl ErrorCode {
     }
 
     /// Get the short description of the error
+    #[allow(dead_code)]
     pub fn description(&self) -> &'static str {
         match self {
             // Parser errors
@@ -250,6 +253,7 @@ impl ErrorCode {
     }
 
     /// Get helpful suggestions for fixing the error
+    #[allow(dead_code)]
     pub fn suggestions(&self) -> Vec<&'static str> {
         match self {
             // Parser errors
@@ -479,11 +483,13 @@ impl ErrorCode {
     }
 
     /// Check if this error code is a warning
+    #[allow(dead_code)]
     pub fn is_warning(&self) -> bool {
         self.severity() == ErrorSeverity::Warning
     }
 
     /// Check if this error code is an error
+    #[allow(dead_code)]
     pub fn is_error(&self) -> bool {
         self.severity() == ErrorSeverity::Error
     }

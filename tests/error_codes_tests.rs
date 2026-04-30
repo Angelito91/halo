@@ -6,7 +6,7 @@
 
 //! Tests for error code system and diagnostics
 
-use halo::diagnostics::error_codes::{ErrorCategory, ErrorCode, ErrorSeverity};
+use halo::diagnostics::error_codes::{ErrorCategory, ErrorCode};
 
 #[test]
 fn test_error_code_display() {

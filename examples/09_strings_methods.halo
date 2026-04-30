@@ -1,0 +1,415 @@
+// Halo Programming Language
+// Example 09: String Methods & Manipulation
+//
+// This example demonstrates string manipulation techniques.
+// Phase 1: Uses built-in functions
+// Phase 2 (future): Will use dot notation (text.upper(), text.lower(), etc.)
+
+// ──────────────────────────────────────────────────────────────────────────
+// 1. BASIC STRING METHODS: Case Conversion
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 1. CASE CONVERSION ===")
+print("")
+
+// Built-in approach (Phase 1)
+text = "Hello World"
+print("Original: " + text)
+print("Upper: " + upper(text))
+print("Lower: " + lower(text))
+
+// Practical use: Normalize user input
+user_input = "JoHn DoE"
+normalized = lower(user_input)
+print("Normalized: " + normalized)
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 2. TRIMMING WHITESPACE
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 2. TRIMMING WHITESPACE ===")
+print("")
+
+dirty_input = "  username  "
+clean = trim(dirty_input)
+print("Before: '" + dirty_input + "'")
+print("After: '" + clean + "'")
+
+// Practical: Clean form inputs
+email = "  user@example.com  "
+cleaned_email = trim(email)
+print("Email cleaned: " + cleaned_email)
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 3. STRING SEARCHING: contains, starts_with, ends_with
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 3. STRING SEARCHING ===")
+print("")
+
+// contains: Check if substring exists
+filename = "document.txt"
+print("Searching in: " + filename)
+print("Contains '.txt'? " + str(contains(filename, ".txt")))
+print("Contains '.pdf'? " + str(contains(filename, ".pdf")))
+
+print("")
+
+// starts_with: Check prefix
+url = "https://example.com"
+print("URL: " + url)
+print("Is secure (https)? " + str(starts_with(url, "https")))
+print("Is HTTP? " + str(starts_with(url, "http://")))
+
+print("")
+
+// ends_with: Check suffix
+filename2 = "image.png"
+print("Filename: " + filename2)
+print("Is PNG? " + str(ends_with(filename2, ".png")))
+print("Is JPG? " + str(ends_with(filename2, ".jpg")))
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 4. STRING REPLACEMENT
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 4. STRING REPLACEMENT ===")
+print("")
+
+// Simple replacement
+sentence = "The quick brown fox jumps over the lazy dog"
+print("Original: " + sentence)
+new_sentence = replace(sentence, "fox", "cat")
+print("Replaced: " + new_sentence)
+
+// Multiple replacements (chained)
+text2 = "Hello, World!"
+text2 = replace(text2, "Hello", "Hi")
+text2 = replace(text2, "World", "Halo")
+print("Modified: " + text2)
+
+// Practical: Clean data
+csv_data = "John, Doe, 30, NYC"
+clean_csv = replace(csv_data, " ", "")
+print("CSV without spaces: " + clean_csv)
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 5. STRING EXTRACTION: substr
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 5. STRING EXTRACTION: substr ===")
+print("")
+
+// Extract first N characters
+text3 = "Hello World"
+first_5 = substr(text3, 0, 5)
+print("First 5 chars: '" + first_5 + "'")
+
+// Extract middle portion
+middle = substr(text3, 6, 5)
+print("Middle (pos 6, len 5): '" + middle + "'")
+
+// Practical: Extract area code from phone
+phone = "555-123-4567"
+area_code = substr(phone, 0, 3)
+print("Phone: " + phone + " -> Area code: " + area_code)
+
+// Extract domain from email
+email2 = "user@example.com"
+at_pos = index_of(email2, "@")
+domain = substr(email2, at_pos + 1, 11)
+print("Email: " + email2 + " -> Domain: " + domain)
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 6. STRING REVERSAL
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 6. STRING REVERSAL ===")
+print("")
+
+// Simple reversal
+word = "hello"
+reversed = reverse(word)
+print("Word: " + word)
+print("Reversed: " + reversed)
+
+// Check if palindrome
+check_palindrome(s) {
+    rev = reverse(s)
+    return s == rev
+}
+
+print("Is 'racecar' a palindrome? " + str(check_palindrome("racecar")))
+print("Is 'hello' a palindrome? " + str(check_palindrome("hello")))
+print("Is 'radar' a palindrome? " + str(check_palindrome("radar")))
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 7. FINDING SUBSTRING POSITION: index_of
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 7. FINDING SUBSTRING POSITION ===")
+print("")
+
+text4 = "The quick brown fox"
+print("Text: " + text4)
+
+// Find position
+pos = index_of(text4, "quick")
+print("Position of 'quick': " + str(pos))
+
+pos2 = index_of(text4, "fox")
+print("Position of 'fox': " + str(pos2))
+
+pos3 = index_of(text4, "cat")
+print("Position of 'cat': " + str(pos3) + " (not found)")
+
+// Practical: Find and extract area after keyword
+text5 = "Price: $99.99"
+pos_dollar = index_of(text5, "$")
+price = substr(text5, pos_dollar, 6)
+print("Found price: " + price)
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 8. STRING LENGTH
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 8. STRING LENGTH ===")
+print("")
+
+// Get length
+text6 = "Hello"
+length = len(text6)
+print("'" + text6 + "' has " + str(length) + " characters")
+
+// Check password strength
+validate_password(pwd) {
+    if len(pwd) < 8 {
+        return "Too short (< 8 chars)"
+    } else if len(pwd) < 12 {
+        return "OK (8-12 chars)"
+    } else {
+        return "Strong (> 12 chars)"
+    }
+}
+
+print("Password strength:")
+print("'pass': " + validate_password("pass"))
+print("'password123': " + validate_password("password123"))
+print("'SuperSecurePassword!': " + validate_password("SuperSecurePassword!"))
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 9. PRACTICAL PROJECT: TEXT FORMATTER
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 9. PRACTICAL PROJECT: Text Formatter ===")
+print("")
+
+format_title(title) {
+    trimmed = trim(title)
+    upper_title = upper(trimmed)
+    return upper_title
+}
+
+format_url_slug(text) {
+    lower_text = lower(text)
+    trimmed = trim(lower_text)
+    slug = replace(trimmed, " ", "-")
+    return slug
+}
+
+title = "  My Awesome Blog Post  "
+print("Original: '" + title + "'")
+print("Formatted title: " + format_title(title))
+print("URL slug: " + format_url_slug(title))
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 10. PRACTICAL PROJECT: EMAIL VALIDATOR
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 10. PRACTICAL PROJECT: Email Validator ===")
+print("")
+
+validate_email(email) {
+    trimmed = trim(email)
+
+    if len(trimmed) < 5 {
+        return false
+    }
+
+    if !contains(trimmed, "@") {
+        return false
+    }
+
+    if !contains(trimmed, ".") {
+        return false
+    }
+
+    at_pos = index_of(trimmed, "@")
+    if at_pos < 1 {
+        return false
+    }
+
+    dot_pos = index_of(trimmed, ".")
+    if dot_pos <= at_pos {
+        return false
+    }
+
+    return true
+}
+
+emails = 6
+test_emails = 1
+
+print("Testing email validation:")
+
+email_test = "user@example.com"
+print(email_test + " -> " + str(validate_email(email_test)))
+
+email_test = "invalid.email"
+print(email_test + " -> " + str(validate_email(email_test)))
+
+email_test = "  user@domain.org  "
+print(email_test + " -> " + str(validate_email(email_test)))
+
+email_test = "@invalid.com"
+print(email_test + " -> " + str(validate_email(email_test)))
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 11. PRACTICAL PROJECT: CSV LINE PARSER
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 11. PRACTICAL PROJECT: CSV Line Parser ===")
+print("")
+
+parse_csv_line(line) {
+    print("Parsing: " + line)
+
+    trim_line = trim(line)
+
+    comma1 = index_of(trim_line, ",")
+    field1 = substr(trim_line, 0, comma1)
+    print("  Field 1: " + trim(field1))
+
+    rest = substr(trim_line, comma1 + 1, len(trim_line))
+    comma2 = index_of(rest, ",")
+    field2 = substr(rest, 0, comma2)
+    print("  Field 2: " + trim(field2))
+
+    field3 = substr(rest, comma2 + 1, len(rest))
+    print("  Field 3: " + trim(field3))
+}
+
+csv_line = "John, Doe, 30"
+parse_csv_line(csv_line)
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 12. PRACTICAL PROJECT: SLUG GENERATOR
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 12. PRACTICAL PROJECT: Slug Generator ===")
+print("")
+
+generate_slug(text) {
+    step1 = lower(text)
+    step2 = trim(step1)
+    step3 = replace(step2, " ", "-")
+    step4 = replace(step3, ",", "")
+    step5 = replace(step4, ".", "")
+    return step5
+}
+
+title1 = "My First Blog Post!"
+slug1 = generate_slug(title1)
+print("Title: " + title1)
+print("Slug: " + slug1)
+
+title2 = "  Another Post, Updated.  "
+slug2 = generate_slug(title2)
+print("Title: " + title2)
+print("Slug: " + slug2)
+
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// 13. FUTURE SYNTAX (Phase 2): Dot Notation Examples
+// ──────────────────────────────────────────────────────────────────────────
+
+print("=== 13. FUTURE: Dot Notation (Phase 2) ===")
+print("")
+print("When Phase 2 is implemented, you'll be able to write:")
+print("")
+print("text = 'Hello World'")
+print("text.upper()           // Instead of: upper(text)")
+print("text.lower()           // Instead of: lower(text)")
+print("text.trim()            // Instead of: trim(text)")
+print("text.contains('World') // Instead of: contains(text, 'World')")
+print("text.replace('o', '0') // Instead of: replace(text, 'o', '0')")
+print("text.reverse()         // Instead of: reverse(text)")
+print("text.substr(0, 5)      // Instead of: substr(text, 0, 5)")
+print("text[0]                // Character indexing")
+print("text[6:11]             // String slicing")
+print("")
+print("This will be more ergonomic and easier to chain:")
+print("text.trim().upper().replace('HELLO', 'HI')")
+print("")
+
+// ──────────────────────────────────────────────────────────────────────────
+// SUMMARY
+// ──────────────────────────────────────────────────────────────────────────
+
+print("===========================================")
+print("String Methods in Halo")
+print("===========================================")
+print("")
+print("Phase 1 (Current) - Built-in Functions:")
+print("✓ upper(string) - Convert to uppercase")
+print("✓ lower(string) - Convert to lowercase")
+print("✓ trim(string) - Remove leading/trailing whitespace")
+print("✓ contains(string, substring) - Check if contains")
+print("✓ starts_with(string, prefix) - Check prefix")
+print("✓ ends_with(string, suffix) - Check suffix")
+print("✓ replace(string, old, new) - Replace substring")
+print("✓ substr(string, start, length) - Extract substring")
+print("✓ reverse(string) - Reverse string")
+print("✓ index_of(string, substring) - Find position")
+print("✓ len(string) - Get length")
+print("")
+print("Phase 2 (Future) - Dot Notation:")
+print("• string.upper() - More ergonomic")
+print("• string[index] - Character access")
+print("• string[start:end] - String slicing")
+print("• Method chaining - text.trim().upper()")
+print("")
+print("Common Use Cases Demonstrated:")
+print("✓ Text normalization and cleaning")
+print("✓ Email validation")
+print("✓ URL slug generation")
+print("✓ CSV parsing")
+print("✓ Palindrome checking")
+print("✓ Password validation")
+print("✓ Case conversion and formatting")
+print("")
+print("Ready to explore more string techniques?")
+print("Check out: 08_practical_projects.halo for more examples!")

@@ -194,6 +194,7 @@ pub fn find_suggestions_smart(
 ///
 /// # Returns
 /// Vector of suggestions sorted by distance (closest first)
+#[allow(dead_code)]
 pub fn find_suggestions_adaptive(
     typo: &str,
     candidates: &[&str],

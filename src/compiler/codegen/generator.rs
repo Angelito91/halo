@@ -20,21 +20,23 @@ use crate::compiler::types::TypeMapper;
 use crate::parser::ast::{BinOp, Block, Expression, Program, Statement, TopLevel};
 use inkwell::basic_block::BasicBlock;
 
+use super::emitter::Emitter;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CodeGenerator
 // ─────────────────────────────────────────────────────────────────────────────
 
 pub struct CodeGenerator<'ctx> {
-    context: &'ctx Context,
-    module: &'ctx Module<'ctx>,
-    builder: IRBuilder<'ctx>,
-    type_mapper: TypeMapper<'ctx>,
+    pub context: &'ctx Context,
+    pub module: &'ctx Module<'ctx>,
+    pub builder: IRBuilder<'ctx>,
+    pub type_mapper: TypeMapper<'ctx>,
     /// All user-defined functions, keyed by name.
-    functions: HashMap<String, FunctionValue<'ctx>>,
+    pub functions: HashMap<String, FunctionValue<'ctx>>,
     /// Module-level global variables (name → GlobalValue).
-    globals: HashMap<String, GlobalValue<'ctx>>,
+    pub globals: HashMap<String, GlobalValue<'ctx>>,
     /// Cached format-string globals for printf calls.
-    string_globals: HashMap<String, GlobalValue<'ctx>>,
+    pub string_globals: HashMap<String, GlobalValue<'ctx>>,
     /// Stack of (loop_cond_bb, loop_exit_bb) for break/continue support.
     loop_stack: Vec<(BasicBlock<'ctx>, BasicBlock<'ctx>)>,
 }
@@ -68,8 +70,7 @@ impl<'ctx> CodeGenerator<'ctx> {
     /// - `GlobalVar` with a real name (e.g. `x = 3`) → module-level global
     ///   with a constant initializer.
     /// - `GlobalVar` with the synthetic name `__expr` (top-level expressions
-    ///   such as `print(42)` or `while …`) → collected and emitted inside a
-    ///   generated `main` function so they execute at program start.
+    ///   in the REPL) → collected and emitted inside `main`.
     pub fn compile(&mut self, program: &Program) -> Result<(), String> {
         self.declare_printf();
 
@@ -322,7 +323,8 @@ impl<'ctx> CodeGenerator<'ctx> {
 
             // Decide storage type: float params stay f64, ints become i64.
             let storage_ty = self.type_mapper.storage_type_of(param_val);
-            let alloca = self.emit_entry_alloca(function, param_name, storage_ty);
+            let alloca =
+                Emitter::emit_entry_alloca(&self.builder, function, param_name, storage_ty);
 
             // Widen boolean/narrow int params before storing.
             let to_store = self.coerce_to_storage(param_val, storage_ty)?;
@@ -470,7 +472,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let alloca = if let Some(slot) = self.builder.get_slot(name) {
                     slot.ptr
                 } else {
-                    let a = self.emit_entry_alloca(function, name, storage_ty);
+                    let a = Emitter::emit_entry_alloca(&self.builder, function, name, storage_ty);
                     self.builder.set_alloca(name.clone(), a, storage_ty);
                     a
                 };
@@ -693,7 +695,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     Some(expr) => {
                         let v = self.generate_expression(expr)?;
                         // Functions always return i64; widen if needed.
-                        self.widen_to_i64(v)?.into()
+                        Emitter::widen_to_i64(self, v)?.into()
                     }
                     None => self.type_mapper.i64_type().const_int(0, false).into(),
                 };
@@ -727,7 +729,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 .into()),
             // ── String literal ───────────────────────────────────────────────
             Expression::StringLiteral(s, _) => {
-                let gv = self.get_or_create_string(s, &format!("str.lit.{}", s.len()));
+                let gv = Emitter::get_or_create_string(self, s, &format!("str.lit.{}", s.len()));
                 Ok(gv.as_pointer_value().into())
             }
 
@@ -766,7 +768,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                                 .map_err(|_| "Failed to negate float")?;
                             Ok(neg.into())
                         } else {
-                            let iv = self.widen_to_i64(val)?;
+                            let iv = Emitter::widen_to_i64(self, val)?;
                             let neg = self
                                 .builder
                                 .builder
@@ -837,6 +839,16 @@ impl<'ctx> CodeGenerator<'ctx> {
             Expression::Index { .. } => {
                 Err("Array indexing is not yet supported in compiled mode".to_string())
             }
+
+            // ── Method call ──────────────────────────────────────────────────
+            Expression::MethodCall { .. } => {
+                Err("Method calls are not yet supported in compiled mode".to_string())
+            }
+
+            // ── Index assignment ────────────────────────────────────────────
+            Expression::IndexAssign { .. } => {
+                Err("Array index assignment is not yet supported in compiled mode".to_string())
+            }
         }
     }
 
@@ -864,8 +876,8 @@ impl<'ctx> CodeGenerator<'ctx> {
         right: BasicValueEnum<'ctx>,
     ) -> Result<BasicValueEnum<'ctx>, String> {
         // Widen both operands to i64 so bit-widths always match.
-        let lv = self.widen_to_i64(left)?;
-        let rv = self.widen_to_i64(right)?;
+        let lv = Emitter::widen_to_i64(self, left)?;
+        let rv = Emitter::widen_to_i64(self, right)?;
         let b = &self.builder.builder;
 
         match op {
@@ -916,8 +928,8 @@ impl<'ctx> CodeGenerator<'ctx> {
         right: BasicValueEnum<'ctx>,
     ) -> Result<BasicValueEnum<'ctx>, String> {
         // Promote both operands to f64.
-        let lv = self.promote_to_f64(left)?;
-        let rv = self.promote_to_f64(right)?;
+        let lv = Emitter::promote_to_f64(self, left)?;
+        let rv = Emitter::promote_to_f64(self, right)?;
         let b = &self.builder.builder;
 
         match op {
@@ -997,21 +1009,21 @@ impl<'ctx> CodeGenerator<'ctx> {
             "print" | "println" => {
                 if args.is_empty() {
                     // No arguments: just emit a newline.
-                    self.emit_printf_str("\n")?;
+                    Emitter::emit_printf_str(self, "\n")?;
                     return Ok(self.type_mapper.i64_type().const_int(0, false).into());
                 }
 
                 for (i, arg_expr) in args.iter().enumerate() {
                     if i > 0 {
                         // Separate multiple arguments with a space.
-                        self.emit_printf_str(" ")?;
+                        Emitter::emit_printf_str(self, " ")?;
                     }
                     let val = self.generate_expression(arg_expr)?;
-                    self.emit_printf_for_value(val)?;
+                    Emitter::emit_printf_for_value(self, val)?;
                 }
 
                 // Always end with a newline.
-                self.emit_printf_str("\n")?;
+                Emitter::emit_printf_str(self, "\n")?;
                 Ok(self.type_mapper.i64_type().const_int(0, false).into())
             }
 
@@ -1033,7 +1045,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                             name
                         ));
                     }
-                    let widened = self.widen_to_i64(val)?;
+                    let widened = Emitter::widen_to_i64(self, val)?;
                     call_args.push(widened.into());
                 }
 
@@ -1054,117 +1066,7 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     // =========================================================================
-    // Printf helpers
-    // =========================================================================
-
-    /// Emit a `printf` call for a literal string (e.g. `"\n"`, `" "`).
-    fn emit_printf_str(&mut self, s: &str) -> Result<(), String> {
-        let printf = self
-            .module
-            .get_function("printf")
-            .ok_or("printf not declared")?;
-        let fmt = self.get_or_create_string(s, &format!("str_{}", s.len()));
-        let fmt_ptr: BasicMetadataValueEnum = fmt.as_pointer_value().into();
-        self.builder
-            .builder
-            .build_call(printf, &[fmt_ptr], "printf_str")
-            .map_err(|_| format!("Failed to call printf for {:?}", s))?;
-        Ok(())
-    }
-
-    /// Emit a `printf` call that prints `val` with an appropriate format string.
-    fn emit_printf_for_value(&mut self, val: BasicValueEnum<'ctx>) -> Result<(), String> {
-        let printf = self
-            .module
-            .get_function("printf")
-            .ok_or("printf not declared")?;
-
-        if val.is_float_value() {
-            // Ensure the value is f64 (promote f32 if necessary).
-            let fv = self.promote_to_f64(val)?;
-            let fmt = self.get_or_create_string("%f", "fmt_f64");
-            let fmt_ptr: BasicMetadataValueEnum = fmt.as_pointer_value().into();
-            let fval: BasicMetadataValueEnum = fv.into();
-            self.builder
-                .builder
-                .build_call(printf, &[fmt_ptr, fval], "printf_f")
-                .map_err(|_| "Failed to call printf (float)")?;
-        } else if val.is_pointer_value() {
-            // Pointer values are assumed to be null-terminated C strings (%s).
-            let fmt = self.get_or_create_string("%s", "fmt_str");
-            let fmt_ptr: BasicMetadataValueEnum = fmt.as_pointer_value().into();
-            let sval: BasicMetadataValueEnum = val.into_pointer_value().into();
-            self.builder
-                .builder
-                .build_call(printf, &[fmt_ptr, sval], "printf_s")
-                .map_err(|_| "Failed to call printf (string)")?;
-        } else {
-            // All integer/bool values → widen to i64 and print as %lld.
-            let wide = self.widen_to_i64(val)?;
-            let fmt = self.get_or_create_string("%lld", "fmt_i64");
-            let fmt_ptr: BasicMetadataValueEnum = fmt.as_pointer_value().into();
-            let ival: BasicMetadataValueEnum = wide.into();
-            self.builder
-                .builder
-                .build_call(printf, &[fmt_ptr, ival], "printf_i")
-                .map_err(|_| "Failed to call printf (int)")?;
-        }
-        Ok(())
-    }
-
-    /// Get (or lazily create) a global null-terminated string constant.
-    fn get_or_create_string(&mut self, s: &str, name: &str) -> GlobalValue<'ctx> {
-        if let Some(&gv) = self.string_globals.get(s) {
-            return gv;
-        }
-        let gv = self
-            .builder
-            .builder
-            .build_global_string_ptr(s, name)
-            .expect("Failed to create global string");
-        self.string_globals.insert(s.to_string(), gv);
-        gv
-    }
-
-    // =========================================================================
-    // Alloca helper
-    // =========================================================================
-
-    /// Emit an `alloca` instruction at the very start of the function's entry
-    /// block so that mem2reg can promote it to a register.
-    fn emit_entry_alloca(
-        &self,
-        function: FunctionValue<'ctx>,
-        name: &str,
-        ty: BasicTypeEnum<'ctx>,
-    ) -> inkwell::values::PointerValue<'ctx> {
-        // Temporarily reposition to the start of the entry block.
-        let entry_bb = function
-            .get_first_basic_block()
-            .expect("function has no entry block");
-        let saved_pos = self.builder.builder.get_insert_block();
-
-        match entry_bb.get_first_instruction() {
-            Some(first_instr) => self.builder.builder.position_before(&first_instr),
-            None => self.builder.builder.position_at_end(entry_bb),
-        }
-
-        let alloca = self
-            .builder
-            .builder
-            .build_alloca(ty, name)
-            .expect("Failed to build alloca");
-
-        // Restore the builder's original position.
-        if let Some(bb) = saved_pos {
-            self.builder.builder.position_at_end(bb);
-        }
-
-        alloca
-    }
-
-    // =========================================================================
-    // Type coercion helpers
+    // Type coercion helpers (called from emitter too)
     // =========================================================================
 
     /// Coerce `val` so it can be stored in a slot of type `slot_ty`.
@@ -1172,13 +1074,13 @@ impl<'ctx> CodeGenerator<'ctx> {
     /// - float → float slot : extend f32→f64 if needed
     /// - int/bool → i64 slot : sign-extend
     /// - mismatch (float into int slot or vice-versa): error
-    fn coerce_to_storage(
+    pub(crate) fn coerce_to_storage(
         &mut self,
         val: BasicValueEnum<'ctx>,
         slot_ty: BasicTypeEnum<'ctx>,
     ) -> Result<BasicValueEnum<'ctx>, String> {
         match slot_ty {
-            BasicTypeEnum::FloatType(_) => Ok(self.promote_to_f64(val)?.into()),
+            BasicTypeEnum::FloatType(_) => Ok(Emitter::promote_to_f64(self, val)?.into()),
             BasicTypeEnum::IntType(it) => {
                 if val.is_float_value() {
                     return Err("Cannot store a float value into an integer variable".to_string());
@@ -1227,50 +1129,5 @@ impl<'ctx> CodeGenerator<'ctx> {
                 )
                 .map_err(|_| "Failed to coerce int to bool".to_string())
         }
-    }
-
-    /// Sign-extend any integer value to `i64`. No-op if already `i64`.
-    /// Returns an error if called with a float (use `promote_to_f64` instead).
-    fn widen_to_i64(
-        &mut self,
-        val: BasicValueEnum<'ctx>,
-    ) -> Result<inkwell::values::IntValue<'ctx>, String> {
-        if val.is_float_value() {
-            return Err("widen_to_i64: value is a float — use promote_to_f64 instead".to_string());
-        }
-        let iv = val.into_int_value();
-        if iv.get_type().get_bit_width() == 64 {
-            return Ok(iv);
-        }
-        self.builder
-            .builder
-            .build_int_s_extend(iv, self.type_mapper.i64_type(), "sext")
-            .map_err(|_| "Failed to sign-extend to i64".to_string())
-    }
-
-    /// Promote any numeric value to `f64`.
-    /// - `f64` → no-op
-    /// - `f32` → `fpext`
-    /// - integer → `sitofp`
-    fn promote_to_f64(
-        &mut self,
-        val: BasicValueEnum<'ctx>,
-    ) -> Result<inkwell::values::FloatValue<'ctx>, String> {
-        if val.is_float_value() {
-            let fv = val.into_float_value();
-            if fv.get_type().get_bit_width() == 64 {
-                return Ok(fv);
-            }
-            return self
-                .builder
-                .builder
-                .build_float_ext(fv, self.type_mapper.f64_type(), "fpext")
-                .map_err(|_| "Failed to extend float to f64".to_string());
-        }
-        let iv = val.into_int_value();
-        self.builder
-            .builder
-            .build_signed_int_to_float(iv, self.type_mapper.f64_type(), "sitofp")
-            .map_err(|_| "Failed to convert int to f64".to_string())
     }
 }

@@ -11,11 +11,13 @@ use std::time::{Duration, Instant};
 
 /// Records timing information for different compilation stages
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Timer {
     start: Instant,
     name: String,
 }
 
+#[allow(dead_code)]
 impl Timer {
     pub fn new(name: impl Into<String>) -> Self {
         Timer {
@@ -39,6 +41,7 @@ impl Timer {
 
 /// Tracks statistics about the compilation process
 #[derive(Debug, Default, Clone)]
+#[allow(dead_code)]
 pub struct CompilationStatistics {
     pub source_lines: usize,
     pub tokens: usize,
@@ -52,6 +55,7 @@ pub struct CompilationStatistics {
     stage_times: HashMap<String, Duration>,
 }
 
+#[allow(dead_code)]
 impl CompilationStatistics {
     pub fn new() -> Self {
         Self::default()
