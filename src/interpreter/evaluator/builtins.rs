@@ -19,6 +19,7 @@ pub fn try_eval_builtin(
         "print" => builtin_print(evaluator, args)?,
         "len" => builtin_single_arg(evaluator, name, args, |v| match v {
             Value::String(s) => Ok(Value::Number(s.len() as i64)),
+            Value::Array(arr) => Ok(Value::Number(arr.len() as i64)),
             Value::Number(n) => Ok(Value::Number(n.to_string().len() as i64)),
             other => Err(format!(
                 "len() does not support type '{}'",

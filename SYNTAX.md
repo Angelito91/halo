@@ -714,12 +714,15 @@ print()             // (línea vacía)
 
 Devuelve la longitud como `number`:
 - Para `string`: número de caracteres.
+- Para `array`: número de elementos.
 - Para `number` o `float`: número de dígitos en su representación textual.
 
 ```halo
 len("hola")         // 4
 len("")             // 0
 len("hola mundo")   // 10
+len([1, 2, 3])      // 3
+len([])             // 0
 len(12345)          // 5
 len(-99)            // 3  (incluye el signo)
 ```

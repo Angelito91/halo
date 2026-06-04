@@ -11,12 +11,14 @@ use std::time::{Duration, Instant};
 
 /// Records timing information for different compilation stages
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // PLANNED FOR v0.3.0: Performance timing
 pub struct Timer {
     start: Instant,
     name: String,
 }
 
 impl Timer {
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Timer creation
     pub fn new(name: impl Into<String>) -> Self {
         Timer {
             start: Instant::now(),
@@ -24,14 +26,17 @@ impl Timer {
         }
     }
 
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Timing methods
     pub fn elapsed(&self) -> Duration {
         self.start.elapsed()
     }
 
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Timing methods
     pub fn elapsed_ms(&self) -> f64 {
         self.elapsed().as_secs_f64() * 1000.0
     }
 
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Timer name
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -39,6 +44,7 @@ impl Timer {
 
 /// Tracks statistics about the compilation process
 #[derive(Debug, Default, Clone)]
+#[allow(dead_code)] // PLANNED FOR v0.3.0: Compilation statistics
 pub struct CompilationStatistics {
     pub source_lines: usize,
     pub tokens: usize,
@@ -53,31 +59,37 @@ pub struct CompilationStatistics {
 }
 
 impl CompilationStatistics {
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Stats tracking
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Record the duration of a compilation stage
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Stage timing
     pub fn record_stage(&mut self, name: &str, duration: Duration) {
         self.stage_times.insert(name.to_string(), duration);
     }
 
     /// Get the duration of a specific stage
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Stage timing
     pub fn stage_duration(&self, name: &str) -> Option<Duration> {
         self.stage_times.get(name).copied()
     }
 
     /// Get total compilation time
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Total time
     pub fn total_time(&self) -> Duration {
         self.stage_times.values().sum()
     }
 
     /// Get total time in milliseconds
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Total time
     pub fn total_time_ms(&self) -> f64 {
         self.total_time().as_secs_f64() * 1000.0
     }
 
     /// Print a formatted summary
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Compilation summary output
     pub fn print_summary(&self) {
         use crate::diagnostics::colors;
 

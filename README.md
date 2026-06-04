@@ -162,7 +162,7 @@ print(factorial(10))   // 3628800
 | Función | Descripción | Ejemplo |
 |---------|-------------|---------|
 | `print(x)` | Imprime un valor en stdout | `print("hola")` |
-| `len(x)` | Longitud de string o dígitos de un número | `len("hola")` → `4` |
+| `len(x)` | Longitud de string, array o dígitos de un número | `len([1,2,3])` → `3` |
 | `str(x)` | Convierte cualquier valor a string | `str(3.14)` → `"3.14"` |
 | `int(x)` | Convierte a entero (trunca floats) | `int(3.9)` → `3` |
 | `float(x)` | Convierte a flotante | `float(42)` → `42.0` |

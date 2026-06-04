@@ -522,7 +522,7 @@ infinite(0)
     let handle = std::thread::Builder::new()
         .stack_size(64 * 1024 * 1024) // 64 MiB
         .spawn(move || {
-            common::assert_runtime_error(&code, "recursion depth exceeded");
+            common::assert_runtime_error(&code, "Infinite recursion detected");
         })
         .expect("failed to spawn thread");
     handle.join().expect("thread panicked");

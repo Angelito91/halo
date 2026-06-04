@@ -389,7 +389,7 @@ is_all_unique(arr) {
         i = i + 1
     }
     return true
-+}
+}
 
 // Test positive validation
 arr1 = [1, 2, 3, 4, 5]

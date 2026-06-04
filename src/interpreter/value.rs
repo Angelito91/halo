@@ -53,6 +53,7 @@ impl Value {
 
     /// Extract the inner i64 if this is a `Number`, otherwise `None`.
     #[inline]
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Value type extractors
     pub fn as_number(&self) -> Option<i64> {
         if let Value::Number(n) = self {
             Some(*n)
@@ -63,6 +64,7 @@ impl Value {
 
     /// Extract the inner f64 if this is a `Float`, otherwise `None`.
     #[inline]
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Value type extractors
     pub fn as_float(&self) -> Option<f64> {
         if let Value::Float(f) = self {
             Some(*f)
@@ -73,6 +75,7 @@ impl Value {
 
     /// Extract the inner bool if this is a `Bool`, otherwise `None`.
     #[inline]
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Value type extractors
     pub fn as_bool(&self) -> Option<bool> {
         if let Value::Bool(b) = self {
             Some(*b)
@@ -83,6 +86,7 @@ impl Value {
 
     /// Extract the inner array if this is an `Array`, otherwise `None`.
     #[inline]
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Value type extractors
     pub fn as_array(&self) -> Option<&Vec<Value>> {
         if let Value::Array(arr) = self {
             Some(arr)

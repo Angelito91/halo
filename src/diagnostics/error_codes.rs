@@ -16,6 +16,7 @@ use std::fmt;
 
 /// Represents a category of error
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // PLANNED FOR v0.3.0: Error categorization system
 pub enum ErrorCategory {
     Parse,
     Type,
@@ -36,6 +37,7 @@ impl fmt::Display for ErrorCategory {
 
 /// Represents the severity level of an error
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // PLANNED FOR v0.3.0: Severity levels
 pub enum ErrorSeverity {
     Error,
     Warning,
@@ -52,6 +54,7 @@ impl fmt::Display for ErrorSeverity {
 
 /// Enumeration of all error codes in the application
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(dead_code)] // PLANNED FOR v0.3.0: Complete error code catalog
 pub enum ErrorCode {
     // Parser errors (E001-E010)
     /// Expected ')' after parameters
@@ -143,6 +146,7 @@ pub enum ErrorCode {
 }
 
 impl ErrorCode {
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error code mapping
     pub fn code(&self) -> &'static str {
         match self {
             ErrorCode::ExpectedCloseParen => "E001",
@@ -191,6 +195,7 @@ impl ErrorCode {
         }
     }
 
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error descriptions
     pub fn description(&self) -> &'static str {
         match self {
             ErrorCode::ExpectedCloseParen => "Expected closing parenthesis ')'",
@@ -239,6 +244,7 @@ impl ErrorCode {
         }
     }
 
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error suggestions
     pub fn suggestions(&self) -> Vec<&'static str> {
         match self {
             ErrorCode::ExpectedCloseParen => {
@@ -394,6 +400,7 @@ impl ErrorCode {
         }
     }
 
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error categorization
     pub fn category(&self) -> ErrorCategory {
         match self {
             ErrorCode::ExpectedCloseParen
@@ -442,6 +449,7 @@ impl ErrorCode {
         }
     }
 
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error severity
     pub fn severity(&self) -> ErrorSeverity {
         match self.category() {
             ErrorCategory::Warning => ErrorSeverity::Warning,
@@ -449,10 +457,12 @@ impl ErrorCode {
         }
     }
 
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Warning detection
     pub fn is_warning(&self) -> bool {
         self.severity() == ErrorSeverity::Warning
     }
 
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error detection
     pub fn is_error(&self) -> bool {
         self.severity() == ErrorSeverity::Error
     }

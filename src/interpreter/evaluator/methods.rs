@@ -8,6 +8,121 @@ use super::super::value::Value;
 use super::core::Evaluator;
 use crate::parser::ast::Expression;
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Helper functions for reducing code duplication
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Helper to extract a string value from an evaluated expression with error handling.
+fn extract_string(value: Value, method_name: &str, arg_pos: usize) -> Result<String, String> {
+    match value {
+        Value::String(s) => Ok(s),
+        other => Err(format!(
+            "{}() expects argument {} to be a string, got {}",
+            method_name,
+            arg_pos + 1,
+            other.type_name()
+        )),
+    }
+}
+
+/// Helper to extract a number value from an evaluated expression with error handling.
+fn extract_number(value: Value, method_name: &str, arg_pos: usize) -> Result<i64, String> {
+    match value {
+        Value::Number(n) => Ok(n),
+        other => Err(format!(
+            "{}() expects argument {} to be a number, got {}",
+            method_name,
+            arg_pos + 1,
+            other.type_name()
+        )),
+    }
+}
+
+/// Helper to apply a string transformation to the first argument.
+/// Validates argument count and applies the transformer function.
+fn apply_string_transformer<F>(
+    evaluator: &mut Evaluator,
+    args: &[Expression],
+    method_name: &str,
+    expected_args: usize,
+    transformer: F,
+) -> Result<Value, String>
+where
+    F: Fn(&str) -> String,
+{
+    if args.len() != expected_args {
+        return Err(format!(
+            "{}() expects exactly {} argument(s), got {}",
+            method_name,
+            expected_args,
+            args.len()
+        ));
+    }
+    let val = evaluator.eval_expr(&args[0])?;
+    let s = extract_string(val, method_name, 0)?;
+    Ok(Value::String(transformer(&s)))
+}
+
+/// Helper to build method call args by prepending the object as a string literal.
+fn build_string_call_args(object: &Value, args: &[Expression]) -> Vec<Expression> {
+    let mut call_args = vec![Expression::StringLiteral(
+        object.to_string_value(),
+        crate::parser::ast::Position { line: 0, column: 0 },
+    )];
+    call_args.extend(args.iter().cloned());
+    call_args
+}
+
+/// Helper for string methods that take 2 string arguments and return a boolean.
+fn apply_string_predicate<F>(
+    evaluator: &mut Evaluator,
+    args: &[Expression],
+    method_name: &str,
+    predicate: F,
+) -> Result<Value, String>
+where
+    F: Fn(&str, &str) -> bool,
+{
+    if args.len() != 2 {
+        return Err(format!(
+            "{}() expects exactly 2 arguments, got {}",
+            method_name,
+            args.len()
+        ));
+    }
+    let text = extract_string(evaluator.eval_expr(&args[0])?, method_name, 0)?;
+    let other = extract_string(evaluator.eval_expr(&args[1])?, method_name, 1)?;
+    Ok(Value::Bool(predicate(&text, &other)))
+}
+
+/// Helper for string methods that take variable numbers of string arguments and apply a transformation.
+fn apply_multi_string_transformer<F>(
+    evaluator: &mut Evaluator,
+    args: &[Expression],
+    method_name: &str,
+    expected_args: usize,
+    transformer: F,
+) -> Result<Value, String>
+where
+    F: Fn(&[String]) -> String,
+{
+    if args.len() != expected_args {
+        return Err(format!(
+            "{}() expects exactly {} argument(s), got {}",
+            method_name,
+            expected_args,
+            args.len()
+        ));
+    }
+    let mut string_args = Vec::new();
+    for (idx, arg) in args.iter().enumerate() {
+        let val = evaluator.eval_expr(arg)?;
+        let s = extract_string(val, method_name, idx)?;
+        string_args.push(s);
+    }
+    Ok(Value::String(transformer(&string_args)))
+}
+
 /// Try to evaluate a method call on an object.
 pub fn try_eval_method_call(
     evaluator: &mut Evaluator,
@@ -24,14 +139,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_upper(evaluator, &call_args)
+            builtin_upper(evaluator, &build_string_call_args(object, args))
         }
         (Value::String(_), "lower") => {
             if !args.is_empty() {
@@ -40,14 +148,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_lower(evaluator, &call_args)
+            builtin_lower(evaluator, &build_string_call_args(object, args))
         }
         (Value::String(_), "trim") => {
             if !args.is_empty() {
@@ -56,14 +157,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_trim(evaluator, &call_args)
+            builtin_trim(evaluator, &build_string_call_args(object, args))
         }
         (Value::String(_), "reverse") => {
             if !args.is_empty() {
@@ -72,14 +166,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_reverse(evaluator, &call_args)
+            builtin_reverse(evaluator, &build_string_call_args(object, args))
         }
         (Value::String(_), "starts_with") => {
             if args.len() != 1 {
@@ -88,14 +175,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_starts_with(evaluator, &call_args)
+            builtin_starts_with(evaluator, &build_string_call_args(object, args))
         }
         (Value::String(_), "ends_with") => {
             if args.len() != 1 {
@@ -104,14 +184,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_ends_with(evaluator, &call_args)
+            builtin_ends_with(evaluator, &build_string_call_args(object, args))
         }
         (Value::String(_), "contains") => {
             if args.len() != 1 {
@@ -120,14 +193,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_contains(evaluator, &call_args)
+            builtin_contains(evaluator, &build_string_call_args(object, args))
         }
         (Value::String(_), "index_of") => {
             if args.len() != 1 {
@@ -136,14 +202,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_index_of(evaluator, &call_args)
+            builtin_index_of(evaluator, &build_string_call_args(object, args))
         }
         (Value::String(_), "replace") => {
             if args.len() != 2 {
@@ -152,14 +211,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_replace(evaluator, &call_args)
+            builtin_replace(evaluator, &build_string_call_args(object, args))
         }
         (Value::String(_), "substr") => {
             if args.len() != 2 {
@@ -168,14 +220,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let mut call_args = vec![Expression::StringLiteral(
-                object.to_string_value(),
-                crate::parser::ast::Position { line: 0, column: 0 },
-            )];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_substr(evaluator, &call_args)
+            builtin_substr(evaluator, &build_string_call_args(object, args))
         }
 
         // Array methods
@@ -489,16 +534,8 @@ pub fn builtin_index_of(evaluator: &mut Evaluator, args: &[Expression]) -> Resul
                 .unwrap_or(-1);
             Ok(Value::Number(index))
         }
-        (Value::String(s), Value::String(substring)) => {
-            let index = s.find(&substring).map(|i| i as i64).unwrap_or(-1);
-            Ok(Value::Number(index))
-        }
-        (Value::String(_), other) => Err(format!(
-            "index_of() with string expects second argument to be a string, got '{}'",
-            other.type_name()
-        )),
         (other, _) => Err(format!(
-            "index_of() expects first argument to be an array or string, got '{}'",
+            "index_of() expects first argument to be an array, got '{}'",
             other.type_name()
         )),
     }
@@ -561,59 +598,17 @@ pub fn builtin_sort(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Va
 
 /// `upper(text)` - Converts a string to uppercase.
 pub fn builtin_upper(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 1 {
-        return Err(format!(
-            "upper() expects exactly 1 argument, got {}",
-            args.len()
-        ));
-    }
-    let val = evaluator.eval_expr(&args[0])?;
-
-    match val {
-        Value::String(s) => Ok(Value::String(s.to_uppercase())),
-        other => Err(format!(
-            "upper() expects a string, got '{}'",
-            other.type_name()
-        )),
-    }
+    apply_string_transformer(evaluator, args, "upper", 1, |s| s.to_uppercase())
 }
 
 /// `lower(text)` - Converts a string to lowercase.
 pub fn builtin_lower(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 1 {
-        return Err(format!(
-            "lower() expects exactly 1 argument, got {}",
-            args.len()
-        ));
-    }
-    let val = evaluator.eval_expr(&args[0])?;
-
-    match val {
-        Value::String(s) => Ok(Value::String(s.to_lowercase())),
-        other => Err(format!(
-            "lower() expects a string, got '{}'",
-            other.type_name()
-        )),
-    }
+    apply_string_transformer(evaluator, args, "lower", 1, |s| s.to_lowercase())
 }
 
 /// `trim(text)` - Removes leading and trailing whitespace from a string.
 pub fn builtin_trim(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 1 {
-        return Err(format!(
-            "trim() expects exactly 1 argument, got {}",
-            args.len()
-        ));
-    }
-    let val = evaluator.eval_expr(&args[0])?;
-
-    match val {
-        Value::String(s) => Ok(Value::String(s.trim().to_string())),
-        other => Err(format!(
-            "trim() expects a string, got '{}'",
-            other.type_name()
-        )),
-    }
+    apply_string_transformer(evaluator, args, "trim", 1, |s| s.trim().to_string())
 }
 
 /// `starts_with(text, prefix)` - Returns true if the string starts with the prefix.
@@ -621,115 +616,23 @@ pub fn builtin_starts_with(
     evaluator: &mut Evaluator,
     args: &[Expression],
 ) -> Result<Value, String> {
-    if args.len() != 2 {
-        return Err(format!(
-            "starts_with() expects exactly 2 arguments, got {}",
-            args.len()
-        ));
-    }
-    let text_val = evaluator.eval_expr(&args[0])?;
-    let prefix_val = evaluator.eval_expr(&args[1])?;
-
-    let text = match text_val {
-        Value::String(s) => s,
-        other => {
-            return Err(format!(
-                "starts_with() expects first argument to be a string, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
-
-    let prefix = match prefix_val {
-        Value::String(s) => s,
-        other => {
-            return Err(format!(
-                "starts_with() expects second argument to be a string, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
-
-    Ok(Value::Bool(text.starts_with(&prefix)))
+    apply_string_predicate(evaluator, args, "starts_with", |text, prefix| {
+        text.starts_with(prefix)
+    })
 }
 
 /// `ends_with(text, suffix)` - Returns true if the string ends with the suffix.
 pub fn builtin_ends_with(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 2 {
-        return Err(format!(
-            "ends_with() expects exactly 2 arguments, got {}",
-            args.len()
-        ));
-    }
-    let text_val = evaluator.eval_expr(&args[0])?;
-    let suffix_val = evaluator.eval_expr(&args[1])?;
-
-    let text = match text_val {
-        Value::String(s) => s,
-        other => {
-            return Err(format!(
-                "ends_with() expects first argument to be a string, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
-
-    let suffix = match suffix_val {
-        Value::String(s) => s,
-        other => {
-            return Err(format!(
-                "ends_with() expects second argument to be a string, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
-
-    Ok(Value::Bool(text.ends_with(&suffix)))
+    apply_string_predicate(evaluator, args, "ends_with", |text, suffix| {
+        text.ends_with(suffix)
+    })
 }
 
 /// `replace(text, old, new)` - Replaces all occurrences of old with new.
 pub fn builtin_replace(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 3 {
-        return Err(format!(
-            "replace() expects exactly 3 arguments, got {}",
-            args.len()
-        ));
-    }
-    let text_val = evaluator.eval_expr(&args[0])?;
-    let old_val = evaluator.eval_expr(&args[1])?;
-    let new_val = evaluator.eval_expr(&args[2])?;
-
-    let text = match text_val {
-        Value::String(s) => s,
-        other => {
-            return Err(format!(
-                "replace() expects first argument to be a string, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
-
-    let old = match old_val {
-        Value::String(s) => s,
-        other => {
-            return Err(format!(
-                "replace() expects second argument to be a string, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
-
-    let new = match new_val {
-        Value::String(s) => s,
-        other => {
-            return Err(format!(
-                "replace() expects third argument to be a string, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
-
-    Ok(Value::String(text.replace(&old, &new)))
+    apply_multi_string_transformer(evaluator, args, "replace", 3, |strings| {
+        strings[0].replace(&strings[1], &strings[2])
+    })
 }
 
 /// `substr(text, start, length)` - Extracts a substring starting at start with given length.
@@ -740,39 +643,9 @@ pub fn builtin_substr(evaluator: &mut Evaluator, args: &[Expression]) -> Result<
             args.len()
         ));
     }
-    let text_val = evaluator.eval_expr(&args[0])?;
-    let start_val = evaluator.eval_expr(&args[1])?;
-    let length_val = evaluator.eval_expr(&args[2])?;
-
-    let text = match text_val {
-        Value::String(s) => s,
-        other => {
-            return Err(format!(
-                "substr() expects first argument to be a string, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
-
-    let start = match start_val {
-        Value::Number(n) => n,
-        other => {
-            return Err(format!(
-                "substr() expects second argument to be a number, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
-
-    let length = match length_val {
-        Value::Number(n) => n,
-        other => {
-            return Err(format!(
-                "substr() expects third argument to be a number, got '{}'",
-                other.type_name()
-            ))
-        }
-    };
+    let text = extract_string(evaluator.eval_expr(&args[0])?, "substr", 0)?;
+    let start = extract_number(evaluator.eval_expr(&args[1])?, "substr", 1)?;
+    let length = extract_number(evaluator.eval_expr(&args[2])?, "substr", 2)?;
 
     if start < 0 {
         return Err(format!(
