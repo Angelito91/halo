@@ -101,11 +101,13 @@ impl Compilation {
     }
 
     /// Emit a native object file directly (no clang needed for this step).
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Native object file emission
     pub fn emit_object(&mut self, filename: &str) -> Result<(), String> {
         self.codegen().emit_object(filename)
     }
 
     /// Print the LLVM IR to stdout.
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Debug LLVM IR output
     pub fn print_ir(&self) {
         println!(
             "{}",

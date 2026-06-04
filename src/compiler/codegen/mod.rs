@@ -4,7 +4,12 @@
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
+pub mod builtins;
+pub mod context;
 pub mod emitter;
+pub mod expressions;
 pub mod generator;
+pub mod runtime;
+pub mod statements;
 
 pub use generator::CodeGenerator;

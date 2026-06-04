@@ -64,6 +64,7 @@ impl<'ctx> TypeMapper<'ctx> {
     /// - float values  -> f64
     /// - i1 (bool)     -> i1
     /// - everything else -> i64
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Type inference utilities
     pub fn llvm_type_of(val: BasicValueEnum<'ctx>) -> BasicTypeEnum<'ctx> {
         match val {
             BasicValueEnum::FloatValue(f) => f.get_type().into(),
@@ -78,6 +79,7 @@ impl<'ctx> TypeMapper<'ctx> {
 
     /// Return a zero constant of the same type as `val`.
     /// Useful for generating default-initialised allocas.
+    #[allow(dead_code)] // PLANNED FOR v0.3.0: Zero constant generation
     pub fn zero_of(&self, ty: BasicTypeEnum<'ctx>) -> BasicValueEnum<'ctx> {
         match ty {
             BasicTypeEnum::IntType(i) => i.const_zero().into(),
