@@ -1,1 +1,13 @@
 /target
+
+# Binarios generados por `halo build` (toman el nombre del archivo .halo)
+/01_hello
+/03_factorial
+/test_*
+
+# Instalación local de skills del agente
+/.agents/
+/skills-lock.json
+
+# Planes y specs del flujo de trabajo (se comparten aparte)
+/.superpowers/
