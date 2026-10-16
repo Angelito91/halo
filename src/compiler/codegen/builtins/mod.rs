@@ -15,7 +15,13 @@ pub fn emit_builtin<'ctx>(
     args: &[Expression],
 ) -> Result<Option<BasicValueEnum<'ctx>>, String> {
     match name {
-        "print" | "println" => io::emit_print(gen, args, name == "println").map(Some),
+        // The interpreter's `print()` always ends its output with a newline
+        // (see builtin_print in the evaluator). Compiled binaries must match
+        // that behavior, so `print` carries `add_newline = true` here too.
+        // NOTE: the interpreter does not know a `println` builtin yet; until
+        // the two tables converge, both names behave like the interpreter's
+        // `print` (one trailing newline, whether printed once or per argument).
+        "print" | "println" => io::emit_print(gen, args, true).map(Some),
         "str" => conversions::emit_str(gen, args).map(Some),
         "int" => conversions::emit_int(gen, args).map(Some),
         "float" => conversions::emit_float(gen, args).map(Some),

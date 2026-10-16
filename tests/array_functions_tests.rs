@@ -810,3 +810,68 @@ final = get_result()
     let result = eval_code(code).unwrap();
     assert_eq!(result, Value::Null);
 }
+
+// ── append (array + array → concatenated array) ──────────────────────────────
+
+#[test]
+fn test_append_two_arrays_returns_their_concatenation() {
+    let code = r#"
+get_result() {
+    joined = append([1, 2], [3, 4])
+    if joined[0] == 1 {
+        if joined[1] == 2 {
+            if joined[2] == 3 {
+                if joined[3] == 4 {
+                    if len(joined) == 4 {
+                        return 1
+                    }
+                }
+            }
+        }
+    }
+    return 0
+}
+final = get_result()
+"#;
+    let result = eval_code(code).unwrap();
+    assert_eq!(result, Value::Null);
+}
+
+#[test]
+fn test_append_does_not_modify_the_original_array() {
+    let code = r#"
+get_result() {
+    original = [1, 2]
+    joined = append(original, [3])
+    if len(original) == 2 {
+        if joined[2] == 3 {
+            return 1
+        }
+    }
+    return 0
+}
+final = get_result()
+"#;
+    let result = eval_code(code).unwrap();
+    assert_eq!(result, Value::Null);
+}
+
+#[test]
+fn test_append_second_argument_must_be_an_array() {
+    let code = r#"
+append([1, 2], 3)
+"#;
+    let result = eval_code(code);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("expects second argument to be an array"));
+}
+
+#[test]
+fn test_append_first_argument_must_be_an_array() {
+    let code = r#"
+append("not an array", [1])
+"#;
+    let result = eval_code(code);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("expects first argument to be an array"));
+}
