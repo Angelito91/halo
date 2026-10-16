@@ -97,33 +97,28 @@ impl CompilationStatistics {
         println!("{}", colors::info("╭─ Compilation Summary ─╮"));
 
         println!(
-            "{}  {} {}",
+            "{}  Source Lines: {}",
             colors::muted("│"),
-            "Source Lines:",
             colors::highlight(&self.source_lines.to_string())
         );
         println!(
-            "{}  {} {}",
+            "{}  Tokens: {}",
             colors::muted("│"),
-            "Tokens:",
             colors::highlight(&self.tokens.to_string())
         );
         println!(
-            "{}  {} {}",
+            "{}  AST Nodes: {}",
             colors::muted("│"),
-            "AST Nodes:",
             colors::highlight(&self.ast_nodes.to_string())
         );
         println!(
-            "{}  {} {}",
+            "{}  Functions: {}",
             colors::muted("│"),
-            "Functions:",
             colors::highlight(&self.functions.to_string())
         );
         println!(
-            "{}  {} {}",
+            "{}  Variables: {}",
             colors::muted("│"),
-            "Variables:",
             colors::highlight(&self.variables.to_string())
         );
 
@@ -153,9 +148,8 @@ impl CompilationStatistics {
 
             let total_ms = self.total_time_ms();
             println!(
-                "{}  {} {} {}",
+                "{}  Total: {} {}",
                 colors::muted("   "),
-                "Total:",
                 colors::highlight(&format!("{:.2}ms", total_ms)),
                 if total_ms > 500.0 {
                     colors::warning("(consider optimization)")
@@ -169,17 +163,15 @@ impl CompilationStatistics {
             println!("{}", colors::muted("├────────────────────"));
             if self.errors > 0 {
                 println!(
-                    "{}  {} {}",
+                    "{}  Errors: {}",
                     colors::muted("│"),
-                    "Errors:",
                     colors::error(&self.errors.to_string())
                 );
             }
             if self.warnings > 0 {
                 println!(
-                    "{}  {} {}",
+                    "{}  Warnings: {}",
                     colors::muted("│"),
-                    "Warnings:",
                     colors::warning(&self.warnings.to_string())
                 );
             }

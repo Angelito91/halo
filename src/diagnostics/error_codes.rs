@@ -182,23 +182,23 @@ impl ErrorCode {
             ErrorCode::InvalidFunctionCall => "E029",
             ErrorCode::DivisionByZero => "E030",
 
-            ErrorCode::UnusedVariable => "W031",
-            ErrorCode::UnusedFunction => "W032",
-            ErrorCode::UnusedImport => "W033",
-            ErrorCode::UnreachableCode => "W034",
-            ErrorCode::VariableShadowing => "W035",
-            ErrorCode::FunctionShadowing => "W036",
-            ErrorCode::DeprecatedFeature => "W037",
-            ErrorCode::PerformanceIssue => "W038",
-            ErrorCode::StyleViolation => "W039",
-            ErrorCode::PossibleLogicError => "W040",
+            ErrorCode::UnusedVariable => "E031",
+            ErrorCode::UnusedFunction => "E032",
+            ErrorCode::UnusedImport => "E033",
+            ErrorCode::UnreachableCode => "E034",
+            ErrorCode::VariableShadowing => "E035",
+            ErrorCode::FunctionShadowing => "E036",
+            ErrorCode::DeprecatedFeature => "E037",
+            ErrorCode::PerformanceIssue => "E038",
+            ErrorCode::StyleViolation => "E039",
+            ErrorCode::PossibleLogicError => "E040",
         }
     }
 
     #[allow(dead_code)] // PLANNED FOR v0.3.0: Error descriptions
     pub fn description(&self) -> &'static str {
         match self {
-            ErrorCode::ExpectedCloseParen => "Expected closing parenthesis ')'",
+            ErrorCode::ExpectedCloseParen => "Expected ')' after parameters",
             ErrorCode::ExpectedCloseBrace => "Expected closing brace '}'",
             ErrorCode::ExpectedCloseBracket => "Expected closing bracket ']'",
             ErrorCode::UnexpectedToken => "Unexpected token in expression",
@@ -231,7 +231,7 @@ impl ErrorCode {
             ErrorCode::InvalidFunctionCall => "Invalid function call",
             ErrorCode::DivisionByZero => "Division by zero",
 
-            ErrorCode::UnusedVariable => "Variable is declared but not used",
+            ErrorCode::UnusedVariable => "Variable is not used",
             ErrorCode::UnusedFunction => "Function is declared but not used",
             ErrorCode::UnusedImport => "Import is not used",
             ErrorCode::UnreachableCode => "Code is unreachable",
@@ -470,6 +470,11 @@ impl ErrorCode {
 
 impl fmt::Display for ErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}] {}", self.code(), self.description())
+        let severity = if self.is_warning() {
+            "warning"
+        } else {
+            "error"
+        };
+        write!(f, "{}[{}]: {}", severity, self.code(), self.description())
     }
 }
