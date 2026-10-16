@@ -100,10 +100,11 @@ impl Lexer {
         Token::new(kind, lexeme.to_string(), pos)
     }
 
-    /// Scan a double-quoted string literal. The opening `"` must be consumed beforehand.
-    /// Supports standard escape sequences: `\\`, `\"`, `\n`, `\t`, `\r`.
+    /// Scan a string literal delimited by `quote` (either `"` or `'`).
+    /// The opening quote must be consumed beforehand.
+    /// Supports escape sequences: `\\`, `\"`, `\'`, `\n`, `\t`, `\r`.
     /// Unterminated strings produce an `Unknown` token for parser error reporting.
-    fn scan_string_literal(&mut self, start_pos: Position) -> Token {
+    fn scan_string_literal(&mut self, start_pos: Position, quote: char) -> Token {
         let mut value = String::new();
 
         loop {
@@ -111,8 +112,8 @@ impl Lexer {
                 // EOF before closing quote — surface the error in the parser.
                 None => return Token::new(TokenKind::Unknown, value, start_pos),
 
-                Some('"') => {
-                    self.next_char(); // consume closing `"`
+                Some(c) if c == quote => {
+                    self.next_char(); // consume closing quote
                     break;
                 }
 
@@ -121,6 +122,7 @@ impl Lexer {
                     let escaped = match self.current_char() {
                         Some('\\') => '\\',
                         Some('"') => '"',
+                        Some('\'') => '\'',
                         Some('n') => '\n',
                         Some('t') => '\t',
                         Some('r') => '\r',
@@ -199,9 +201,10 @@ impl Lexer {
                 Token::new(TokenKind::Number, num, pos)
             }
 
-            Some('"') => {
-                self.next_char(); // consume opening `"`
-                self.scan_string_literal(pos)
+            Some('"') | Some('\'') => {
+                let quote = self.current_char().unwrap();
+                self.next_char(); // consume opening quote
+                self.scan_string_literal(pos, quote)
             }
 
             Some('=') => {
