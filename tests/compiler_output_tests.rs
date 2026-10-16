@@ -86,3 +86,41 @@ fn compiled_multiple_prints_should_each_have_their_own_line() {
     let stdout = compile_link_and_run("print_lines", code);
     assert_eq!(stdout, "a\n123\n");
 }
+
+#[test]
+fn compiled_trim_should_keep_inner_text_untouched() {
+    let code = "print(\"Hola Mundo\".trim())";
+    let stdout = compile_link_and_run("trim_full", code);
+    assert_eq!(stdout, "Hola Mundo\n");
+}
+
+#[test]
+fn compiled_trim_should_remove_leading_and_trailing_whitespace() {
+    let code = "print(\"  ab  \".trim())";
+    let stdout = compile_link_and_run("trim_spaces", code);
+    assert_eq!(stdout, "ab\n");
+}
+
+#[test]
+fn compiled_trim_should_keep_a_single_char() {
+    let code = "print(\"X\".trim())";
+    let stdout = compile_link_and_run("trim_single", code);
+    assert_eq!(stdout, "X\n");
+}
+
+#[test]
+fn compiled_contains_should_report_true_when_substring_is_present() {
+    // The interpreter prints booleans as true/false; compiled mode prints
+    // them as 1/0 until the output-format gap is closed. Branch on the
+    // result to check the value without pinning the boolean format.
+    let code = "if \"Hola Mundo\".contains(\"la Mu\") { print(\"has-it\") }";
+    let stdout = compile_link_and_run("contains_true", code);
+    assert_eq!(stdout, "has-it\n");
+}
+
+#[test]
+fn compiled_contains_should_report_false_when_substring_is_absent() {
+    let code = "if \"Hola Mundo\".contains(\"zzz\") { print(\"x\") } else { print(\"not-there\") }";
+    let stdout = compile_link_and_run("contains_false", code);
+    assert_eq!(stdout, "not-there\n");
+}
