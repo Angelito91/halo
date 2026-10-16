@@ -10,7 +10,7 @@ use inkwell::values::BasicValueEnum;
 
 /// Maps Halo types to LLVM types via inkwell
 pub struct TypeMapper<'ctx> {
-    context: &'ctx Context,
+    pub context: &'ctx Context,
 }
 
 impl<'ctx> TypeMapper<'ctx> {
@@ -41,13 +41,30 @@ impl<'ctx> TypeMapper<'ctx> {
         self.context.f64_type()
     }
 
+    /// 8-bit integer type (bytes / chars)
+    pub fn i8_type(&self) -> IntType<'ctx> {
+        self.context.i8_type()
+    }
+
+    /// Default pointer type (opaque i8*)
+    pub fn ptr_type(&self) -> inkwell::types::PointerType<'ctx> {
+        self.context.ptr_type(inkwell::AddressSpace::default())
+    }
+
     // ===== Function types =====
 
-    /// Function type: (i64 x N) -> i64
-    pub fn fn_i64_n(&self, param_count: usize) -> FunctionType<'ctx> {
+    /// Function type: (i64 x N) -> ret_type where ret_type is "i64", "f64", or "string"
+    pub fn fn_type_for(&self, param_count: usize, ret_ty: &str) -> FunctionType<'ctx> {
         let i64_type = self.i64_type();
         let params: Vec<_> = vec![i64_type.into(); param_count];
-        i64_type.fn_type(&params, false)
+        match ret_ty {
+            "string" => {
+                let ptr_ty = self.ptr_type();
+                ptr_ty.fn_type(&params, false)
+            }
+            "f64" => self.f64_type().fn_type(&params, false),
+            _ => i64_type.fn_type(&params, false),
+        }
     }
 
     /// Printf-compatible variadic function type: i32 (ptr, ...)
@@ -93,12 +110,17 @@ impl<'ctx> TypeMapper<'ctx> {
     }
 
     /// Return the storage `BasicTypeEnum` that should be used when allocating
-    /// a variable that holds `val`.  Floats stay as `f64`; everything else
-    /// is widened to `i64` so that re-assignments of booleans/i32 are always
+    /// a variable that holds `val`.  Floats stay as `f64`; pointer values
+    /// (e.g. strings) are stored as opaque pointers; everything else is
+    /// widened to `i64` so that re-assignments of booleans/i32 are always
     /// stored in a uniform slot.
     pub fn storage_type_of(&self, val: BasicValueEnum<'ctx>) -> BasicTypeEnum<'ctx> {
         if val.is_float_value() {
             self.f64_type().into()
+        } else if val.is_pointer_value() {
+            self.context
+                .ptr_type(inkwell::AddressSpace::default())
+                .into()
         } else {
             self.i64_type().into()
         }
@@ -132,10 +154,10 @@ mod tests {
     }
 
     #[test]
-    fn test_fn_i64_n() {
+    fn test_fn_type_for_i64() {
         let context = Context::create();
         let mapper = TypeMapper::new(&context);
-        let ft = mapper.fn_i64_n(3);
+        let ft = mapper.fn_type_for(3, "i64");
         assert_eq!(ft.count_param_types(), 3);
     }
 

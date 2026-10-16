@@ -19,9 +19,9 @@
 
 pub mod arrays;
 pub mod binary_ops;
-pub mod conditional;
 pub mod function_call;
 pub mod literals;
+pub mod method_call;
 pub mod unary_ops;
 pub mod variables;
 
@@ -44,14 +44,10 @@ pub fn emit_expression<'ctx>(
 
         // Variables
         Expression::Var(name, _) => variables::emit_var_ref(&gen.builder, &gen.globals, name),
-        Expression::Assign { name, value, .. } => {
-            variables::emit_var_assign(gen, name, value)
-        }
+        Expression::Assign { name, value, .. } => variables::emit_var_assign(gen, name, value),
 
         // Unary operations
-        Expression::Unary { operator, expr, .. } => {
-            unary_ops::emit_unary(gen, operator, expr)
-        }
+        Expression::Unary { operator, expr, .. } => unary_ops::emit_unary(gen, operator, expr),
 
         // Binary operations
         Expression::Binary {
@@ -59,9 +55,7 @@ pub fn emit_expression<'ctx>(
         } => binary_ops::emit_binop(gen, left, op, right),
 
         // Function calls
-        Expression::Call { name, args, .. } => {
-            function_call::emit_function_call(gen, name, args)
-        }
+        Expression::Call { name, args, .. } => function_call::emit_function_call(gen, name, args),
 
         // Arrays
         Expression::ArrayLiteral { elements, .. } => arrays::emit_array_literal(gen, elements),
@@ -71,8 +65,11 @@ pub fn emit_expression<'ctx>(
         }
 
         // Method calls
-        Expression::MethodCall { .. } => {
-            Err("Method calls are not yet supported in compiled mode".to_string())
-        }
+        Expression::MethodCall {
+            object,
+            method,
+            args,
+            ..
+        } => method_call::emit_method_call(gen, object, method, args),
     }
 }

@@ -133,6 +133,9 @@ impl Emitter {
         if val.is_float_value() {
             return Err("widen_to_i64: value is a float — use promote_to_f64 instead".to_string());
         }
+        if val.is_pointer_value() {
+            return Err("widen_to_i64: value is a pointer — likely a string. Use emit_printf_for_value for string values".to_string());
+        }
         let iv = val.into_int_value();
         if iv.get_type().get_bit_width() == 64 {
             return Ok(iv);

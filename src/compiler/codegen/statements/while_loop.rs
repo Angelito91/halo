@@ -12,6 +12,7 @@ use inkwell::values::FunctionValue;
 pub fn emit_while_loop<'ctx>(
     gen: &mut CodeGenerator<'ctx>,
     function: FunctionValue<'ctx>,
+    _fn_name: &str,
     cond: &Expression,
     body: &Block,
 ) -> Result<bool, String> {

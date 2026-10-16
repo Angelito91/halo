@@ -12,6 +12,7 @@ use inkwell::values::FunctionValue;
 pub fn emit_if_stmt<'ctx>(
     gen: &mut CodeGenerator<'ctx>,
     function: FunctionValue<'ctx>,
+    _fn_name: &str,
     cond: &Expression,
     then_branch: &Block,
     else_if_branches: &[crate::parser::ast::ElseIfBranch],

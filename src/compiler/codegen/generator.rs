@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use crate::compiler::builder::IRBuilder;
 use crate::compiler::types::TypeMapper;
-use crate::parser::ast::{Block, Expression, Program, Statement, TopLevel};
+use crate::parser::ast::{BinOp, Block, Expression, Program, Statement, TopLevel};
 use inkwell::basic_block::BasicBlock;
 
 use super::emitter::Emitter;
@@ -33,6 +33,8 @@ pub struct CodeGenerator<'ctx> {
     pub type_mapper: TypeMapper<'ctx>,
     /// All user-defined functions, keyed by name.
     pub functions: HashMap<String, FunctionValue<'ctx>>,
+    /// Return type of each user function ("i64", "f64", "string").
+    pub fn_return_types: HashMap<String, &'static str>,
     /// Module-level global variables (name → GlobalValue).
     pub globals: HashMap<String, GlobalValue<'ctx>>,
     /// Cached format-string globals for printf calls.
@@ -52,6 +54,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             builder,
             type_mapper,
             functions: HashMap::new(),
+            fn_return_types: HashMap::new(),
             globals: HashMap::new(),
             string_globals: HashMap::new(),
             loop_stack: Vec::new(),
@@ -69,10 +72,21 @@ impl<'ctx> CodeGenerator<'ctx> {
     /// - `Function`   → compiled to a named LLVM function.
     /// - `GlobalVar` with a real name (e.g. `x = 3`) → module-level global
     ///   with a constant initializer.
+    /// - `GlobalVar` with a non-constant initializer (e.g. `g = "hello"`)
+    ///   → emitted as a local assignment at the start of `main`.
     /// - `GlobalVar` with the synthetic name `__expr` (top-level expressions
     ///   in the REPL) → collected and emitted inside `main`.
     pub fn compile(&mut self, program: &Program) -> Result<(), String> {
         self.declare_printf();
+        self.declare_string_runtime();
+
+        // ── Pass 0: determine return types for all functions ───────────────
+        for item in &program.items {
+            if let TopLevel::Function { name, body, .. } = item {
+                let ret = determine_return_type(body);
+                self.fn_return_types.insert(name.clone(), ret);
+            }
+        }
 
         // ── Pass 1: declare all named function signatures ──────────────────
         for item in &program.items {
@@ -83,7 +97,10 @@ impl<'ctx> CodeGenerator<'ctx> {
 
         // ── Pass 2: generate named functions and true globals ───────────────
         // While doing so, collect top-level statements (the __expr items) that
-        // must go into main.
+        // must go into main. Variables with non-constant initializers
+        // (e.g. string literals) are also collected so they are emitted as
+        // local assignments inside `main` (LLVM does not allow non-const
+        // values in global initializers).
         let mut top_level_stmts: Vec<Statement> = Vec::new();
 
         for item in &program.items {
@@ -105,9 +122,21 @@ impl<'ctx> CodeGenerator<'ctx> {
                     top_level_stmts.push(stmt.clone());
                 }
 
-                TopLevel::GlobalVar { name, init, .. } => {
+                TopLevel::GlobalVar { name, init, pos } => {
                     if let Some(expr) = init {
-                        self.generate_global_var(name, expr)?;
+                        if is_constant_initializer(expr) {
+                            self.generate_global_var(name, expr)?;
+                        } else {
+                            // Non-constant initializer (e.g. a string literal).
+                            // Emit it as a local variable declaration inside
+                            // `main` instead, since LLVM does not allow
+                            // non-const values in global initializers.
+                            top_level_stmts.push(Statement::VarDecl {
+                                name: name.clone(),
+                                init: Some(expr.clone()),
+                                pos: *pos,
+                            });
+                        }
                     } else {
                         self.generate_global_var_typed(name, None)?;
                     }
@@ -236,8 +265,9 @@ impl<'ctx> CodeGenerator<'ctx> {
         self.builder.builder.position_at_end(entry_bb);
 
         // Execute every top-level statement.
+        let main_name = String::from("main");
         for stmt in stmts {
-            self.generate_statement(stmt, main_fn)?;
+            self.generate_statement(stmt, main_fn, &main_name)?;
         }
 
         // Return 0 from main if the block has no terminator yet.
@@ -269,13 +299,48 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
+    /// Declare the string runtime helpers we use (strlen, malloc, strcpy, strcat).
+    /// All take `i8*` and return either `i64` or `i8*`.
+    fn declare_string_runtime(&mut self) {
+        let i64_type = self.type_mapper.i64_type();
+        let i8_ptr = self
+            .type_mapper
+            .context
+            .ptr_type(inkwell::AddressSpace::default());
+        // size_t strlen(const char *s) — declared as i64 (i8*) for simplicity
+        if self.module.get_function("strlen").is_none() {
+            let ty = i64_type.fn_type(&[i8_ptr.into()], false);
+            self.module
+                .add_function("strlen", ty, Some(Linkage::External));
+        }
+        // void *malloc(size_t size)
+        if self.module.get_function("malloc").is_none() {
+            let ty = i8_ptr.fn_type(&[i64_type.into()], false);
+            self.module
+                .add_function("malloc", ty, Some(Linkage::External));
+        }
+        // char *strcpy(char *dest, const char *src)
+        if self.module.get_function("strcpy").is_none() {
+            let ty = i8_ptr.fn_type(&[i8_ptr.into(), i8_ptr.into()], false);
+            self.module
+                .add_function("strcpy", ty, Some(Linkage::External));
+        }
+        // char *strcat(char *dest, const char *src)
+        if self.module.get_function("strcat").is_none() {
+            let ty = i8_ptr.fn_type(&[i8_ptr.into(), i8_ptr.into()], false);
+            self.module
+                .add_function("strcat", ty, Some(Linkage::External));
+        }
+    }
+
     // =========================================================================
     // Function management
     // =========================================================================
 
     /// First-pass: register the function signature so it can be called.
     fn declare_function(&mut self, name: &str, params: &[String]) -> Result<(), String> {
-        let fn_type = self.type_mapper.fn_i64_n(params.len());
+        let ret_ty = self.fn_return_types.get(name).copied().unwrap_or("i64");
+        let fn_type = self.type_mapper.fn_type_for(params.len(), ret_ty);
         let function = self.module.add_function(name, fn_type, None);
 
         // Mark functions with attributes that enable more aggressive optimisation.
@@ -425,8 +490,15 @@ impl<'ctx> CodeGenerator<'ctx> {
         block: &Block,
         function: FunctionValue<'ctx>,
     ) -> Result<bool, String> {
+        // Look up the function name from the FunctionValue using fn_return_types.
+        let fn_name = self
+            .functions
+            .iter()
+            .find(|(_, fv)| **fv == function)
+            .map(|(name, _)| name.clone())
+            .unwrap_or_default();
         for stmt in &block.stmts {
-            let terminated = self.generate_statement(stmt, function)?;
+            let terminated = self.generate_statement(stmt, function, &fn_name)?;
             if terminated {
                 return Ok(true);
             }
@@ -441,8 +513,9 @@ impl<'ctx> CodeGenerator<'ctx> {
         &mut self,
         stmt: &Statement,
         function: FunctionValue<'ctx>,
+        fn_name: &str,
     ) -> Result<bool, String> {
-        super::statements::emit_statement(self, stmt, function)
+        super::statements::emit_statement(self, stmt, function, fn_name)
     }
 
     // =========================================================================
@@ -460,10 +533,20 @@ impl<'ctx> CodeGenerator<'ctx> {
         slot_ty: BasicTypeEnum<'ctx>,
     ) -> Result<BasicValueEnum<'ctx>, String> {
         match slot_ty {
-            BasicTypeEnum::FloatType(_) => Ok(Emitter::promote_to_f64(self, val)?.into()),
+            BasicTypeEnum::FloatType(_) => {
+                if val.is_pointer_value() {
+                    return Err("Cannot store a string (pointer) into a float variable".to_string());
+                }
+                Ok(Emitter::promote_to_f64(self, val)?.into())
+            }
             BasicTypeEnum::IntType(it) => {
                 if val.is_float_value() {
                     return Err("Cannot store a float value into an integer variable".to_string());
+                }
+                if val.is_pointer_value() {
+                    return Err(
+                        "Cannot store a string (pointer) into an integer variable".to_string()
+                    );
                 }
                 let iv = val.into_int_value();
                 if iv.get_type() == it {
@@ -475,7 +558,14 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .map(|v| v.into())
                     .map_err(|_| "Failed to coerce int to slot type".to_string())
             }
-            _ => Ok(val), // pass-through for pointer/aggregate types
+            BasicTypeEnum::PointerType(_) => {
+                if val.is_pointer_value() {
+                    Ok(val)
+                } else {
+                    Err("Cannot store a non-pointer value into a string variable".to_string())
+                }
+            }
+            _ => Ok(val), // pass-through for aggregate/other types
         }
     }
 
@@ -510,4 +600,174 @@ impl<'ctx> CodeGenerator<'ctx> {
                 .map_err(|_| "Failed to coerce int to bool".to_string())
         }
     }
+}
+
+/// Scan a function body and determine its return type.
+/// Returns one of "i64", "f64", or "string".
+fn determine_return_type(body: &Block) -> &'static str {
+    // First pass: check explicit return expressions
+    for stmt in &body.stmts {
+        if let Some(ty) = return_type_of_stmt(stmt) {
+            if ty == "string" || ty == "f64" {
+                return ty;
+            }
+        }
+    }
+
+    // Second pass: check if the function body contains string operations
+    // (string concat `+`, string repeat `*`, or string literals being assigned).
+    // If so, it might return a string via a variable.
+    if contains_string_op(body) {
+        return "string";
+    }
+
+    // Fallback: check for any non-i64 return type
+    for stmt in &body.stmts {
+        if let Some(ty) = return_type_of_stmt(stmt) {
+            return ty;
+        }
+    }
+
+    "i64"
+}
+
+/// Check if a block contains any string-related operations.
+fn contains_string_op(body: &Block) -> bool {
+    for stmt in &body.stmts {
+        if stmt_has_string(stmt) {
+            return true;
+        }
+    }
+    false
+}
+
+fn stmt_has_string(stmt: &Statement) -> bool {
+    match stmt {
+        Statement::Return { value: Some(expr), .. } => expr_has_string(expr),
+        Statement::Expr(expr) => expr_has_string(expr),
+        Statement::VarDecl { init: Some(expr), .. } => expr_has_string(expr),
+        Statement::VarDecl { init: None, .. } => false,
+        Statement::Return { value: None, .. } => false,
+        Statement::If { then_branch, else_branch, else_if_branches, .. } => {
+            for s in &then_branch.stmts {
+                if stmt_has_string(s) {
+                    return true;
+                }
+            }
+            if let Some(else_b) = else_branch {
+                for s in &else_b.stmts {
+                    if stmt_has_string(s) {
+                        return true;
+                    }
+                }
+            }
+            for branch in else_if_branches {
+                if expr_has_string(&branch.cond) {
+                    return true;
+                }
+                for s in &branch.body.stmts {
+                    if stmt_has_string(s) {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+        Statement::While { cond, body, .. } => {
+            expr_has_string(cond) || body.stmts.iter().any(|s| stmt_has_string(s))
+        }
+        Statement::Break { .. } | Statement::Continue { .. } => false,
+    }
+}
+
+fn expr_has_string(expr: &Expression) -> bool {
+    match expr {
+        Expression::StringLiteral(_, _) => true,
+        Expression::Binary { left, op, right, .. } => {
+            matches!(op, BinOp::Add | BinOp::Mul) && (expr_has_string(left) || expr_has_string(right))
+        }
+        Expression::Var(_, _) => false, // variable — could be string, but conservative
+        _ => false,
+    }
+}
+
+/// Check if a statement contains a return expression that reveals the return type.
+fn return_type_of_stmt(stmt: &Statement) -> Option<&'static str> {
+    match stmt {
+        Statement::Return { value: Some(expr), .. } => return_type_of_expr(expr),
+        Statement::If { then_branch, else_branch, else_if_branches, .. } => {
+            for s in &then_branch.stmts {
+                if let Some(ty) = return_type_of_stmt(s) {
+                    return Some(ty);
+                }
+            }
+            if let Some(else_b) = else_branch {
+                for s in &else_b.stmts {
+                    if let Some(ty) = return_type_of_stmt(s) {
+                        return Some(ty);
+                    }
+                }
+            }
+            for branch in else_if_branches {
+                for s in &branch.body.stmts {
+                    if let Some(ty) = return_type_of_stmt(s) {
+                        return Some(ty);
+                    }
+                }
+            }
+            None
+        }
+        Statement::While { body, .. } => {
+            for s in &body.stmts {
+                if let Some(ty) = return_type_of_stmt(s) {
+                    return Some(ty);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+/// Check what type a return expression would yield.
+fn return_type_of_expr(expr: &Expression) -> Option<&'static str> {
+    match expr {
+        Expression::StringLiteral(_, _) => Some("string"),
+        Expression::Float(_, _) => Some("f64"),
+        Expression::Number(_, _) => Some("i64"),
+        Expression::Bool(_, _) => Some("i64"),
+        Expression::Binary { left, op, right, .. } => {
+            // String concat/repeat → string return
+            if matches!(op, BinOp::Add | BinOp::Mul) {
+                if return_type_of_expr(left) == Some("string")
+                    || return_type_of_expr(right) == Some("string")
+                {
+                    return Some("string");
+                }
+            }
+            if matches!(op, BinOp::Eq | BinOp::Neq | BinOp::Lt | BinOp::Gt | BinOp::Le | BinOp::Ge
+                | BinOp::And | BinOp::Or)
+            {
+                return Some("i64"); // bools are stored as i64
+            }
+            // Arithmetic → i64 or f64
+            if return_type_of_expr(left) == Some("f64") || return_type_of_expr(right) == Some("f64")
+            {
+                return Some("f64");
+            }
+            Some("i64")
+        }
+        _ => Some("i64"),
+    }
+}
+
+/// Returns true if the given expression is a valid constant initializer for
+/// a global variable. LLVM requires global initializers to be compile-time
+/// constants; we only support number, float, and bool literals. Strings and
+/// any computed value must be promoted to a local assignment inside `main`.
+fn is_constant_initializer(expr: &Expression) -> bool {
+    matches!(
+        expr,
+        Expression::Number(_, _) | Expression::Float(_, _) | Expression::Bool(_, _)
+    )
 }

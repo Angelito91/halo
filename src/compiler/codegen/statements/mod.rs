@@ -30,11 +30,13 @@ use inkwell::values::FunctionValue;
 
 /// Main entry point for statement code generation.
 /// Dispatches to appropriate submodule based on statement type.
+/// `fn_name` is the name of the enclosing function (used for return type dispatch).
 /// Returns whether the statement terminates (prevents unreachable code after return/break).
 pub fn emit_statement<'ctx>(
     gen: &mut CodeGenerator<'ctx>,
     stmt: &Statement,
     function: FunctionValue<'ctx>,
+    fn_name: &str,
 ) -> Result<bool, String> {
     match stmt {
         Statement::Expr(expr) => expr_stmt::emit_expr_stmt(gen, expr),
@@ -48,14 +50,17 @@ pub fn emit_statement<'ctx>(
         } => if_stmt::emit_if_stmt(
             gen,
             function,
+            fn_name,
             cond,
             then_branch,
             else_if_branches,
             else_branch,
         ),
-        Statement::While { cond, body, .. } => while_loop::emit_while_loop(gen, function, cond, body),
+        Statement::While { cond, body, .. } => {
+            while_loop::emit_while_loop(gen, function, fn_name, cond, body)
+        }
         Statement::Break { .. } => break_stmt::emit_break(gen),
         Statement::Continue { .. } => continue_stmt::emit_continue(gen),
-        Statement::Return { value, .. } => return_stmt::emit_return(gen, value),
+        Statement::Return { value, .. } => return_stmt::emit_return(gen, value, fn_name),
     }
 }
