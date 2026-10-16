@@ -389,6 +389,33 @@ pub fn builtin_pop(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Val
     }
 }
 
+/// `append(array, array)` - Combines two arrays and returns a new array.
+pub fn builtin_append(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err(format!(
+            "append() expects exactly 2 arguments, got {}",
+            args.len()
+        ));
+    }
+    let arr1_val = evaluator.eval_expr(&args[0])?;
+    let arr2_val = evaluator.eval_expr(&args[1])?;
+
+    match (arr1_val, arr2_val) {
+        (Value::Array(mut arr1), Value::Array(arr2)) => {
+            arr1.extend(arr2);
+            Ok(Value::Array(arr1))
+        }
+        (Value::Array(_), other) => Err(format!(
+            "append() expects second argument to be an array, got '{}'",
+            other.type_name()
+        )),
+        (other, _) => Err(format!(
+            "append() expects first argument to be an array, got '{}'",
+            other.type_name()
+        )),
+    }
+}
+
 /// `first(array)` - Returns the first element of the array (null if empty).
 pub fn builtin_first(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
     if args.len() != 1 {
@@ -534,14 +561,22 @@ pub fn builtin_index_of(evaluator: &mut Evaluator, args: &[Expression]) -> Resul
                 .unwrap_or(-1);
             Ok(Value::Number(index))
         }
+        (Value::String(s), Value::String(substring)) => match s.find(&substring) {
+            Some(idx) => Ok(Value::Number(idx as i64)),
+            None => Ok(Value::Number(-1)),
+        },
+        (Value::String(_), other) => Err(format!(
+            "index_of() with string expects second argument to be a string, got '{}'",
+            other.type_name()
+        )),
         (other, _) => Err(format!(
-            "index_of() expects first argument to be an array, got '{}'",
+            "index_of() expects first argument to be an array or string, got '{}'",
             other.type_name()
         )),
     }
 }
 
-/// `sort(array)` - Returns a new array with elements sorted (only for numbers).
+/// `sort(array)` - Returns a new array with elements sorted.
 pub fn builtin_sort(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
@@ -553,35 +588,47 @@ pub fn builtin_sort(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Va
 
     match arr_val {
         Value::Array(mut arr) => {
-            // Validate that all elements are numbers or floats
-            for elem in &arr {
-                match elem {
-                    Value::Number(_) | Value::Float(_) => {}
-                    other => {
-                        return Err(format!(
-                            "sort() only works with arrays of numbers, found '{}'",
-                            other.type_name()
-                        ))
-                    }
-                }
+            // Determine the element type: numbers, floats, or strings.
+            let has_string = arr.iter().any(|e| matches!(e, Value::String(_)));
+            let has_number = arr
+                .iter()
+                .any(|e| matches!(e, Value::Number(_) | Value::Float(_)));
+
+            if has_string && has_number {
+                return Err("sort() cannot mix strings and numbers in the same array".to_string());
             }
 
-            // Sort the array
-            arr.sort_by(|a, b| {
-                let a_num = match a {
-                    Value::Number(n) => *n as f64,
-                    Value::Float(f) => *f,
-                    _ => 0.0,
-                };
-                let b_num = match b {
-                    Value::Number(n) => *n as f64,
-                    Value::Float(f) => *f,
-                    _ => 0.0,
-                };
-                a_num
-                    .partial_cmp(&b_num)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+            if has_string {
+                // Sort strings lexicographically.
+                arr.sort_by(|a, b| {
+                    let a_str = match a {
+                        Value::String(s) => s.clone(),
+                        _ => String::new(),
+                    };
+                    let b_str = match b {
+                        Value::String(s) => s.clone(),
+                        _ => String::new(),
+                    };
+                    a_str.cmp(&b_str)
+                });
+            } else {
+                // Sort numbers (int or float).
+                arr.sort_by(|a, b| {
+                    let a_num = match a {
+                        Value::Number(n) => *n as f64,
+                        Value::Float(f) => *f,
+                        _ => 0.0,
+                    };
+                    let b_num = match b {
+                        Value::Number(n) => *n as f64,
+                        Value::Float(f) => *f,
+                        _ => 0.0,
+                    };
+                    a_num
+                        .partial_cmp(&b_num)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
 
             Ok(Value::Array(arr))
         }

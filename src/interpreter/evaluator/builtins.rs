@@ -45,6 +45,7 @@ pub fn try_eval_builtin(
         // Array methods that can also be called as functions
         "push" => super::methods::builtin_push(evaluator, args)?,
         "pop" => super::methods::builtin_pop(evaluator, args)?,
+        "append" => super::methods::builtin_append(evaluator, args)?,
         "first" => super::methods::builtin_first(evaluator, args)?,
         "last" => super::methods::builtin_last(evaluator, args)?,
         "reverse" => super::methods::builtin_reverse(evaluator, args)?,

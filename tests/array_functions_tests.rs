@@ -633,15 +633,35 @@ result = index_of([1, 2])
 }
 
 #[test]
-fn test_index_of_non_array() {
+fn test_index_of_string() {
     let code = r#"
-result = index_of("string", "s")
+get_result() {
+    idx = index_of("hello world", "world")
+    if idx == 6 {
+        return 1
+    }
+    return 0
+}
+final = get_result()
 "#;
-    let result = eval_code(code);
-    assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .contains("first argument to be an array"));
+    let result = eval_code(code).unwrap();
+    assert_eq!(result, Value::Null);
+}
+
+#[test]
+fn test_index_of_string_not_found() {
+    let code = r#"
+get_result() {
+    idx = index_of("hello", "xyz")
+    if idx == -1 {
+        return 1
+    }
+    return 0
+}
+final = get_result()
+"#;
+    let result = eval_code(code).unwrap();
+    assert_eq!(result, Value::Null);
 }
 
 // ── sort() tests ───────────────────────────────────────────────────────────
@@ -754,15 +774,23 @@ result = sort(123)
 }
 
 #[test]
-fn test_sort_with_strings_fails() {
+fn test_sort_with_strings() {
     let code = r#"
-result = sort(["a", "b", "c"])
+get_result() {
+    sorted = sort(["banana", "apple", "cherry"])
+    if sorted[0] == "apple" {
+        if sorted[1] == "banana" {
+            if sorted[2] == "cherry" {
+                return 1
+            }
+        }
+    }
+    return 0
+}
+final = get_result()
 "#;
-    let result = eval_code(code);
-    assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .contains("only works with arrays of numbers"));
+    let result = eval_code(code).unwrap();
+    assert_eq!(result, Value::Null);
 }
 
 #[test]
