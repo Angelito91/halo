@@ -146,19 +146,21 @@ f  = 1.0       // float entero
 
 ### Literales de string
 
-Las cadenas van entre comillas dobles y soportan las siguientes
-secuencias de escape:
+Las cadenas van entre comillas dobles (`"..."`) o simples (`'...'`) y soportan
+las siguientes secuencias de escape:
 
 | Escape | Carácter |
 |--------|---------|
 | `\\` | Barra invertida `\` |
 | `\"` | Comilla doble `"` |
+| `\'` | Comilla simple `'` |
 | `\n` | Salto de línea |
 | `\t` | Tabulador horizontal |
 | `\r` | Retorno de carro |
 
 ```halo
 s = "hola mundo"
+s = 'hola "con" comillas dobles dentro'
 s = "línea1\nlínea2"
 s = "col1\tcol2"
 s = "comilla: \""

@@ -64,29 +64,28 @@ Halo nace como un proyecto de aprendizaje práctico para desmitificar el proceso
 | **Recursión mutua** | `is_even` / `is_odd` y similares funcionan |
 | **Límite de recursión** | Guard contra stack overflow (500 niveles en producción) |
 | **Límite de iteraciones** | Guard contra bucles infinitos (1 000 000 iteraciones) |
-| **Funciones built-in** | `print`, `len`, `str`, `int`, `float`, `abs`, `type` |
+| **Funciones built-in** | `print`, `len`, `str`, `int`, `float`, `abs`, `type` + arrays (`push`, `pop`, `append`, `first`, `last`, `reverse`, `index_of`) |
 | **Protección de overflow** | Aritmética entera con checked operations |
 | **Intérprete tree-walking** | Ejecución directa del AST |
 | **Compilación nativa** | AST → LLVM IR → binario nativo vía clang o llc+cc |
 | **Optimización LLVM** | Niveles O0–O3 configurables |
-| **Lexer** | Escaneo lineal O(n), soporte de flotantes, strings con escapes |
+| **Lexer** | Escaneo lineal O(n), flotantes, strings con comillas simples/dobles y escapes |
 | **Parser** | Recursivo descendente, expresiones top-level directas |
-| **Suite de tests** | +500 tests de integración y unitarios |
+| **Suite de tests** | 750+ tests de integración y unitarios |
 
 ### 🚧 En Progreso
 
 | Característica | Prioridad |
 |---|---|
-| Mensajes de error con número de línea | Alta |
-| Arrays / Listas | Media |
-| Standard library extendida | Media |
+| Mensajes de error con número de línea y columna | Alta |
 
 ### 📅 Planificado
 
 | Característica | Prioridad |
 |---|---|
+| Iteración con `for` | Alta |
 | Diccionarios / Maps | Media |
-| Métodos de string | Media |
+| Toolkit de sistema (sh, archivos, entorno) | Media |
 | Comentarios multi-línea | Baja |
 | Backend a bytecode VM | Baja |
 | REPL interactivo | Baja |
@@ -698,11 +697,12 @@ cargo tarpaulin --out Html
 - [x] Niveles de optimización O0–O3
 - [x] Suite de +500 tests de integración
 
-### 📋 v0.3.0 — Estructuras de Datos
+### ✅ v0.3.0 — Estructuras de Datos
 
-- [ ] Arrays / Listas con indexación
+- [x] Arrays / Listas con indexación (`push`, `pop`, `append`, `first`, `last`, `reverse`, `index_of`…)
+- [x] Métodos de string (`upper`, `lower`, `trim`, `starts_with`, `ends_with`, `contains`, `index_of`…), en intérprete y binarios compilados
+- [x] Strings con comillas simples y dobles
 - [ ] Diccionarios / Maps
-- [ ] Métodos de string (`upper`, `lower`, `split`, `trim`…)
 - [ ] Iteración con `for`
 
 ### 🔮 v0.4.0 — Tooling
