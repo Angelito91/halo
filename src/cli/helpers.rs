@@ -4,12 +4,14 @@
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::cli::args::Args;
 use crate::diagnostics::{location_from_source, Diagnostic};
 use crate::interpreter::Evaluator;
 use crate::lexer::{Lexer, TokenKind};
 use crate::parser::Parser;
 use crate::utils::{BANNER, VERSION};
 use std::fs;
+use std::process;
 use std::path::Path;
 
 pub fn print_version() {
@@ -188,4 +190,65 @@ pub fn run_command(mut cmd: std::process::Command, step_name: &str, verbose: boo
             false
         }
     }
+}
+
+pub fn link_with_clang(ll_path: &str, bin_path: &str, args: &Args) -> bool {
+    if args.verbose {
+        eprintln!("🔨 Linking with clang…");
+    }
+
+    let mut cmd = process::Command::new("clang");
+    cmd.args([ll_path, args.opt_level.clang_flag(), "-o", bin_path, "-lm"]);
+
+    if !run_command(cmd, "clang", args.verbose) {
+        eprintln!("❌ clang failed. Is clang installed?");
+        return false;
+    }
+
+    if args.verbose {
+        eprintln!("✅ Linked via clang\n");
+    }
+    true
+}
+
+/// Link using `llc` (IR → assembly) then `cc` (assembly → binary).
+/// This is the former `haloc` toolchain, now available as `halo build --toolchain llc`.
+pub fn link_with_llc(ll_path: &str, bin_path: &str, args: &Args) -> bool {
+    let asm_path = format!("{bin_path}.s");
+
+    if args.verbose {
+        eprintln!("🔨 Compiling IR to assembly (llc)…");
+    }
+
+    let mut llc = process::Command::new("llc");
+    llc.arg(ll_path).arg("-o").arg(&asm_path);
+    if args.opt_level != crate::compiler::OptLevel::O0 {
+        llc.arg(args.opt_level.clang_flag());
+    }
+
+    if !run_command(llc, "llc", args.verbose) {
+        eprintln!("❌ llc failed. Is llc installed?");
+        return false;
+    }
+
+    if args.verbose {
+        eprintln!("✅ Assembly: {asm_path}\n");
+        eprintln!("🔗 Linking with cc…");
+    }
+
+    let mut cc = process::Command::new("cc");
+    cc.arg(&asm_path).arg("-o").arg(bin_path);
+
+    if !run_command(cc, "cc", args.verbose) {
+        eprintln!("❌ cc failed. Is a C compiler installed?");
+        let _ = fs::remove_file(&asm_path);
+        return false;
+    }
+
+    let _ = fs::remove_file(&asm_path);
+
+    if args.verbose {
+        eprintln!("✅ Linked via llc + cc\n");
+    }
+    true
 }

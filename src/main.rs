@@ -19,7 +19,7 @@ mod cli;
 
 // ── Re-exports ────────────────────────────────────────────────────────────────
 
-use cli::commands::{cmd_ast, cmd_build, cmd_check, cmd_llvm, cmd_run, cmd_tokens};
+use cli::{cmd_ast, cmd_build, cmd_check, cmd_llvm, cmd_run, cmd_tokens};
 use cli::{parse_args, Subcommand};
 
 // ── Entry point ───────────────────────────────────────────────────────────────

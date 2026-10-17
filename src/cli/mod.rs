@@ -8,13 +8,21 @@
 //!
 //! This module organizes all command-line interface functionality:
 //! - `args`: Argument parsing and CLI types
-//! - `commands`: Subcommand handlers (run, build, check, etc.)
-//! - `helpers`: UI output and helper functions
+//! - `run`, `build`, `check`, `tokens`, `ast`, `llvm`: one module per subcommand
+//! - `helpers`: UI output, linking and helper functions
 
 pub mod args;
-pub mod commands;
+pub mod ast;
+pub mod build;
+pub mod check;
 pub mod helpers;
+pub mod llvm;
+pub mod run;
+pub mod tokens;
 
 pub use args::{parse_args, Subcommand};
 #[allow(unused_imports)]
-pub use commands::{cmd_ast, cmd_build, cmd_check, cmd_llvm, cmd_run, cmd_tokens};
+pub use {
+    ast::cmd_ast, build::cmd_build, check::cmd_check, llvm::cmd_llvm, run::cmd_run,
+    tokens::cmd_tokens,
+};

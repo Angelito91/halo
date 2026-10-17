@@ -37,3 +37,20 @@ fn ast_subcommand_is_stable() {
         "ast items out of order: {out}"
     );
 }
+
+#[test]
+fn run_subcommand_is_stable() {
+    let out = run_halo("run");
+    assert_eq!(out, "3\n");
+}
+
+#[test]
+fn check_subcommand_is_stable() {
+    let out = run_halo("check");
+    // Real output: `✅  <path> — OK (2 top-level item(s))` (colorised).
+    assert!(out.contains("OK"), "unexpected check output: {out}");
+    assert!(
+        out.contains("top-level item(s)"),
+        "unexpected check output: {out}"
+    );
+}
