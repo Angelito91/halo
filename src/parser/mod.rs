@@ -5,8 +5,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 pub mod ast;
-#[allow(clippy::module_inception)]
-pub mod parser;
+mod core;
+mod declarations;
+mod expressions;
+mod statements;
 pub mod visitor;
 
-pub use parser::*;
+pub use core::Parser;
