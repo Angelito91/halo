@@ -399,6 +399,79 @@ while i < 5 {
 // 0 1 2 3 4
 ```
 
+### for
+
+```halo
+for variable in iterable {
+    // cuerpo
+}
+```
+
+El `iterable` se evalúa **una sola vez**, antes de la primera iteración.
+Halo no tiene un iterable propio todavía: hoy se itera un array o el
+resultado de `range()`.
+
+```halo
+for i in range(5) {
+    print(i)
+}
+// 0 1 2 3 4
+```
+
+La variable del bucle **vive en un scope propio**: oculta a cualquier
+variable externa con el mismo nombre y deja de existir al terminar el
+bucle.
+
+```halo
+i = 99
+for i in range(2) { print(i) }   // 0 1
+print(i)                         // 99 (la `i` de fuera no cambió)
+```
+
+Las asignaciones dentro del cuerpo sí actualizan variables definidas
+fuera del bucle, así que los acumuladores funcionan sin trucos:
+
+```halo
+total = 0
+for i in range(4) {
+    total = total + i
+}
+print(total)   // 6
+```
+
+`break` y `continue` se comportan igual que en un `while`:
+
+```halo
+for i in range(10) {
+    if i == 2 { break }
+    print(i)              // 0 1
+}
+```
+
+### range
+
+```halo
+range(end)          // [0, 1, …, end-1]
+range(start, end)   // [start, …, end-1]
+```
+
+`range()` devuelve un array de enteros. `end <= start` da un array vacío;
+todavía no hay paso negativo. Como cualquier array, se puede recorrer con
+`for` o guardar en una variable:
+
+```halo
+nums = range(3)        // [0, 1, 2]
+print(len(nums))       // 3
+```
+
+Igual que en los bucles, `range()` rechaza rangos absurdamente grandes
+(más de 1 000 000 elementos) para no agotar la memoria.
+
+> **Compilado:** en modo compilado `for` solo admite `range(n)` y
+> `range(a, b)` directamente en el `for`; iterar sobre un array o una
+> variable da un error claro ("not yet supported"), porque los binarios
+> nativos todavía no soportan arrays.
+
 ### break
 
 Sale del bucle más cercano inmediatamente.
@@ -676,7 +749,7 @@ print(original)  // 7  ← sin cambios
 print(result)    // 14
 ```
 
-### Variables en if y while
+### Variables en if, while y for
 
 Los bloques `if` y `while` **no crean un scope nuevo**. Las variables
 asignadas dentro son visibles después del bloque:
@@ -692,12 +765,23 @@ while i < 3 { i = i + 1 }
 print(i)            // 3  — i sigue visible
 ```
 
+El `for` es la excepción: su variable de bucle vive en un scope propio
+(ver la sección de bucles). El resto de asignaciones del cuerpo siguen
+actualizando las variables de fuera:
+
+```halo
+suma = 0
+for n in range(3) { suma = suma + n }
+print(suma)         // 3  — suma sigue visible
+```
+
 ---
 
 ## 10. Funciones Built-in
 
-Todas las funciones built-in son de **aridad fija 1** (salvo `print`).
-Pasar un número distinto de argumentos es un error de runtime.
+Todas las funciones built-in son de **aridad fija 1** (salvo `print` y
+`range`, que acepta 1 o 2). Pasar un número distinto de argumentos es un
+error de runtime.
 
 ### `print(x)`
 
@@ -801,6 +885,20 @@ type("hola")        // "string"
 type(0)             // "number"
 ```
 
+### `range(end)` / `range(start, end)`
+
+Devuelve un array de enteros consecutivos: `[0, …, end-1]` o
+`[start, …, end-1]`. Ambos límites deben ser enteros; no hay paso
+negativo. Se usa sobre todo con `for`:
+
+```halo
+range(4)            // [0, 1, 2, 3]
+range(2, 5)         // [2, 3, 4]
+range(3, 3)         // []
+range(5, 2)         // []  (no hay paso negativo)
+range(1.5)          // Error: range() expects integer arguments, got 'float'
+```
+
 ---
 
 ## 11. Errores de Runtime
@@ -821,6 +919,10 @@ indefinidos. A continuación se listan los principales:
 | `Cannot convert "x" to integer` | `int()` sobre string no numérico |
 | `Cannot convert "x" to float` | `float()` sobre string no numérico |
 | `abs does not support type 'T'` | `abs()` sobre tipo no numérico |
+| `for expects an array to iterate, got 'T'` | `for` sobre algo que no es array |
+| `range() expects 1 or 2 arguments, got N` | Aridad incorrecta de `range()` |
+| `range() expects integer arguments, got 'T'` | `range()` con límites no enteros |
+| `range(a, b) produces N elements, above the limit of 1000000` | `range()` demasiado grande |
 | `negative` | Repetición de string con entero negativo |
 
 ---

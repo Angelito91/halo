@@ -26,6 +26,11 @@ inkwell/llvm-sys 211 = LLVM 21) que evoluciona en dos etapas:
 Los **métodos de string** de v0.3.0 ya están implementados (intérprete deduplicado
 + código compilado vía `desugaring`); se verifican y commitean en la Fase 0.
 
+Estado: Fase 0 ✅ completada. Fase 1 ✅ completada — `for` (intérprete: arrays y
+`range()`; compilado: solo `range(n)`/`range(a, b)`) + builtin `range()`, con la
+variable de bucle en su propio scope. Pendiente para más adelante: `for` sobre
+arrays en binarios compilados, que espera a que el modo compilado soporte arrays.
+
 La "stdlib extendida" genérica de v0.4.0 se absorbe más adelante con el toolkit
 de sistema de la Etapa 2 (evita duplicar trabajo).
 

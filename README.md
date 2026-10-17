@@ -57,33 +57,33 @@ Halo nace como un proyecto de aprendizaje práctico para desmitificar el proceso
 | **Comparaciones** | `<`, `>`, `==`, `!=`, `<=`, `>=` (incluso entre tipos mixtos) |
 | **Operadores lógicos** | `&&`, `||`, `!` con cortocircuito |
 | **Condicionales** | `if / else if / else` anidables |
-| **Bucles** | `while` con `break` y `continue` |
+| **Bucles** | `while` y `for … in range(...)` con `break` y `continue` |
 | **Funciones** | Definición sin keyword, parámetros, retorno, recursión |
 | **Scope aislado** | Cada llamada a función tiene su propio frame |
 | **Call-before-definition** | Puedes llamar una función antes de definirla |
 | **Recursión mutua** | `is_even` / `is_odd` y similares funcionan |
 | **Límite de recursión** | Guard contra stack overflow (500 niveles en producción) |
 | **Límite de iteraciones** | Guard contra bucles infinitos (1 000 000 iteraciones) |
-| **Funciones built-in** | `print`, `len`, `str`, `int`, `float`, `abs`, `type` + arrays (`push`, `pop`, `append`, `first`, `last`, `reverse`, `index_of`) |
+| **Funciones built-in** | `print`, `len`, `str`, `int`, `float`, `abs`, `type`, `range` + arrays (`push`, `pop`, `append`, `first`, `last`, `reverse`, `index_of`) |
 | **Protección de overflow** | Aritmética entera con checked operations |
 | **Intérprete tree-walking** | Ejecución directa del AST |
 | **Compilación nativa** | AST → LLVM IR → binario nativo vía clang o llc+cc |
 | **Optimización LLVM** | Niveles O0–O3 configurables |
 | **Lexer** | Escaneo lineal O(n), flotantes, strings con comillas simples/dobles y escapes |
 | **Parser** | Recursivo descendente, expresiones top-level directas |
-| **Suite de tests** | 750+ tests de integración y unitarios |
+| **Suite de tests** | 780+ tests de integración y unitarios |
 
 ### 🚧 En Progreso
 
 | Característica | Prioridad |
 |---|---|
 | Mensajes de error con número de línea y columna | Alta |
+| Iteración con `for` sobre arrays (intérprete completo; compilado solo `range()`) | Media |
 
 ### 📅 Planificado
 
 | Característica | Prioridad |
 |---|---|
-| Iteración con `for` | Alta |
 | Diccionarios / Maps | Media |
 | Toolkit de sistema (sh, archivos, entorno) | Media |
 | Comentarios multi-línea | Baja |
@@ -139,6 +139,11 @@ while i < 10 {
     print(i)
     i = i + 1
 }
+
+// o con `for` sobre un rango:
+for n in range(3) {
+    print(n)        // 0 1 2
+}
 ```
 
 ### Funciones
@@ -167,8 +172,9 @@ print(factorial(10))   // 3628800
 | `float(x)` | Convierte a flotante | `float(42)` → `42.0` |
 | `abs(x)` | Valor absoluto de number o float | `abs(-7)` → `7` |
 | `type(x)` | Nombre del tipo como string | `type(true)` → `"bool"` |
+| `range(n)` / `range(a, b)` | Array de enteros `[0..n-1]` o `[a..b-1]` | `range(3)` → `[0, 1, 2]` |
 
-Todos los built-ins aceptan exactamente **1 argumento** (salvo `print`). Pasar un número distinto produce un error de runtime.
+Todos los built-ins aceptan exactamente **1 argumento** (salvo `print` y `range`, que acepta 1 o 2). Pasar un número distinto produce un error de runtime.
 
 ---
 
@@ -502,7 +508,7 @@ halo/
 │   ├── common/
 │   │   └── mod.rs            # Helpers compartidos (eval_*, assert_*)
 │   ├── arithmetic_tests.rs   # Aritmética, floats, overflow, comparaciones
-│   ├── control_flow_tests.rs # if/else-if/else, while, break, continue, return
+│   ├── control_flow_tests.rs # if/else-if/else, while, for, range, break, continue, return
 │   ├── function_tests.rs     # Definición, llamada, recursión, scope, aridad
 │   ├── interpreter_tests.rs  # Tests end-to-end del intérprete
 │   ├── lexer_tests.rs        # Tokenización
@@ -702,8 +708,9 @@ cargo tarpaulin --out Html
 - [x] Arrays / Listas con indexación (`push`, `pop`, `append`, `first`, `last`, `reverse`, `index_of`…)
 - [x] Métodos de string (`upper`, `lower`, `trim`, `starts_with`, `ends_with`, `contains`, `index_of`…), en intérprete y binarios compilados
 - [x] Strings con comillas simples y dobles
+- [x] Iteración con `for` (`for x in range(...)`) + built-in `range()`
+- [ ] Iteración con `for` sobre arrays en modo compilado
 - [ ] Diccionarios / Maps
-- [ ] Iteración con `for`
 
 ### 🔮 v0.4.0 — Tooling
 
