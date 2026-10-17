@@ -252,6 +252,18 @@ pub enum Statement {
         body: Block,
         pos: Position,
     },
+    /// `for <var> in <iterable> { … }` — iterate an array or a `range()`.
+    ///
+    /// The loop variable is bound in a scope of its own: it shadows any
+    /// outer variable with the same name and does not exist after the loop.
+    /// Assignments inside the body still update variables defined outside
+    /// the loop (there is no separate declaration keyword in Halo).
+    For {
+        var: String,
+        iterable: Expression,
+        body: Block,
+        pos: Position,
+    },
     Return {
         value: Option<Expression>,
         pos: Position,
@@ -318,6 +330,18 @@ impl fmt::Display for Statement {
             }
             Statement::Break { .. } => write!(f, "break"),
             Statement::Continue { .. } => write!(f, "continue"),
+            Statement::For {
+                var,
+                iterable,
+                body,
+                ..
+            } => {
+                write!(f, "for {} in {} {{", var, iterable)?;
+                for stmt in &body.stmts {
+                    write!(f, " {}", stmt)?;
+                }
+                write!(f, " }}")
+            }
         }
     }
 }
@@ -330,6 +354,7 @@ impl Statement {
             Statement::VarDecl { pos, .. } => *pos,
             Statement::If { pos, .. } => *pos,
             Statement::While { pos, .. } => *pos,
+            Statement::For { pos, .. } => *pos,
             Statement::Return { pos, .. } => *pos,
             Statement::Break { pos } => *pos,
             Statement::Continue { pos } => *pos,

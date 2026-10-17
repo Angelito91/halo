@@ -674,7 +674,10 @@ fn stmt_has_string(stmt: &Statement) -> bool {
             false
         }
         Statement::While { cond, body, .. } => {
-            expr_has_string(cond) || body.stmts.iter().any(|s| stmt_has_string(s))
+            expr_has_string(cond) || body.stmts.iter().any(stmt_has_string)
+        }
+        Statement::For { iterable, body, .. } => {
+            expr_has_string(iterable) || body.stmts.iter().any(stmt_has_string)
         }
         Statement::Break { .. } | Statement::Continue { .. } => false,
     }
@@ -718,6 +721,14 @@ fn return_type_of_stmt(stmt: &Statement) -> Option<&'static str> {
             None
         }
         Statement::While { body, .. } => {
+            for s in &body.stmts {
+                if let Some(ty) = return_type_of_stmt(s) {
+                    return Some(ty);
+                }
+            }
+            None
+        }
+        Statement::For { body, .. } => {
             for s in &body.stmts {
                 if let Some(ty) = return_type_of_stmt(s) {
                     return Some(ty);

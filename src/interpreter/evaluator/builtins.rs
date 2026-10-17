@@ -42,6 +42,7 @@ pub fn try_eval_builtin(
         "type" => builtin_single_arg(evaluator, name, args, |v| {
             Ok(Value::String(v.type_name().to_string()))
         })?,
+        "range" => super::methods::builtin_range(evaluator, args)?,
         // Array methods that can also be called as functions
         "push" => super::methods::builtin_push(evaluator, args)?,
         "pop" => super::methods::builtin_pop(evaluator, args)?,

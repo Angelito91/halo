@@ -235,6 +235,9 @@ impl StyleChecker {
             Statement::While { body, .. } => {
                 self.check_nesting_depth(body, depth + 1);
             }
+            Statement::For { body, .. } => {
+                self.check_nesting_depth(body, depth + 1);
+            }
             _ => {}
         }
     }

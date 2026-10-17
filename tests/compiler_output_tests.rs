@@ -124,3 +124,47 @@ fn compiled_contains_should_report_false_when_substring_is_absent() {
     let stdout = compile_link_and_run("contains_false", code);
     assert_eq!(stdout, "not-there\n");
 }
+
+#[test]
+fn compiled_for_range_prints_every_iteration() {
+    let code = "for i in range(4) { print(i) }";
+    let stdout = compile_link_and_run("for_range", code);
+    assert_eq!(stdout, "0\n1\n2\n3\n");
+}
+
+#[test]
+fn compiled_for_range_with_start_and_end() {
+    let code = "for i in range(2, 4) { print(i) }";
+    let stdout = compile_link_and_run("for_range_ab", code);
+    assert_eq!(stdout, "2\n3\n");
+}
+
+#[test]
+fn compiled_for_break_exits_early() {
+    let code = "for i in range(100) {\nif i == 2 { break }\nprint(i)\n}";
+    let stdout = compile_link_and_run("for_break", code);
+    assert_eq!(stdout, "0\n1\n");
+}
+
+#[test]
+fn compiled_for_variable_shadows_an_outer_name_and_gives_it_back() {
+    // The loop variable is scoped to the loop in the interpreter; compiled
+    // mode must at least not clobber the outer binding (which here holds a
+    // string, a different type from the loop counter).
+    let code = "name = \"hi\"\nfor name in range(2) { print(name) }\nprint(name)";
+    let stdout = compile_link_and_run("for_shadow", code);
+    assert_eq!(stdout, "0\n1\nhi\n");
+}
+
+#[test]
+fn compiled_for_continue_skips_to_the_next_iteration() {
+    let code = "for i in range(5) {\nif i % 2 == 0 { continue }\nprint(i)\n}";
+    let stdout = compile_link_and_run("for_continue", code);
+    assert_eq!(stdout, "1\n3\n");
+}
+
+#[test]
+#[should_panic(expected = "not yet supported")]
+fn compiled_for_over_an_array_reports_a_clear_error() {
+    compile_link_and_run("for_array_err", "for x in [1, 2] { print(x) }");
+}

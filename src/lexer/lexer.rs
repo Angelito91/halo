@@ -78,6 +78,8 @@ impl Lexer {
             "if" => Some(TokenKind::If),
             "else" => Some(TokenKind::Else),
             "while" => Some(TokenKind::While),
+            "for" => Some(TokenKind::For),
+            "in" => Some(TokenKind::In),
             "return" => Some(TokenKind::Return),
             "true" => Some(TokenKind::True),
             "false" => Some(TokenKind::False),

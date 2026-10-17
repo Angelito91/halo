@@ -88,6 +88,7 @@ impl Parser {
             self.peek().kind,
             TokenKind::If
                 | TokenKind::While
+                | TokenKind::For
                 | TokenKind::Break
                 | TokenKind::Continue
                 | TokenKind::Return
@@ -258,6 +259,8 @@ impl Parser {
             self.parse_return_statement()
         } else if self.advance_if(TokenKind::While) {
             self.parse_while_statement()
+        } else if self.advance_if(TokenKind::For) {
+            self.parse_for_statement()
         } else if self.advance_if(TokenKind::Break) {
             Some(Statement::Break {
                 pos: self.previous().position,
@@ -344,6 +347,31 @@ impl Parser {
         let body = self.parse_block();
         self.consume(TokenKind::RightBrace, "Expected '}' after while body")?;
         Some(Statement::While { cond, body, pos })
+    }
+
+    /// `for <var> in <iterable> { … }`
+    fn parse_for_statement(&mut self) -> Option<Statement> {
+        let pos = self.previous().position;
+
+        let var = if self.check(TokenKind::Identifier) {
+            self.advance().lexeme.clone()
+        } else {
+            self.error("Expected loop variable after 'for'");
+            return None;
+        };
+
+        self.consume(TokenKind::In, "Expected 'in' after for variable")?;
+        let iterable = self.parse_expression()?;
+        self.consume(TokenKind::LeftBrace, "Expected '{' after for iterable")?;
+        let body = self.parse_block();
+        self.consume(TokenKind::RightBrace, "Expected '}' after for body")?;
+
+        Some(Statement::For {
+            var,
+            iterable,
+            body,
+            pos,
+        })
     }
 
     fn parse_return_statement(&mut self) -> Option<Statement> {

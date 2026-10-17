@@ -64,6 +64,10 @@ pub trait ASTVisitor {
                 self.visit_expression(cond);
                 self.visit_block(body);
             }
+            Statement::For { iterable, body, .. } => {
+                self.visit_expression(iterable);
+                self.visit_block(body);
+            }
             Statement::Return { value, .. } => {
                 if let Some(e) = value {
                     self.visit_expression(e);

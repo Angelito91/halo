@@ -1090,3 +1090,60 @@ while i < 10 {
     // Regardless, parsing must succeed.
     assert!(!prog.items.is_empty());
 }
+
+// ── For statement ─────────────────────────────────────────────────────────────
+
+#[test]
+fn test_top_level_for_is_stmt_variant() {
+    let prog = parse_ok("for i in range(3) { }");
+    assert!(
+        matches!(
+            &prog.items[0],
+            TopLevel::Stmt {
+                stmt: Statement::For { .. },
+                ..
+            }
+        ),
+        "expected TopLevel::Stmt(For), got {:?}",
+        prog.items[0]
+    );
+}
+
+#[test]
+fn test_for_statement_structure() {
+    let prog = parse_ok("for n in items { x = n }");
+    match &prog.items[0] {
+        TopLevel::Stmt {
+            stmt: Statement::For { var, iterable, .. },
+            ..
+        } => {
+            assert_eq!(var, "n");
+            assert!(
+                matches!(iterable, Expression::Var(name, _) if name == "items"),
+                "expected iterable Var(items), got {:?}",
+                iterable
+            );
+        }
+        other => panic!("expected Statement::For, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_for_requires_in_keyword() {
+    let errs = parse("for i range(3) { }").unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.contains("Expected 'in'")),
+        "expected an 'Expected in' error, got {:?}",
+        errs
+    );
+}
+
+#[test]
+fn test_for_requires_variable_name() {
+    let errs = parse("for in range(3) { }").unwrap_err();
+    assert!(
+        errs.iter().any(|e| e.contains("Expected loop variable")),
+        "expected a 'loop variable' error, got {:?}",
+        errs
+    );
+}

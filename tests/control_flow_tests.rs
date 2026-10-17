@@ -645,3 +645,124 @@ fn test_if_missing_brace_errors() {
 fn test_while_missing_brace_errors() {
     assert_parse_error("while true x = x + 1", "Expected '{'");
 }
+
+// ── for / range ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_for_range_sums_first_count_numbers() {
+    let code = "
+total = 0
+for i in range(4) {
+    total = total + i
+}
+";
+    assert_eq!(eval_var(code, "total"), Value::Number(6));
+}
+
+#[test]
+fn test_for_range_with_start_and_end() {
+    let code = "
+total = 0
+for i in range(2, 5) {
+    total = total + i
+}
+";
+    assert_eq!(eval_var(code, "total"), Value::Number(9));
+}
+
+#[test]
+fn test_for_iterates_an_array_literal() {
+    let code = "
+total = 0
+for x in [10, 20, 30] {
+    total = total + x
+}
+";
+    assert_eq!(eval_var(code, "total"), Value::Number(60));
+}
+
+#[test]
+fn test_for_break_exits_early() {
+    let code = "
+total = 0
+for i in range(100) {
+    if i == 2 { break }
+    total = total + i
+}
+";
+    assert_eq!(eval_var(code, "total"), Value::Number(1));
+}
+
+#[test]
+fn test_for_continue_skips_current_item() {
+    // Sum 0..4, skipping odd values: 0+2+4 = 6.
+    let code = "
+total = 0
+for i in range(5) {
+    if i % 2 == 1 { continue }
+    total = total + i
+}
+";
+    assert_eq!(eval_var(code, "total"), Value::Number(6));
+}
+
+#[test]
+fn test_for_over_empty_range_runs_never() {
+    let code = "
+total = 0
+for i in range(0) {
+    total = total + 1
+}
+";
+    assert_eq!(eval_var(code, "total"), Value::Number(0));
+}
+
+#[test]
+fn test_for_loop_variable_is_scoped_to_the_loop() {
+    let code = "
+for i in range(3) { }
+result = i
+";
+    assert_runtime_error(code, "Undefined variable");
+}
+
+#[test]
+fn test_for_over_a_non_iterable_is_a_runtime_error() {
+    assert_runtime_error("for i in 42 { }", "expects an array");
+}
+
+#[test]
+fn test_for_loop_variable_shadows_outer_name() {
+    let code = "
+i = 100
+total = 0
+for i in range(3) {
+    total = total + i
+}
+";
+    assert_eq!(eval_var(code, "i"), Value::Number(100));
+    assert_eq!(eval_var(code, "total"), Value::Number(3));
+}
+
+#[test]
+fn test_range_builtin_can_be_assigned_and_indexed() {
+    let code = "
+seq = range(3)
+result = seq[2]
+";
+    assert_eq!(eval_var(code, "result"), Value::Number(2));
+}
+
+#[test]
+fn test_for_nested_arrays_accumulate_correctly() {
+    let code = "
+grid = [[1, 2], [3, 4]]
+total = 0
+for row in grid {
+    for cell in row {
+        total = total + cell
+    }
+}
+";
+    assert_eq!(eval_var(code, "total"), Value::Number(10));
+}

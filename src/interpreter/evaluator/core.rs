@@ -75,6 +75,12 @@ pub struct Evaluator {
     pub return_value: Option<Value>,
     /// Pending `break` or `continue` signal, cleared by the enclosing loop.
     pub loop_signal: Option<LoopSignal>,
+    /// How many `for` bodies are currently being executed. Inside a `for`
+    /// body, assignments update the nearest existing binding instead of
+    /// declaring a loop-scoped shadow, so accumulators keep working while
+    /// the loop variable itself stays scoped to the loop. Reset to 0 when
+    /// entering a function frame.
+    pub loop_scope_depth: usize,
     /// How many user-function frames are currently on the call stack.
     pub recursion_depth: usize,
     /// Total loop iterations executed in the current program run.
@@ -93,6 +99,7 @@ impl Evaluator {
             functions: HashMap::new(),
             return_value: None,
             loop_signal: None,
+            loop_scope_depth: 0,
             recursion_depth: 0,
             loop_iterations: 0,
             all_variables: Vec::new(),
@@ -245,7 +252,15 @@ impl Evaluator {
                     .map(|expr| self.eval_expr(expr))
                     .transpose()?
                     .unwrap_or(Value::Null);
-                self.env.set(name.clone(), value);
+                if self.loop_scope_depth > 0 {
+                    // Inside a `for` body, an assignment to an existing name
+                    // targets that binding (even outside the loop scope);
+                    // a brand-new name lands in the loop scope and disappears
+                    // once the loop ends.
+                    self.env.update(name, value)?;
+                } else {
+                    self.env.set(name.clone(), value);
+                }
                 Ok(Value::Null)
             }
 
@@ -300,6 +315,64 @@ impl Evaluator {
                         None => {}
                     }
                 }
+                Ok(Value::Null)
+            }
+
+            Statement::For {
+                var,
+                iterable,
+                body,
+                ..
+            } => {
+                // The iterable is evaluated exactly once, before the first
+                // iteration.
+                let iterable_value = self.eval_expr(iterable)?;
+                let items = match iterable_value {
+                    Value::Array(items) => items,
+                    other => {
+                        return Err(format!(
+                            "for expects an array to iterate, got '{}'",
+                            other.type_name()
+                        ))
+                    }
+                };
+
+                // The loop variable lives in a scope of its own: it shadows
+                // any outer binding of the same name and is gone afterwards.
+                self.env.push_scope();
+                self.loop_scope_depth += 1;
+
+                let mut loop_result = Ok(());
+                for item in items {
+                    self.loop_iterations += 1;
+                    if self.loop_iterations > MAX_LOOP_ITERATIONS {
+                        loop_result = Err(format!(
+                            "Loop iteration limit exceeded ({})",
+                            MAX_LOOP_ITERATIONS
+                        ));
+                        break;
+                    }
+
+                    self.env.set(var.clone(), item);
+                    if let Err(e) = self.eval_block(body) {
+                        loop_result = Err(e);
+                        break;
+                    }
+
+                    if self.return_value.is_some() {
+                        break;
+                    }
+
+                    match self.loop_signal.take() {
+                        Some(LoopSignal::Break) => break,
+                        Some(LoopSignal::Continue) => continue,
+                        None => {}
+                    }
+                }
+
+                self.loop_scope_depth -= 1;
+                self.env.pop_scope();
+                loop_result?;
                 Ok(Value::Null)
             }
 
@@ -655,7 +728,12 @@ impl Evaluator {
 
         // Execute the body, then tear down the scope regardless of outcome.
         self.return_value = None;
+        // A function frame starts a fresh declaration regime: assignments
+        // inside it declare function-locals instead of updating outer scopes.
+        let outer_loop_depth = self.loop_scope_depth;
+        self.loop_scope_depth = 0;
         let body_result = self.eval_block(body);
+        self.loop_scope_depth = outer_loop_depth;
         self.env.pop_scope();
 
         // Pop function name from call stack

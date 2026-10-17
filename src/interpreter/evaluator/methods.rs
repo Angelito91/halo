@@ -8,6 +8,54 @@ use super::super::value::Value;
 use super::core::Evaluator;
 use crate::parser::ast::Expression;
 
+/// Maximum number of elements `range()` will materialise.
+///
+/// Mirrors the interpreter's loop guard so that a runaway `range()` fails
+/// loudly instead of exhausting memory.
+const MAX_RANGE_LENGTH: i64 = 1_000_000;
+
+/// `range(end)` → `[0, 1, …, end-1]` and `range(start, end)` →
+/// `[start, …, end-1]`.
+///
+/// Both bounds must be integers. `end <= start` yields an empty array; Halo
+/// has no negative steps yet.
+pub fn builtin_range(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+    if args.is_empty() || args.len() > 2 {
+        return Err(format!(
+            "range() expects 1 or 2 arguments, got {}",
+            args.len()
+        ));
+    }
+
+    let mut bounds = Vec::with_capacity(args.len());
+    for arg in args {
+        match evaluator.eval_expr(arg)? {
+            Value::Number(n) => bounds.push(n),
+            other => {
+                return Err(format!(
+                    "range() expects integer arguments, got '{}'",
+                    other.type_name()
+                ))
+            }
+        }
+    }
+
+    let (start, end) = match bounds.as_slice() {
+        [end] => (0, *end),
+        [start, end] => (*start, *end),
+        _ => unreachable!("range() arity checked above"),
+    };
+
+    let length = end.saturating_sub(start);
+    if length > MAX_RANGE_LENGTH {
+        return Err(format!(
+            "range({start}, {end}) produces {length} elements, above the limit of {MAX_RANGE_LENGTH}"
+        ));
+    }
+
+    Ok(Value::Array((start..end).map(Value::Number).collect()))
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Helper functions for reducing code duplication
 // ──────────────────────────────────────────────────────────────────────────────

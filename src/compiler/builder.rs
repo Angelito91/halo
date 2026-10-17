@@ -59,6 +59,15 @@ impl<'ctx> IRBuilder<'ctx> {
         self.allocas.get(name).copied()
     }
 
+    /// Forget the slot registered for `name`.
+    ///
+    /// Used by constructs that introduce a temporary binding — a `for` loop
+    /// variable, for instance — so the name can go back to meaning whatever
+    /// it meant before (or to nothing at all).
+    pub fn remove_slot(&mut self, name: &str) {
+        self.allocas.remove(name);
+    }
+
     /// Emit a `store` of `value` into the alloca for `name`.
     /// Returns an error if the variable has not been declared.
     #[allow(dead_code)] // PLANNED FOR v0.3.0: Variable storage

@@ -898,3 +898,13 @@ fn test_exclamation_alone_is_not() {
     assert_eq!(ks[0], TokenKind::Not);
     assert_eq!(ks[1], TokenKind::Identifier);
 }
+
+#[test]
+fn test_keyword_for() {
+    assert_eq!(single("for").kind, TokenKind::For);
+}
+
+#[test]
+fn test_keyword_in() {
+    assert_eq!(single("in").kind, TokenKind::In);
+}

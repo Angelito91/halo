@@ -19,6 +19,7 @@
 pub mod break_stmt;
 pub mod continue_stmt;
 pub mod expr_stmt;
+pub mod for_loop;
 pub mod if_stmt;
 pub mod return_stmt;
 pub mod var_decl;
@@ -59,6 +60,12 @@ pub fn emit_statement<'ctx>(
         Statement::While { cond, body, .. } => {
             while_loop::emit_while_loop(gen, function, fn_name, cond, body)
         }
+        Statement::For {
+            var,
+            iterable,
+            body,
+            ..
+        } => for_loop::emit_for_loop(gen, function, var, iterable, body),
         Statement::Break { .. } => break_stmt::emit_break(gen),
         Statement::Continue { .. } => continue_stmt::emit_continue(gen),
         Statement::Return { value, .. } => return_stmt::emit_return(gen, value, fn_name),
