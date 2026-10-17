@@ -214,9 +214,11 @@ Módulo nuevo, sin dependencias de LLVM ni del intérprete:
 - `lang/errors.rs`: tabla única de mensajes de runtime (hoy dispersos);
   P2 hará que ambos backends la usen.
 
-**Criterio de aceptación:** existe el módulo, ambos backends consultan el
-catálogo en al menos un punto (p. ej. validación de aridad / lista de métodos
-conocidos) sin cambiar ninguna salida.
+**Criterio de aceptación:** existe el módulo y el **arnés de R0.0 y los tests
+lo consumen como fuente única de verdad** (comparan el catálogo contra el
+comportamiento observado de ambos modos). Los backends lo consumirán de verdad
+en P1/P2, que es cuando su comportamiento *debe* cambiar; en R0 solo se
+consume desde tests y documentación, para no alterar ninguna salida.
 
 ### 4.4 R0.2 — Partir el intérprete
 
