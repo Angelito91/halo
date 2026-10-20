@@ -15,7 +15,6 @@ pub struct Position {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<Statement>,
-    #[allow(dead_code)]
     pub pos: Position,
 }
 
@@ -77,7 +76,6 @@ impl fmt::Display for BinOp {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum Expression {
     Number(i64, Position),
     Float(f64, Position),
@@ -228,7 +226,6 @@ pub struct ElseIfBranch {
     pub cond: Expression,
     pub body: Block,
     /// Source position of the `else if` keyword (retained for future tooling).
-    #[allow(dead_code)]
     pub pos: Position,
 }
 
@@ -347,7 +344,6 @@ impl fmt::Display for Statement {
 }
 
 impl Statement {
-    #[allow(dead_code)]
     pub fn pos(&self) -> Position {
         match self {
             Statement::Expr(e) => e.pos(),
@@ -381,7 +377,6 @@ pub enum TopLevel {
 }
 
 impl TopLevel {
-    #[allow(dead_code)]
     pub fn pos(&self) -> Position {
         match self {
             TopLevel::Function { pos, .. } => *pos,

@@ -21,7 +21,6 @@ pub mod run;
 pub mod tokens;
 
 pub use args::{parse_args, Subcommand};
-#[allow(unused_imports)]
 pub use {
     ast::cmd_ast, build::cmd_build, check::cmd_check, llvm::cmd_llvm, run::cmd_run,
     tokens::cmd_tokens,

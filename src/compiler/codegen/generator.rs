@@ -7,9 +7,7 @@
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::passes::PassBuilderOptions;
-use inkwell::targets::{
-    CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
-};
+use inkwell::targets::{CodeModel, InitializationConfig, RelocMode, Target, TargetMachine};
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, FunctionValue, GlobalValue};
 use std::collections::HashMap;
@@ -195,54 +193,14 @@ impl<'ctx> CodeGenerator<'ctx> {
         Ok(())
     }
 
-    /// Write LLVM IR text to a `.ll` file.
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: LLVM IR file emission
-    pub fn emit_llvm(&self, filename: &str) -> Result<(), String> {
-        self.module
-            .print_to_file(filename)
-            .map_err(|e| format!("Failed to write LLVM IR: {}", e))
-    }
 
-    /// Compile directly to a native object file (bypasses clang).
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Direct object file emission
-    pub fn emit_object(&self, filename: &str) -> Result<(), String> {
-        Target::initialize_native(&InitializationConfig::default())
-            .map_err(|e| format!("Failed to initialise native target: {}", e))?;
-
-        let triple = TargetMachine::get_default_triple();
-        let target = Target::from_triple(&triple)
-            .map_err(|e| format!("Failed to get target from triple: {}", e))?;
-
-        let machine = target
-            .create_target_machine(
-                &triple,
-                "generic",
-                "",
-                inkwell::OptimizationLevel::Default,
-                RelocMode::Default,
-                CodeModel::Default,
-            )
-            .ok_or("Failed to create TargetMachine for object emission")?;
-
-        machine
-            .write_to_file(
-                self.module,
-                FileType::Object,
-                std::path::Path::new(filename),
-            )
-            .map_err(|e| format!("Failed to write object file: {}", e))?;
-
-        Ok(())
-    }
 
     /// Print LLVM IR to stdout (useful for debugging).
-    #[allow(dead_code)]
     pub fn print_ir(&self) {
         println!("{}", self.module.print_to_string().to_string());
     }
 
     /// Access the underlying LLVM module.
-    #[allow(dead_code)]
     pub fn get_module(&self) -> &'ctx Module<'ctx> {
         self.module
     }

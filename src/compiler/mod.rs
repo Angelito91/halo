@@ -100,20 +100,7 @@ impl Compilation {
             .map_err(|e| format!("Failed to write LLVM IR: {}", e))
     }
 
-    /// Emit a native object file directly (no clang needed for this step).
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Native object file emission
-    pub fn emit_object(&mut self, filename: &str) -> Result<(), String> {
-        self.codegen().emit_object(filename)
-    }
 
-    /// Print the LLVM IR to stdout.
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Debug LLVM IR output
-    pub fn print_ir(&self) {
-        println!(
-            "{}",
-            self.module.as_ref().unwrap().print_to_string().to_string()
-        );
-    }
 }
 
 impl Drop for Compilation {

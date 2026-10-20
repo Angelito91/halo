@@ -7,7 +7,6 @@
 use super::ErrorCode;
 
 impl ErrorCode {
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error code mapping
     pub fn code(&self) -> &'static str {
         match self {
             ErrorCode::ExpectedCloseParen => "E001",

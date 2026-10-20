@@ -7,7 +7,6 @@
 use super::{ErrorCategory, ErrorCode, ErrorSeverity};
 
 impl ErrorCode {
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error categorization
     pub fn category(&self) -> ErrorCategory {
         match self {
             ErrorCode::ExpectedCloseParen
@@ -56,7 +55,6 @@ impl ErrorCode {
         }
     }
 
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error severity
     pub fn severity(&self) -> ErrorSeverity {
         match self.category() {
             ErrorCategory::Warning => ErrorSeverity::Warning,
@@ -64,12 +62,10 @@ impl ErrorCode {
         }
     }
 
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Warning detection
     pub fn is_warning(&self) -> bool {
         self.severity() == ErrorSeverity::Warning
     }
 
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error detection
     pub fn is_error(&self) -> bool {
         self.severity() == ErrorSeverity::Error
     }

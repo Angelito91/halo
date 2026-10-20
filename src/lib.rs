@@ -4,6 +4,7 @@
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
+pub mod cli;
 pub mod compiler;
 pub mod diagnostics;
 pub mod interpreter;
@@ -17,7 +18,4 @@ pub use diagnostics::colors;
 pub use interpreter::Evaluator;
 pub use lexer::Lexer;
 pub use parser::Parser;
-pub use utils::{
-    find_suggestions, find_suggestions_adaptive, find_suggestions_smart, CompilationStatistics,
-    Suggestion, Timer,
-};
+pub use utils::{find_suggestions, find_suggestions_adaptive, find_suggestions_smart, Suggestion};

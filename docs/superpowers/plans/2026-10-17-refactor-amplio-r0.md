@@ -72,7 +72,7 @@ Riesgos que el spec implica y que ningún test de las tareas cubre por sí solo:
   - `pub fn compare(id: &str, code: &str, table: &[KnownDivergence]) -> Result<(), String>`
   - `pub fn assert_parity(id: &str, code: &str)`
 
-- [ ] **Step 1: Escribir los tests que fallan (el arnés aún no existe)**
+- [x] **Step 1: Escribir los tests que fallan (el arnés aún no existe)**
 
 `tests/common/mod.rs`, añadir al final de las declaraciones de módulo (arriba del archivo, junto a los `use`):
 
@@ -172,12 +172,12 @@ fn harness_reports_parity_for_an_agreeing_case() {
 #[test] fn case_println_builtin() { parity::assert_parity("println_builtin", "println(\"hola\")"); }
 ```
 
-- [ ] **Step 2: Ejecutar y ver el rojo esperado**
+- [x] **Step 2: Ejecutar y ver el rojo esperado**
 
 Run: `cargo test --test parity_freeze_tests 2>&1 | tail -20`
 Expected: los tests fallan con `not implemented` (`unimplemented!()`) — el arnés no existe todavía.
 
-- [ ] **Step 3: Implementar el arnés**
+- [x] **Step 3: Implementar el arnés**
 
 Reemplazar el cuerpo de `tests/common/parity.rs`:
 
@@ -436,7 +436,7 @@ pub fn assert_parity(id: &str, code: &str) {
 }
 ```
 
-- [ ] **Step 4: Ejecutar y ver el verde**
+- [x] **Step 4: Ejecutar y ver el verde**
 
 Run: `cargo test --test parity_freeze_tests`
 Expected: PASS (38 tests: 34 del corpus + 4 del arnés). La primera ejecución compila 33 binarios con clang (~30 s); las siguientes salen de caché.
@@ -444,7 +444,7 @@ Expected: PASS (38 tests: 34 del corpus + 4 del arnés). La primera ejecución c
 Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print p, f}'`
 Expected: `822 0` (baseline 784 + 38 pruebas nuevas de este archivo).
 
-- [ ] **Step 5: Probar que el arnés no miente (mutación temporal)**
+- [x] **Step 5: Probar que el arnés no miente (mutación temporal)**
 
 Añadir temporalmente al corpus una prueba con una divergencia no declarada:
 
@@ -455,7 +455,7 @@ Añadir temporalmente al corpus una prueba con una divergencia no declarada:
 Run: `cargo test --test parity_freeze_tests tmp_mutation_probe`
 Expected: FALLA con `undocumented divergence for 'tmp_new_divergence'`. **Quitar la prueba temporal** y volver a ejecutar para confirmar verde.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/common/mod.rs tests/common/parity.rs tests/parity_freeze_tests.rs
@@ -482,7 +482,7 @@ declared one that stops diverging fails too. Corpus of 34 measured cases."
   - `lang::format::{format_bool, format_number, format_float, format_null, TYPE_NAMES}` (reglas del intérprete, canónicas)
   - `lang::errors::{DIVISION_BY_ZERO, INTEGER_OVERFLOW, NEGATIVE_INDEX, UNDEFINED_VARIABLE, UNDEFINED_FUNCTION}` (constantes `&str`)
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 `tests/lang_catalog_tests.rs` (nuevo):
 
@@ -545,12 +545,12 @@ fn catalog_matches_observed_behavior() {
 }
 ```
 
-- [ ] **Step 2: Ejecutar y ver el rojo esperado**
+- [x] **Step 2: Ejecutar y ver el rojo esperado**
 
 Run: `cargo test --test lang_catalog_tests 2>&1 | head -20`
 Expected: FAIL — `unresolved import halo::lang` / `unresolved import common::parity` (el módulo no existe).
 
-- [ ] **Step 3: Implementar `src/lang/`**
+- [x] **Step 3: Implementar `src/lang/`**
 
 `src/lib.rs`: añadir junto a los otros módulos:
 
@@ -715,7 +715,7 @@ pub const UNDEFINED_VARIABLE: &str = "Undefined variable:";
 pub const UNDEFINED_FUNCTION: &str = "Undefined function:";
 ```
 
-- [ ] **Step 4: Ejecutar y ver el verde**
+- [x] **Step 4: Ejecutar y ver el verde**
 
 Run: `cargo test --test lang_catalog_tests`
 Expected: PASS (3 tests).
@@ -723,12 +723,12 @@ Expected: PASS (3 tests).
 Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print p, f}'`
 Expected: sin fallos; el total sube en 3 (de 822 a 825).
 
-- [ ] **Step 5: Verificar que no cambió nada observable**
+- [x] **Step 5: Verificar que no cambió nada observable**
 
 Run: `cargo test 2>&1 | grep -cE "^test result: ok"`
 Expected: todas las suites `ok` (ninguna `FAILED`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib.rs src/lang tests/lang_catalog_tests.rs
@@ -753,12 +753,12 @@ catalog against observed behavior in both modes."
 - Consumes: nada nuevo.
 - Produces (visible para Task 4): `Evaluator` conserva sus campos `pub` y los métodos siguen siendo accesibles desde los submódulos (`pub(crate)` como mínimo: `eval_stmt`, `eval_expr`, `eval_call`, `eval_args`).
 
-- [ ] **Step 1: Línea base**
+- [x] **Step 1: Línea base**
 
 Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print p, f}'`
 Expected: `825 0` (el número exacto tras Task 2). Anotarlo.
 
-- [ ] **Step 2: Mover funciones a los submódulos**
+- [x] **Step 2: Mover funciones a los submódulos**
 
 `src/interpreter/evaluator/statements.rs` (nuevo) recibe, como `impl Evaluator { … }`:
 `eval_program`, `eval_block`, `eval_stmt`, y la constante `MAX_LOOP_ITERATIONS` (hoy privada en `core.rs`; pasa a `pub(crate)`).
@@ -779,7 +779,7 @@ use crate::interpreter::value::Value;
 
 `core.rs` conserva: el `struct Evaluator` con sus campos, `impl Default`, `Evaluator::new`, y las declaraciones `mod`/`pub use` que enlazan los submódulos.
 
-- [ ] **Step 3: Ajustar el árbol de módulos**
+- [x] **Step 3: Ajustar el árbol de módulos**
 
 `src/interpreter/evaluator/mod.rs`: declarar los submódulos y reexportar lo que era público:
 
@@ -793,12 +793,12 @@ pub use core::Evaluator;
 pub use statements::MAX_LOOP_ITERATIONS;  // solo si hace falta fuera
 ```
 
-- [ ] **Step 4: Compilar y arreglar visibilidad**
+- [x] **Step 4: Compilar y arreglar visibilidad**
 
 Run: `cargo build 2>&1 | grep -E "^(error|warning)" | head -30`
 Expected: 0 errores, 0 warnings. Si aparece `private` en un método llamado desde otro submódulo, subirlo a `pub(crate)` **sin cambiar la lógica**.
 
-- [ ] **Step 5: Verificar que la red sigue verde y el total es idéntico**
+- [x] **Step 5: Verificar que la red sigue verde y el total es idéntico**
 
 Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print p, f}'`
 Expected: exactamente el mismo total que Step 1, con `0` fallos.
@@ -806,7 +806,7 @@ Expected: exactamente el mismo total que Step 1, con `0` fallos.
 Run: `cargo test --test parity_freeze_tests`
 Expected: PASS (el corpus no cambia).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/interpreter/evaluator
@@ -830,7 +830,7 @@ No behavior change."
 - Consumes: `Evaluator` (Task 3).
 - Produces: `methods::try_eval_method_call` y los `builtin_*` siguen en la misma ruta pública (`super::methods::builtin_range` etc. ya usados por `builtins.rs`).
 
-- [ ] **Step 1: Mover**
+- [x] **Step 1: Mover**
 
 `methods/arrays.rs` recibe: `builtin_range`, `builtin_push`, `builtin_pop`, `builtin_append`, `builtin_first`, `builtin_last`, `builtin_reverse`, `builtin_join`, `builtin_sort`.
 
@@ -846,7 +846,7 @@ pub use arrays::*;
 pub use strings::*;
 ```
 
-- [ ] **Step 2: Verificar**
+- [x] **Step 2: Verificar**
 
 Run: `cargo build 2>&1 | grep -cE "^(error|warning)"`
 Expected: `0`.
@@ -854,7 +854,7 @@ Expected: `0`.
 Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print p, f}'`
 Expected: mismo total que Task 3, `0` fallos.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A src/interpreter/evaluator
@@ -877,7 +877,7 @@ mod.rs; no behavior change."
 - Consumes: nada nuevo.
 - Produces: `builtins::strings::{emit_upper, emit_lower, emit_trim, emit_starts_with, emit_ends_with, emit_contains, emit_index_of, emit_reverse, emit_substr, emit_replace}` con firmas idénticas (`&mut CodeGenerator<'ctx>`, `&[Expression]`) → `Result<BasicValueEnum<'ctx>, String>`.
 
-- [ ] **Step 1: Mover**
+- [x] **Step 1: Mover**
 
 `strings/helpers.rs` recibe: la macro `b!` (hoy `strings.rs:8`), `get_fn`, `get_strlen`, `get_malloc`, `get_memcpy`, `get_strcpy`, `get_toupper`, `get_tolower`, `get_isspace`, `get_strstr`, `get_strcmp`, `get_strncmp`, `expect_string`, `ptr_off`, `load_u8`, `store_u8`, `call_strlen`, `call_malloc`, `call_libc1`. Como la macro se usa en otros submódulos, declararla con `macro_rules!` y `pub(crate) use`:
 
@@ -908,7 +908,7 @@ pub use substr::*;
 pub use trim::*;
 ```
 
-- [ ] **Step 2: Verificar que las salidas no cambian**
+- [x] **Step 2: Verificar que las salidas no cambian**
 
 Run: `cargo build 2>&1 | grep -cE "^(error|warning)"`
 Expected: `0`.
@@ -919,7 +919,7 @@ Expected: PASS en ambos (los string methods compilados siguen imprimiendo igual)
 Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print p, f}'`
 Expected: mismo total que Task 4, `0` fallos (esto compila **todas** las suites de integración, no solo las dos de arriba).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A src/compiler/codegen/builtins
@@ -942,7 +942,7 @@ behavior change."
 - Consumes: nada nuevo.
 - Produces: `CodeGenerator` conserva su API pública (`new`, `compile`, `optimise`, `emit_llvm`, `emit_object`, `print_ir`, `get_module`, `generate_block`, `coerce_to_storage`, `coerce_to_bool`).
 
-- [ ] **Step 1: Mover**
+- [x] **Step 1: Mover**
 
 `codegen/module.rs` recibe, todas como métodos de `impl CodeGenerator`: `generate_main`, `declare_printf`, `declare_string_runtime`, `declare_function`, `generate_function`, `generate_global_var`, `generate_global_var_typed`, `generate_const_expr`, `generate_block`, `generate_statement`.
 
@@ -950,7 +950,7 @@ behavior change."
 
 `generator.rs` conserva: `struct CodeGenerator`, campos, `new`, `compile`, `optimise`, `emit_llvm`, `emit_object`, `print_ir`, `get_module`, `coerce_to_storage`, `coerce_to_bool`.
 
-- [ ] **Step 2: Verificar**
+- [x] **Step 2: Verificar**
 
 Run: `cargo build 2>&1 | grep -cE "^(error|warning)"`
 Expected: `0`.
@@ -961,7 +961,7 @@ Expected: PASS.
 Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print p, f}'`
 Expected: mismo total que Task 5, `0` fallos (compila todas las suites de integración).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/compiler/codegen
@@ -985,7 +985,7 @@ codegen/functions.rs. No behavior change."
 - Consumes: nada nuevo.
 - Produces: `Parser` conserva `new` y `parse`; el resto pasan a ser `pub(crate)`.
 
-- [ ] **Step 1: Mover**
+- [x] **Step 1: Mover**
 
 `parser/core.rs`: `struct Parser`, `new`, `parse`, `parse_program`, y los helpers de cursor: `consume`, `advance_if`, `check`, `advance`, `skip_newlines`, `is_at_end`, `peek`, `previous`, `error`.
 
@@ -1008,7 +1008,7 @@ pub use core::Parser;
 
 Los submódulos se importan entre sí con `use super::Parser;` (los campos de `Parser` ya son privados al módulo padre: ponerlos `pub(crate)` si hace falta).
 
-- [ ] **Step 2: Verificar (incluye orden de tokens/items, Review Focus #1)**
+- [x] **Step 2: Verificar (incluye orden de tokens/items, Review Focus #1)**
 
 Crear primero el test que fija la salida de los subcomandos que dependen del parser, `tests/cli_output_tests.rs`:
 
@@ -1057,7 +1057,7 @@ Expected: PASS.
 Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print p, f}'`
 Expected: mismo total que Task 6 **más 2** (los dos tests nuevos de la CLI), `0` fallos.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A src/parser tests/cli_output_tests.rs
@@ -1080,7 +1080,7 @@ test pinning tokens/ast output so the split cannot change token or item order."
 - Consumes: nada nuevo.
 - Produces: `cli::{run::cmd_run, build::cmd_build, check::cmd_check, tokens::cmd_tokens, ast::cmd_ast, llvm::cmd_llvm}` con las mismas firmas `fn(args: &Args) -> i32`; `cli::helpers::{link_with_clang, link_with_llc, toplevel_kind}`.
 
-- [ ] **Step 1: Mover y comprobar la salida de los subcomandos**
+- [x] **Step 1: Mover y comprobar la salida de los subcomandos**
 
 Mover `cmd_run`→`run.rs`, `cmd_build`+`link_with_clang`+`link_with_llc`→`build.rs` (los dos `link_*` van a `helpers.rs`, `build.rs` los importa), `cmd_check`→`check.rs`, `cmd_tokens`→`tokens.rs`, `cmd_ast`+`toplevel_kind`→`ast.rs`, `cmd_llvm`→`llvm.rs`.
 
@@ -1116,7 +1116,7 @@ fn check_subcommand_is_stable() {
 
 Run: `cargo test --test cli_output_tests` (antes de mover) → Expected: PASS. Ejecutarlo otra vez **después** de mover: mismo resultado.
 
-- [ ] **Step 2: Verificar**
+- [x] **Step 2: Verificar**
 
 Run: `cargo build 2>&1 | grep -cE "^(error|warning)"`
 Expected: `0`.
@@ -1124,7 +1124,7 @@ Expected: `0`.
 Run: `cargo test --test cli_output_tests --test parity_freeze_tests`
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A src/cli tests/cli_output_tests.rs
@@ -1147,7 +1147,7 @@ CLI output tests to run/check so the split cannot change their output."
 - Consumes: nada nuevo.
 - Produces: `diagnostics::error_codes::{ErrorCode, ErrorCategory, ErrorSeverity}` exactamente como hoy (+ los métodos `code`, `description`, `suggestions`, `category`, `severity`, `is_warning`, `is_error`).
 
-- [ ] **Step 1: Mover respetando los límites de Rust**
+- [x] **Step 1: Mover respetando los límites de Rust**
 
 Un `enum` no se puede repartir entre archivos, así que el corte es **por método** (cada `impl ErrorCode` va en su archivo):
 
@@ -1169,7 +1169,7 @@ pub use category::*;
 
 Mover cada `match` **verbatim** (las armas son exhaustivas y no deben tocarse).
 
-- [ ] **Step 2: Verificar**
+- [x] **Step 2: Verificar**
 
 Run: `cargo build 2>&1 | grep -cE "^(error|warning)"`
 Expected: `0`.
@@ -1177,7 +1177,7 @@ Expected: `0`.
 Run: `cargo test --test error_codes_tests --test style_checker_tests`
 Expected: PASS con los mismos textos de diagnóstico.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A src/diagnostics
@@ -1199,7 +1199,7 @@ Each match moves verbatim; no diagnostic text changes."
 - Consumes: todo lo anterior.
 - Produces: nada nuevo.
 
-- [ ] **Step 1: Inventariar el código muerto con evidencia**
+- [x] **Step 1: Inventariar el código muerto con evidencia**
 
 Run:
 ```bash
@@ -1217,7 +1217,7 @@ grep -rn "IDENT" src/ tests/ | grep -v "fn IDENT" | grep -v "PLANNED FOR"
 # 2) si sale vacío → borrar la definición; si sale algo → quitar solo el atributo
 ```
 
-- [ ] **Step 2: Verificar tras la poda**
+- [x] **Step 2: Verificar tras la poda**
 
 Run: `cargo build 2>&1 | grep -cE "^(error|warning)"`
 Expected: `0` (si borrar algo rompe un consumidor, ese item se **restaura** y se deja marcado: forma parte de la fachada).
@@ -1228,13 +1228,13 @@ Expected: mismo total que Task 9, `0` fallos.
 Run: `cargo test --test parity_freeze_tests`
 Expected: PASS.
 
-- [ ] **Step 3: Sincronizar documentación**
+- [x] **Step 3: Sincronizar documentación**
 
 - `COMPILER_REFACTORING.md` y `REFACTORING_SUMMARY.md`: actualizar el árbol de módulos al estado real tras R0 (rutas de `src/lang`, `strings/`, `module.rs`, `functions.rs`, parser partido, CLI partida).
 - `LSP_ARCHITECTURE.md` y `LSP_IMPLEMENTATION_GUIDE.md`: añadir al inicio una nota destacada: **"Diseño futuro — no implementado. No existe `src/lsp` ni dependencias LSP."**
 - `README.md`: actualizar el árbol de archivos de la sección de tests si menciona módulos movidos (p. ej. describe `control_flow_tests.rs`), y añadir `tests/parity_freeze_tests.rs` a la lista.
 
-- [ ] **Step 4: Verificación final de R0**
+- [x] **Step 4: Verificación final de R0**
 
 Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print "passed", p, "failed", f}'`
 Expected: `failed 0`.
@@ -1245,7 +1245,7 @@ Expected: **no más** que el baseline (2: `math.rs` useless conversion y `genera
 Run: `git status --short`
 Expected: solo los archivos de esta tarea.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A

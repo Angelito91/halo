@@ -71,7 +71,7 @@ Halo nace como un proyecto de aprendizaje práctico para desmitificar el proceso
 | **Optimización LLVM** | Niveles O0–O3 configurables |
 | **Lexer** | Escaneo lineal O(n), flotantes, strings con comillas simples/dobles y escapes |
 | **Parser** | Recursivo descendente, expresiones top-level directas |
-| **Suite de tests** | 780+ tests de integración y unitarios |
+| **Suite de tests** | 828 tests de integración y unitarios |
 
 ### 🚧 En Progreso
 
@@ -482,39 +482,90 @@ print(sep)
 ```
 halo/
 ├── src/
+│   ├── lang/                 # Fuente única de verdad (catálogo/formato/errores)
+│   │   ├── catalog.rs        # Soporte de built-ins y métodos en cada backend
+│   │   ├── format.rs         # Reglas de formato del intérprete
+│   │   ├── errors.rs         # Mensajes de error de runtime
+│   │   └── mod.rs
 │   ├── lexer/
 │   │   ├── lexer.rs          # Tokenizador carácter a carácter
 │   │   ├── token.rs          # TokenKind + Token
 │   │   └── mod.rs
 │   ├── parser/
 │   │   ├── ast.rs            # Nodos del AST (Expression, Statement, TopLevel…)
-│   │   ├── parser.rs         # Parser recursivo descendente
+│   │   ├── core.rs           # Parser: struct, new/parse, cursores
+│   │   ├── declarations.rs   # Nivel superior (funciones, variables globales)
+│   │   ├── statements.rs     # Bloques, if/while/for/return, declaraciones
+│   │   ├── expressions.rs    # Expresiones y precedencia
 │   │   ├── visitor.rs        # Patrón Visitor
 │   │   └── mod.rs
 │   ├── interpreter/
-│   │   ├── value.rs          # Enum Value (Number, Float, Bool, String, Null)
+│   │   ├── value.rs          # Enum Value (Number, Float, Bool, String, Null, Array)
 │   │   ├── environment.rs    # Scoping con tabla plana + pila de frames
-│   │   ├── evaluator.rs      # Evaluador del AST + built-ins + guards
+│   │   ├── evaluator/
+│   │   │   ├── core.rs       # Estado del evaluador, recursión, helpers
+│   │   │   ├── statements.rs # Sentencias y control de flujo
+│   │   │   ├── expressions.rs# Evaluación de expresiones
+│   │   │   ├── calls.rs      # Llamadas a funciones
+│   │   │   ├── builtins.rs   # Built-ins globales (print, str, int…)
+│   │   │   ├── methods/      # Métodos de string y de array
+│   │   │   └── mod.rs
 │   │   └── mod.rs
 │   ├── compiler/
-│   │   ├── codegen.rs        # AST → LLVM IR
+│   │   ├── codegen/
+│   │   │   ├── generator.rs  # CodeGenerator: AST → LLVM IR
+│   │   │   ├── module.rs     # Declaración de libc / helpers de módulo
+│   │   │   ├── functions.rs  # Funciones de usuario
+│   │   │   ├── emitter.rs    # Emisión de nodos
+│   │   │   ├── statements/   # if, while, for, return, var-decl…
+│   │   │   ├── expressions/  # literales, binarias, llamadas, arrays…
+│   │   │   ├── builtins/     # print/str/int/abs… y strings/
+│   │   │   ├── runtime/      # Soporte de runtime en IR
+│   │   │   └── mod.rs
 │   │   ├── builder.rs        # IRBuilder y gestión de allocas
 │   │   ├── types.rs          # TypeMapper: tipos Halo → tipos LLVM
 │   │   └── mod.rs            # Compilation, OptLevel
+│   ├── diagnostics/
+│   │   ├── colors.rs         # Colores ANSI
+│   │   ├── error_codes/      # mod + mapping + descriptions + category
+│   │   ├── style_checker.rs  # Avisos de estilo
+│   │   └── mod.rs
+│   ├── cli/
+│   │   ├── args.rs           # Parseo de argumentos
+│   │   ├── run.rs build.rs check.rs tokens.rs ast.rs llvm.rs
+│   │   ├── helpers.rs        # Salida de UI y linkeo (clang/llc)
+│   │   └── mod.rs
+│   ├── utils/
+│   │   ├── constants.rs      # BANNER, VERSION
+│   │   ├── similarity.rs     # Sugerencias de similitud
+│   │   └── mod.rs
 │   ├── main.rs               # Binario halo — CLI unificada
 │   └── lib.rs                # Exports públicos de la librería
 │
 ├── tests/
 │   ├── common/
-│   │   └── mod.rs            # Helpers compartidos (eval_*, assert_*)
+│   │   ├── mod.rs            # Helpers compartidos (eval_*, assert_*)
+│   │   └── parity.rs         # Arnés diferencial intérprete vs compilado
 │   ├── arithmetic_tests.rs   # Aritmética, floats, overflow, comparaciones
+│   ├── array_functions_tests.rs     # Built-ins y métodos de arrays
+│   ├── cli_args_tests.rs     # Parseo de argumentos y toolchains
+│   ├── cli_output_tests.rs   # Salida de los subcomandos (tokens/ast/run/check)
+│   ├── compiler_output_tests.rs     # IR y binario generados
 │   ├── control_flow_tests.rs # if/else-if/else, while, for, range, break, continue, return
+│   ├── environment_tests.rs  # Scopes, shadowing, frames
+│   ├── error_codes_tests.rs  # Catálogo de códigos de error
+│   ├── evaluator_tests.rs    # Evaluador: expresiones y sentencias
 │   ├── function_tests.rs     # Definición, llamada, recursión, scope, aridad
 │   ├── interpreter_tests.rs  # Tests end-to-end del intérprete
+│   ├── lang_catalog_tests.rs # Coherencia del catálogo con ambos backends
 │   ├── lexer_tests.rs        # Tokenización
+│   ├── parity_freeze_tests.rs       # Corpus congelado intérprete/compilador
 │   ├── parser_tests.rs       # Análisis sintáctico y errores de parse
 │   ├── scope_and_variable_tests.rs  # Scoping, shadowing, variables globales
-│   └── string_and_types_tests.rs    # Strings, built-ins, conversiones
+│   ├── similarity_tests.rs   # Sugerencias de similitud
+│   ├── string_and_types_tests.rs    # Strings, built-ins, conversiones
+│   ├── style_checker_tests.rs       # Avisos de estilo
+│   └── value_tests.rs        # Semántica del enum Value
 │
 ├── examples/
 │   ├── factorial.halo
@@ -644,6 +695,10 @@ cargo test --test string_and_types_tests
 cargo test --test lexer_tests
 cargo test --test parser_tests
 cargo test --test interpreter_tests
+
+# Paridad intérprete ↔ compilador (corpus congelado + CLI)
+cargo test --test parity_freeze_tests
+cargo test --test cli_output_tests
 
 # Un test específico por nombre
 cargo test test_factorial_10

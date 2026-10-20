@@ -1,5 +1,9 @@
 # Language Server Protocol (LSP) Implementation Guide para Halo
 
+> ⚠️ **Diseño futuro — no implementado.** No existe `src/lsp` ni dependencias
+> LSP en `Cargo.toml`. Es una guía de implementación a futuro, no un manual de
+> algo que ya funcione.
+
 ## 📚 Tabla de Contenidos
 1. [Introducción](#introducción)
 2. [Arquitectura General](#arquitectura-general)

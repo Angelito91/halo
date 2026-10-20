@@ -9,7 +9,6 @@
 /// ANSI color codes for terminal output
 pub struct Colors;
 
-#[allow(dead_code)]
 impl Colors {
     pub const RESET: &'static str = "\x1b[0m";
     pub const BOLD: &'static str = "\x1b[1m";

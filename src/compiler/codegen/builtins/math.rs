@@ -56,6 +56,5 @@ pub fn emit_abs<'ctx>(
     gen.builder
         .builder
         .build_select(cond, neg, iv, "abs.result")
-        .map(|v| v.into())
         .map_err(|_| "Failed to build select for abs".to_string())
 }

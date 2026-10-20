@@ -8,6 +8,7 @@
 
 use crate::compiler::OptLevel;
 use std::process;
+use std::str::FromStr;
 
 // ── Subcommands ───────────────────────────────────────────────────────────────
 
@@ -40,8 +41,10 @@ pub enum Toolchain {
     Llc,
 }
 
-impl Toolchain {
-    pub fn from_str(s: &str) -> Result<Self, String> {
+impl FromStr for Toolchain {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "clang" => Ok(Toolchain::Clang),
             "llc" => Ok(Toolchain::Llc),
@@ -50,7 +53,9 @@ impl Toolchain {
             )),
         }
     }
+}
 
+impl Toolchain {
     pub fn name(self) -> &'static str {
         match self {
             Toolchain::Clang => "clang",

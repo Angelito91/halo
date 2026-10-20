@@ -86,7 +86,6 @@ impl Environment {
 
     /// Return a shared reference to the value of `name`, avoiding a clone.
     /// Useful for read-only checks (e.g. `is_truthy`) before deciding to clone.
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Ref-based variable access
     pub fn get_ref(&self, name: &str) -> Option<&Value> {
         for entry in self.entries.iter().rev() {
             if entry.name.as_ref() == name {
@@ -133,7 +132,6 @@ impl Environment {
 
     /// Return a mutable reference to the nearest binding of `name`.
     /// Allows callers to mutate the stored value without an extra lookup.
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Mutable variable access
     pub fn get_mut(&mut self, name: &str) -> Option<&mut Value> {
         for entry in self.entries.iter_mut().rev() {
             if entry.name.as_ref() == name {
@@ -144,19 +142,16 @@ impl Environment {
     }
 
     /// Number of live variable bindings (useful for tests / debugging).
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Environment introspection
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Return `true` when no variable bindings are live.
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Environment introspection
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// Current scope depth (0 = global only).
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Scope depth tracking
     pub fn depth(&self) -> usize {
         self.scope_starts.len() - 1
     }

@@ -108,31 +108,7 @@ impl Diagnostic {
         }
     }
 
-    /// Create a new warning diagnostic
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Enhanced warning levels
-    pub fn warning(message: impl Into<String>) -> Self {
-        Diagnostic {
-            level: DiagnosticLevel::Warning,
-            message: message.into(),
-            location: None,
-            hints: Vec::new(),
-            stack_trace: None,
-            error_code: None,
-        }
-    }
 
-    /// Create a new note diagnostic
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Enhanced note levels
-    pub fn note(message: impl Into<String>) -> Self {
-        Diagnostic {
-            level: DiagnosticLevel::Note,
-            message: message.into(),
-            location: None,
-            hints: Vec::new(),
-            stack_trace: None,
-            error_code: None,
-        }
-    }
 
     /// Add location information to the diagnostic
     pub fn with_location(mut self, location: DiagnosticLocation) -> Self {
@@ -140,45 +116,11 @@ impl Diagnostic {
         self
     }
 
-    /// Add a single hint/suggestion
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Enhanced hint system
-    pub fn with_hint(mut self, hint: impl Into<String>) -> Self {
-        self.hints.push(hint.into());
-        self
-    }
 
-    /// Add multiple hints/suggestions
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Enhanced hints system
-    pub fn with_hints(mut self, hints: Vec<String>) -> Self {
-        self.hints.extend(hints);
-        self
-    }
 
-    /// Add error code to diagnostic
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error code tracking
-    pub fn with_error_code(mut self, code: impl Into<String>) -> Self {
-        self.error_code = Some(code.into());
-        self
-    }
 
-    /// Add stack trace to diagnostic
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Stack trace support
-    pub fn with_stack_trace(mut self, trace: StackTrace) -> Self {
-        self.stack_trace = Some(trace);
-        self
-    }
 
-    /// Export diagnostic to JSON string
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: JSON serialization support
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string_pretty(self)
-    }
 
-    /// Import diagnostic from JSON string
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: JSON deserialization support
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
 
     /// Format and write the diagnostic to any writer
     pub fn print(&self, out: &mut dyn fmt::Write) -> fmt::Result {
@@ -310,102 +252,8 @@ pub fn location_from_source(
     }
 }
 
-/// Collection of diagnostics for a compilation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)] // PLANNED FOR v0.3.0: Diagnostic collection management
-pub struct DiagnosticCollection {
-    pub diagnostics: Vec<Diagnostic>,
-}
 
-impl DiagnosticCollection {
-    /// Create a new empty collection
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Diagnostic collection
-    pub fn new() -> Self {
-        DiagnosticCollection {
-            diagnostics: Vec::new(),
-        }
-    }
 
-    /// Add a diagnostic to the collection
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Diagnostic collection
-    pub fn push(&mut self, diagnostic: Diagnostic) {
-        self.diagnostics.push(diagnostic);
-    }
-
-    /// Export all diagnostics to JSON
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: JSON export
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string_pretty(self)
-    }
-
-    /// Import diagnostics from JSON
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: JSON import
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-
-    /// Get all errors
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Filtering diagnostics
-    pub fn errors(&self) -> Vec<&Diagnostic> {
-        self.diagnostics
-            .iter()
-            .filter(|d| d.level == DiagnosticLevel::Error)
-            .collect()
-    }
-
-    /// Get all warnings
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Filtering diagnostics
-    pub fn warnings(&self) -> Vec<&Diagnostic> {
-        self.diagnostics
-            .iter()
-            .filter(|d| d.level == DiagnosticLevel::Warning)
-            .collect()
-    }
-
-    /// Check if there are any errors
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error checking
-    pub fn has_errors(&self) -> bool {
-        self.diagnostics
-            .iter()
-            .any(|d| d.level == DiagnosticLevel::Error)
-    }
-
-    /// Get count of errors and warnings
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Issue counting
-    pub fn count_issues(&self) -> (usize, usize) {
-        let errors = self.errors().len();
-        let warnings = self.warnings().len();
-        (errors, warnings)
-    }
-
-    /// Print summary of all diagnostics
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Summary printing
-    pub fn print_summary(&self) {
-        let (errors, warnings) = self.count_issues();
-        println!();
-        if errors > 0 || warnings > 0 {
-            println!(
-                "{}",
-                colors::error(&format!(
-                    "✗ {} error{}, {} warning{}",
-                    errors,
-                    if errors == 1 { "" } else { "s" },
-                    warnings,
-                    if warnings == 1 { "" } else { "s" }
-                ))
-            );
-        } else {
-            println!("{}", colors::highlight("✓ No issues found"));
-        }
-        println!();
-    }
-}
-
-impl Default for DiagnosticCollection {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 /// Statistics gathered during compilation
 #[derive(Debug, Default, Clone)]

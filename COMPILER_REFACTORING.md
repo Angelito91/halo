@@ -1,8 +1,13 @@
 # Refactorización del Compilador LLVM - Propuesta Estructural
 
-## 📋 Problema Actual
+> **Estado: ejecutado.** Este documento fue la propuesta previa al refactor.
+> La estructura del compilador ya está partida como se describe en
+> «Estructura real (post-R0)»; el resto del documento se conserva como
+> registro de la decisión.
 
-La estructura actual del compilador funciona, pero tiene limitaciones:
+## 📋 Problema (estado anterior al refactor)
+
+La estructura anterior del compilador funcionaba, pero tenía limitaciones:
 
 ```
 src/compiler/
@@ -26,57 +31,72 @@ src/compiler/
 
 ---
 
-## 🎯 Estructura Propuesta (v2)
+## 🎯 Estructura real (post-R0)
 
 ```
-src/compiler/
-├── mod.rs                    # Exports públicos
-├── compilation.rs            # Compilation (la actual + context)
-├── types.rs                  # TypeMapper (sin cambios)
-├── builder.rs                # IRBuilder (sin cambios)
-│
-├── codegen/
+src/
+├── lang/                       # Fuente única de verdad (catálogo/formato/errores)
+│   ├── catalog.rs
+│   ├── format.rs
+│   ├── errors.rs
+│   └── mod.rs
+├── parser/                     # Antes: parser.rs monolítico (804 líneas)
+│   ├── ast.rs
+│   ├── core.rs                 # Parser: struct, new/parse, cursores
+│   ├── declarations.rs         # Nivel superior
+│   ├── statements.rs
+│   ├── expressions.rs
+│   ├── visitor.rs
+│   └── mod.rs
+├── interpreter/
+│   ├── value.rs
+│   ├── environment.rs
+│   └── evaluator/              # Antes: evaluator.rs monolítico
+│       ├── core.rs
+│       ├── statements.rs
+│       ├── expressions.rs
+│       ├── calls.rs
+│       ├── builtins.rs
+│       ├── methods/{mod,strings,arrays}.rs
+│       └── mod.rs
+├── compiler/
+│   ├── mod.rs                  # Compilation, OptLevel
+│   ├── builder.rs              # IRBuilder (allocas, variable slots)
+│   ├── types.rs                # TypeMapper (Halo → LLVM)
+│   └── codegen/
+│       ├── mod.rs
+│       ├── generator.rs        # CodeGenerator (orquestación) — 292 líneas
+│       ├── module.rs           # libc y helpers de módulo (282)
+│       ├── functions.rs        # funciones de usuario (183)
+│       ├── emitter.rs          # salida (LLVM IR / objeto / binario)
+│       ├── statements/{mod,expr_stmt,var_decl,while_loop,if_stmt,
+│       │              for_loop,return_stmt,break_stmt,continue_stmt}.rs
+│       ├── expressions/{mod,literals,arrays,binary_ops,unary_ops,
+│       │               variables,function_call,method_call}.rs
+│       ├── builtins/{mod,io,math,conversions}.rs
+│       ├── builtins/strings/{mod,helpers,trim,replace,substr,search,case}.rs
+│       └── runtime/mod.rs
+├── diagnostics/                # Antes: error_codes.rs monolítico (480 líneas)
 │   ├── mod.rs
-│   ├── generator.rs          # CodeGenerator (solo orquestación)
-│   ├── context.rs            # GeneratorContext (estado compartido)
-│   │
-│   ├── statements/           # NEW: Generación de statements
-│   │   ├── mod.rs
-│   │   ├── expr_stmt.rs      # Expression statements
-│   │   ├── var_decl.rs       # Variable declarations
-│   │   ├── while_loop.rs     # While loops
-│   │   ├── if_stmt.rs        # If statements
-│   │   └── return_stmt.rs    # Return statements
-│   │
-│   ├── expressions/          # NEW: Generación de expressions
-│   │   ├── mod.rs
-│   │   ├── literals.rs       # Numbers, floats, strings, bools
-│   │   ├── arrays.rs         # Array literals y indexing
-│   │   ├── binary_ops.rs     # Arithmetic, comparison, logic
-│   │   ├── unary_ops.rs      # Negation, NOT
-│   │   ├── variables.rs      # Variable references
-│   │   ├── function_call.rs  # Function calls
-│   │   └── conditionals.rs   # Ternary conditionals
-│   │
-│   ├── builtins/             # NEW: Funciones built-in
-│   │   ├── mod.rs
-│   │   ├── io.rs             # print()
-│   │   ├── types.rs          # type(), str(), int(), float()
-│   │   ├── arrays.rs         # len() for arrays, indexing
-│   │   ├── strings.rs        # len() for strings
-│   │   ├── math.rs           # abs()
-│   │   └── conversions.rs    # Type conversions
-│   │
-│   ├── runtime/              # NEW: Runtime support
-│   │   ├── mod.rs
-│   │   ├── memory.rs         # Memory management (malloc, free)
-│   │   ├── arrays.rs         # Array runtime support
-│   │   ├── strings.rs        # String runtime support
-│   │   └── helpers.rs        # Helper functions
-│   │
-│   ├── emitter.rs            # Output (LLVM IR, object, binary)
-│   └── optimizer.rs          # Optimization passes
+│   ├── colors.rs
+│   ├── style_checker.rs
+│   └── error_codes/{mod,mapping,descriptions,category}.rs
+├── cli/                        # Antes: commands.rs monolítico (544 líneas)
+│   ├── mod.rs
+│   ├── args.rs
+│   ├── run.rs build.rs check.rs tokens.rs ast.rs llvm.rs
+│   └── helpers.rs              # UI + linkeo (clang/llc)
+└── utils/
+    ├── constants.rs            # BANNER, VERSION
+    ├── similarity.rs
+    └── mod.rs
 ```
+
+Respecto a la propuesta original no se adoptaron `codegen/context.rs`
+(`GeneratorContext`), `codegen/optimizer.rs`, `expressions/conditionals.rs`
+ni `builtins/{types,arrays,strings}.rs` separados: el reparto actual cubre esas
+responsabilidades con menos indirección (`module.rs`/`functions.rs` en vez de
+`context.rs`; `builtins/strings/` como subdirectorio).
 
 ---
 
@@ -86,11 +106,11 @@ src/compiler/
 
 | Aspecto | Antes | Después |
 |---------|-------|---------|
-| **generator.rs** | ~1600 líneas (TODO todo) | ~200 líneas (orquestación) |
-| **Expresiones** | En generator.rs | `expressions/*.rs` |
-| **Statements** | En generator.rs | `statements/*.rs` |
-| **Built-ins** | En generator.rs | `builtins/*.rs` |
-| **Runtime support** | Disperso | `runtime/*.rs` |
+| **generator.rs** | monolítico (~1600 líneas) | 292 líneas (orquestación) + `module.rs` + `functions.rs` |
+| **Expresiones** | En generator.rs | `expressions/*.rs` (865 líneas) |
+| **Statements** | En generator.rs | `statements/*.rs` (637 líneas) |
+| **Built-ins** | En generator.rs | `builtins/*.rs` + `builtins/strings/*` (1507 líneas) |
+| **Runtime support** | Disperso | `runtime/mod.rs` |
 | **Testing** | Difícil | Fácil (módulos pequeños) |
 
 ---
@@ -239,6 +259,9 @@ pub fn emit_malloc(gen: &ExpressionGenerator, size: BasicValueEnum)
 
 ## 🛠️ Plan de Migración
 
+> **Ejecutado** (fases 1–3) durante el refactor R0; la fase 4 (runtime de
+> arrays en el compilado) queda para la fase **P3** del programa de paridad.
+
 ### **Fase 1: Preparación** (1-2 horas)
 1. Crear `codegen/context.rs` con `GeneratorContext`
 2. Crear estructura de directorios vacíos
@@ -297,9 +320,11 @@ pub fn emit_malloc(gen: &ExpressionGenerator, size: BasicValueEnum)
 
 ## 📌 Decision Point
 
-**¿Implementar refactorización antes de arrays?**
+**¿Implementar refactorización antes de arrays?** → **Resuelto:** se eligió la
+Opción A y se ejecutó (el compilador ya está partido). El soporte de arrays en
+el backend compilado es ahora la fase P3 del programa de paridad.
 
-### **Opción A: Refactorizar primero** ✅ RECOMENDADO
+### **Opción A: Refactorizar primero** ✅ ELEGIDA Y EJECUTADA
 - Pro: Arrays quedan en estructura limpia
 - Pro: Futuras features más fáciles
 - Con: Extra 3-4 horas de trabajo

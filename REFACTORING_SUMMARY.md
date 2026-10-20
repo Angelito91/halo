@@ -4,6 +4,10 @@
 
 Se ha refactorizado exitosamente `src/interpreter/evaluator/methods.rs` para reducir la duplicación de código en los métodos string. La refactorización mantiene la funcionalidad idéntica mientras mejora significativamente la mantenibilidad y reduce aproximadamente **~250 líneas de código duplicado**.
 
+> **Nota (R0):** ese archivo ya no existe como tal. Ahora es el directorio
+> `src/interpreter/evaluator/methods/` (`mod.rs`, `strings.rs`, `arrays.rs`);
+> los helpers descritos aquí viven en `methods/strings.rs`.
+
 ## ✅ Logros
 
 - ✓ Código compila sin errores
@@ -168,15 +172,24 @@ Cada método string en `try_eval_method_call` se simplificó usando `build_strin
 
 ## 🧪 Verificación
 
+Estado en el momento del cambio:
+
 ```bash
 $ cargo check
 ✓ Compila sin errores
 
 $ cargo test --lib
-✓ Todos los 8 tests pasan
+✓ Los tests unitarios pasaban
 
 $ cargo build
 ✓ Build exitoso sin errores
+```
+
+Tras el refactor R0 la verificación es la suite completa:
+
+```bash
+$ cargo test
+✓ 829 tests, 0 fallos
 ```
 
 ## 🎯 Beneficios

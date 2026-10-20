@@ -149,12 +149,11 @@ pub(crate) fn return_type_of_expr(expr: &Expression) -> Option<&'static str> {
         Expression::Bool(_, _) => Some("i64"),
         Expression::Binary { left, op, right, .. } => {
             // String concat/repeat → string return
-            if matches!(op, BinOp::Add | BinOp::Mul) {
-                if return_type_of_expr(left) == Some("string")
-                    || return_type_of_expr(right) == Some("string")
-                {
-                    return Some("string");
-                }
+            if matches!(op, BinOp::Add | BinOp::Mul)
+                && (return_type_of_expr(left) == Some("string")
+                    || return_type_of_expr(right) == Some("string"))
+            {
+                return Some("string");
             }
             if matches!(op, BinOp::Eq | BinOp::Neq | BinOp::Lt | BinOp::Gt | BinOp::Le | BinOp::Ge
                 | BinOp::And | BinOp::Or)

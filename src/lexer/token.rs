@@ -70,10 +70,8 @@ pub enum TokenKind {
 
     // ── Special ───────────────────────────────────────────────────────────────
     /// Horizontal whitespace (currently not emitted into the token stream).
-    #[allow(dead_code)]
     Whitespace,
     /// A `//` line comment (currently not emitted into the token stream).
-    #[allow(dead_code)]
     Comment,
     /// A `\n` newline, which acts as the statement terminator (no semicolons).
     Newline,

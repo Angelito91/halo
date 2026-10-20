@@ -161,7 +161,7 @@ fn test_to_string_value_number() {
 
 #[test]
 fn test_to_string_value_float() {
-    let s = Value::Float(3.14).to_string_value();
+    let s = Value::Float(std::f64::consts::PI).to_string_value();
     assert!(s.starts_with("3.14"));
 }
 
@@ -191,7 +191,7 @@ fn test_type_name_number() {
 
 #[test]
 fn test_type_name_float() {
-    assert_eq!(Value::Float(3.14).type_name(), "float");
+    assert_eq!(Value::Float(std::f64::consts::PI).type_name(), "float");
 }
 
 #[test]

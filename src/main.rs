@@ -6,21 +6,15 @@
 
 use std::process;
 
-// ── Modules ───────────────────────────────────────────────────────────────────
-
-mod compiler;
-mod diagnostics;
-mod interpreter;
-mod lexer;
-mod parser;
-mod utils;
-
-mod cli;
-
 // ── Re-exports ────────────────────────────────────────────────────────────────
+//
+// The binary is a thin wrapper over the library: every module lives in
+// `halo::*` exactly once. Declaring them here as private `mod`s would build a
+// second, unreachable copy of the tree inside the binary crate, and every
+// public item the CLI does not use would be reported as dead code.
 
-use cli::{cmd_ast, cmd_build, cmd_check, cmd_llvm, cmd_run, cmd_tokens};
-use cli::{parse_args, Subcommand};
+use halo::cli::{cmd_ast, cmd_build, cmd_check, cmd_llvm, cmd_run, cmd_tokens};
+use halo::cli::{parse_args, Subcommand};
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 

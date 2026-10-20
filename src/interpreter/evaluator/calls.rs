@@ -14,7 +14,6 @@ use crate::utils::find_suggestions_smart;
 
 impl Evaluator {
     /// Get the current call stack as a vector of function names
-    #[allow(dead_code)]
     pub fn get_call_stack(&self) -> Vec<String> {
         self.call_stack.clone()
     }

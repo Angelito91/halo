@@ -13,6 +13,15 @@ fn catalog_has_no_duplicate_names() {
 }
 
 #[test]
+fn methods_catalog_has_no_duplicate_names() {
+    let mut names: Vec<&str> = METHODS.iter().map(|m| m.name).collect();
+    names.sort_unstable();
+    let mut dedup = names.clone();
+    dedup.dedup();
+    assert_eq!(names, dedup, "duplicate method names in catalog");
+}
+
+#[test]
 fn catalog_declares_the_measured_support() {
     // Verificado contra el probe del spec §1.1:
     assert_eq!(builtin("print").unwrap().support, Support::Both);

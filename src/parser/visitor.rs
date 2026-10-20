@@ -9,7 +9,6 @@
 
 use crate::parser::ast::{Block, Expression, IndexType, Program, Statement, TopLevel};
 
-#[allow(dead_code)]
 pub trait ASTVisitor {
     fn visit_program(&mut self, program: &Program) {
         for item in &program.items {

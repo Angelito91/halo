@@ -1,5 +1,9 @@
 # Arquitectura Técnica del LSP para Halo
 
+> ⚠️ **Diseño futuro — no implementado.** No existe `src/lsp` ni dependencias
+> LSP en `Cargo.toml`. Este documento describe el diseño previsto, no código
+> que se pueda ejecutar hoy.
+
 ## 1. Visión General
 
 Un Language Server sigue la arquitectura cliente-servidor donde:

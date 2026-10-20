@@ -7,7 +7,6 @@
 use super::ErrorCode;
 
 impl ErrorCode {
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error descriptions
     pub fn description(&self) -> &'static str {
         match self {
             ErrorCode::ExpectedCloseParen => "Expected ')' after parameters",
@@ -56,7 +55,6 @@ impl ErrorCode {
         }
     }
 
-    #[allow(dead_code)] // PLANNED FOR v0.3.0: Error suggestions
     pub fn suggestions(&self) -> Vec<&'static str> {
         match self {
             ErrorCode::ExpectedCloseParen => {
