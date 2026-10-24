@@ -1,0 +1,96 @@
+---
+title: Ejemplos
+description: Programas completos en Halo, organizados por tema, con instrucciones para ejecutarlos.
+---
+
+import Example from '../../../components/Example.astro';
+
+El repositorio incluye una colección de programas comentados en `examples/`.
+Son la forma más rápida de ver el lenguaje en acción y de comprobar que tu
+instalación funciona.
+
+```bash
+git clone https://github.com/Angelito91/halo.git
+cd halo
+
+halo run examples/01_hello.halo
+halo run examples/03_factorial.halo
+```
+
+## Factorial
+
+El ejemplo clásico de recursión, con versión iterativa y recursiva:
+
+<Example file="03_factorial.halo" from={69} to={84} title="examples/03_factorial.halo — factorial recursivo" />
+
+Salida:
+
+```text
+factorial(1) = 1
+factorial(2) = 2
+factorial(3) = 6
+factorial(4) = 24
+factorial(5) = 120
+factorial(10) = 3628800
+```
+
+## Arrays
+
+Crear, añadir y quitar elementos:
+
+<Example file="10_arrays.halo" from={85} to={100} title="examples/10_arrays.halo — push y pop" />
+
+Recuerda que `push` devuelve un array nuevo; por eso el ejemplo reasigna
+`arr`. `pop` devuelve el elemento, no el array.
+
+## Proyecto práctico
+
+Conversión de temperaturas, un clásico para practicar funciones y expresiones:
+
+<Example file="08_practical_projects.halo" from={14} to={31} title="examples/08_practical_projects.halo — conversor de temperaturas" />
+
+## Catálogo de ejemplos
+
+| Archivo | Tema | Qué demuestra |
+|---|---|---|
+| `01_hello.halo` | Fundamentos | Hello World, variables, aritmética y strings |
+| `02_conditionals.halo` | Condicionales | `if`, `else if`, `else`, anidamiento |
+| `03_factorial.halo` | Recursión | Versión iterativa vs recursiva, traza |
+| `04_fibonacci.halo` | Recursión | Fibonacci recursivo e iterativo |
+| `05_operators.halo` | Operadores | Aritmética, comparación, lógica, precedencia |
+| `06_new_features.halo` | Bucles | `while`, `for`, `break`, `continue` |
+| `07_functions_scope.halo` | Funciones y scope | Parámetros, retorno, shadowing, frames |
+| `08_practical_projects.halo` | Proyectos | 12 mini-proyectos combinando todo |
+| `09_strings_methods.halo` | Strings | Concatenación, repetición y métodos |
+| `10_arrays.halo` | Arrays | Indexación, slicing, métodos y recorrido |
+
+:::caution
+`09_test_error.halo` contiene errores **intencionados** para probar el sistema
+de diagnóstico. No esperes que se ejecute.
+:::
+
+## Cómo leer un ejemplo
+
+1. Abre el archivo y lee los comentarios de sección.
+2. Ejecútalo con `halo run`.
+3. Cambia algún valor y vuelve a ejecutarlo.
+4. Usa `halo ast` para ver cómo se representa.
+5. Si quieres ver el código generado, prueba `halo llvm`.
+
+```bash
+halo run examples/05_operators.halo
+halo ast examples/05_operators.halo
+halo llvm examples/05_operators.halo
+```
+
+## Más proyectos
+
+En [proyectos](proyectos/) encontrarás versiones condensadas de los ejemplos
+prácticos, pensadas para copiar y modificar: conversores, notas, estadísticas
+de texto y más.
+
+## Enlaces
+
+- [Guía del lenguaje](../guia/estructura/).
+- [Referencia de built-ins](../referencia/builtins/).
+- [Ejemplos en GitHub](https://github.com/Angelito91/halo/tree/main/examples).

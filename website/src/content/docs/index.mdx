@@ -1,0 +1,149 @@
+---
+title: Documentación
+description: Un lenguaje dinámico y minimalista para aprender cómo funcionan los compiladores, desde el lexer hasta LLVM.
+template: splash
+hero:
+  title: Halo
+  tagline: Un lenguaje pequeño, legible y hackeable para aprender compiladores construyendo uno. Sin frameworks, sin magia y sin semicolons.
+  image:
+    file: ../../assets/halo.png
+    alt: Mascota de Halo
+  actions:
+    - text: Empezar
+      link: /empezando/que-es-halo/
+      icon: right-arrow
+    - text: Ver en GitHub
+      link: https://github.com/Angelito91/halo
+      icon: github
+      variant: minimal
+---
+
+import { Aside, Card, CardGrid, LinkCard, TabItem, Tabs } from '@astrojs/starlight/components';
+import { VERSION } from '../../lib/version';
+
+## Empieza en dos comandos
+
+Halo se compila con Rust. Compilar el proyecto desde fuente requiere LLVM porque
+`inkwell` es una dependencia obligatoria, aunque solo vayas a usar `halo run`.
+Clang solo hace falta para enlazar binarios con `halo build`.
+
+<Tabs>
+	<TabItem label="Linux / macOS">
+		```bash
+		git clone https://github.com/Angelito91/halo.git
+		cd halo
+		cargo build --release
+		./target/release/halo examples/01_hello.halo
+		```
+	</TabItem>
+	<TabItem label="Windows">
+		```powershell
+		git clone https://github.com/Angelito91/halo.git
+		cd halo
+		cargo build --release
+		.\target\release\halo.exe examples\01_hello.halo
+		```
+	</TabItem>
+</Tabs>
+
+¿Prefieres los detalles? Sigue la [guía de instalación](empezando/instalacion/)
+o salta directamente al [primer programa](empezando/primer-programa/).
+
+## Todo el pipeline, a la vista
+
+Halo no esconde las fases: puedes inspeccionar los tokens, el AST, el IR de LLVM
+y el binario final con un solo ejecutable.
+
+<CardGrid>
+	<Card title="Lexer + parser" icon="pencil">
+		Escaneo lineal, parser recursivo descendente y un AST tipado que puedes
+		imprimir con `halo ast`.
+	</Card>
+	<Card title="Intérprete tree-walking" icon="rocket">
+		Ejecuta el AST directamente con `halo run`. Ideal para experimentar sin
+		compilar.
+	</Card>
+	<Card title="Backend LLVM" icon="setting">
+		Genera IR optimizado (O0–O3) y enlaza con `clang` o `llc` para producir
+		un binario nativo.
+	</Card>
+	<Card title="Errores claros" icon="error">
+		Variables inexistentes, aridad incorrecta, overflow, recursión excesiva y
+		bucles infinitos se detectan con mensajes explícitos.
+	</Card>
+</CardGrid>
+
+## Código que se lee como pseudocódigo
+
+Sin `main`, sin tipos obligatorios y sin llaves en líneas separadas:
+
+```halo
+// Factorial recursivo
+factorial(n) {
+    if n <= 1 { return 1 }
+    return n * factorial(n - 1)
+}
+
+print(factorial(10))   // 3628800
+```
+
+```text
+$ halo run factorial.halo
+3628800
+```
+
+Cuando quieras velocidad, el mismo programa se compila a un ejecutable nativo:
+
+```bash
+halo build -O3 --run factorial.halo
+```
+
+## Dos backends, con diferencias conocidas
+
+El intérprete es la referencia completa. El compilador todavía no comparte toda
+la semántica; las divergencias están documentadas en
+[diferencias entre backends](referencia/diferencias/).
+
+| | Intérprete (`halo run`) | Compilado (`halo build`) |
+|---|---|---|
+| Arranque | Inmediato | Requiere LLVM + Clang |
+| Arrays y métodos de array | ✅ | ❌ todavía no |
+| `for` sobre `range()` | ✅ | ✅ (solo esa forma) |
+| `range()` como valor | ✅ | ❌ |
+| Optimización | — | `-O0` a `-O3` |
+| Ideal para | Aprender y prototipar | Ver el código máquina y medir |
+
+La suite de tests de paridad compara ambos backends y registra las diferencias
+conocidas mientras se corrigen. Puedes leer más en
+[arquitectura](proyecto/arquitectura/) y [testing](proyecto/testing/).
+
+## Explora la documentación
+
+<CardGrid stagger>
+	<LinkCard
+		title="Guía del lenguaje"
+		description="Variables, operadores, control de flujo, funciones, arrays y strings."
+		href="guia/estructura/"
+	/>
+	<LinkCard
+		title="Referencia"
+		description="Built-ins, errores de runtime y precedencia de operadores."
+		href="referencia/builtins/"
+	/>
+	<LinkCard
+		title="Ejemplos"
+		description="Programas completos y proyectos pequeños para practicar."
+		href="ejemplos/"
+	/>
+	<LinkCard
+		title="Roadmap"
+		description="Qué está hecho, qué viene en la próxima versión y cómo contribuir."
+		href="proyecto/roadmap/"
+	/>
+</CardGrid>
+
+<Aside type="note" title="Estado del proyecto">
+	Halo está en desarrollo activo. La documentación corresponde a la versión
+	**v{VERSION}** y se actualiza junto con el compilador. Si algo no coincide con el
+	código, [abre un issue](https://github.com/Angelito91/halo/issues).
+</Aside>

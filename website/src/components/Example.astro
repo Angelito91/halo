@@ -1,0 +1,41 @@
+---
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { Code } from '@astrojs/starlight/components';
+
+interface Props {
+	/** File name inside the repository's `examples/` directory. */
+	file: string;
+	/** First line to show (1-based, inclusive). */
+	from?: number;
+	/** Last line to show (1-based, inclusive). */
+	to?: number;
+	/** Optional caption shown above the code block. */
+	title?: string;
+	/** Extra Expressive Code meta string (e.g. `showLineNumbers`). */
+	meta?: string;
+}
+
+const { file, from = 1, to, title, meta } = Astro.props;
+
+const fileName = file.endsWith('.halo') ? file : `${file}.halo`;
+const candidates = [
+	// `astro build` / `astro dev` are normally run from `website/`.
+	resolve(process.cwd(), '..', 'examples', fileName),
+	// Running from the repository root with `--root website`.
+	resolve(process.cwd(), 'examples', fileName),
+];
+const examplePath = candidates.find((path) => existsSync(path));
+
+if (!examplePath) {
+	throw new Error(
+		`Could not find the example "${fileName}". Looked in:\n${candidates.join('\n')}`,
+	);
+}
+
+const source = readFileSync(examplePath, 'utf8');
+const lines = source.replace(/\s+$/, '').split('\n');
+const code = lines.slice(from - 1, to ?? lines.length).join('\n');
+---
+
+<Code code={code} lang="halo" title={title ?? `examples/${fileName}`} meta={meta} />

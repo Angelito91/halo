@@ -1,0 +1,15 @@
+{
+	"expressiveCode.copyButtonCopied": "Copiado",
+	"expressiveCode.copyButtonTooltip": "Copiar código",
+	"expressiveCode.terminalWindowFallbackTitle": "Terminal",
+	"pagefind.clear_search": "Limpiar",
+	"pagefind.load_more": "Cargar más",
+	"pagefind.search_label": "Buscar en la documentación",
+	"pagefind.filters_label": "Filtros",
+	"pagefind.zero_results": "Sin resultados para [SEARCH_TERM]",
+	"pagefind.many_results": "[COUNT] resultados para [SEARCH_TERM]",
+	"pagefind.one_result": "1 resultado para [SEARCH_TERM]",
+	"pagefind.alt_search": "No hay resultados para [SEARCH_TERM]. Mostrando resultados para [DIFFERENT_TERM] en su lugar.",
+	"pagefind.search_suggestion": "Sin resultados para [SEARCH_TERM]. Prueba una de estas búsquedas:",
+	"pagefind.searching": "Buscando [SEARCH_TERM]..."
+}
