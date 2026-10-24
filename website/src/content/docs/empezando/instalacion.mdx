@@ -1,0 +1,212 @@
+---
+title: Instalación
+description: Requisitos, compilación desde fuente y verificación de la instalación de Halo.
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components';
+
+Halo se distribuye como un único binario llamado `halo`. Todavía no hay un
+paquete en crates.io, así que la vía principal es compilar desde el código
+fuente.
+
+## Requisitos
+
+| Componente | Versión | ¿Para qué? |
+|---|---|---|
+| Rust + Cargo | Estable reciente (edición 2021) | Compilar el proyecto |
+| LLVM | 23.1 | Backend de compilación (`inkwell` / `llvm-sys`) |
+| Clang | 23.1 | Enlazar el binario nativo (toolchain por defecto) |
+| Git | Cualquiera reciente | Clonar el repositorio |
+
+:::note
+Compilar Halo desde fuente requiere LLVM porque `inkwell` es una dependencia
+obligatoria, aunque solo vayas a usar `halo run`. Clang solo es necesario para
+enlazar binarios con `halo build`; el intérprete no lo invoca.
+:::
+
+La versión exacta de LLVM la fija `Cargo.toml` mediante la feature
+`llvm23-1` de `inkwell`. Si tu `llvm-config` no es 23.1, la compilación
+fallará con un mensaje de `llvm-sys`.
+
+## Compilar desde fuente
+
+<Tabs>
+	<TabItem label="Linux / macOS">
+		```bash
+		git clone https://github.com/Angelito91/halo.git
+		cd halo
+		cargo build --release
+		```
+
+		El binario queda en `target/release/halo`.
+	</TabItem>
+
+	<TabItem label="Windows">
+		```powershell
+		git clone https://github.com/Angelito91/halo.git
+		cd halo
+		cargo build --release
+		```
+
+		El binario queda en `target\release\halo.exe`.
+	</TabItem>
+</Tabs>
+
+También puedes instalarlo en tu `PATH` de Cargo:
+
+```bash
+cargo install --path . --locked
+```
+
+Esto coloca `halo` en `~/.cargo/bin` (o `%USERPROFILE%\.cargo\bin` en
+Windows), que normalmente ya está en el `PATH`.
+
+## Verificar
+
+```bash
+halo --version
+# 🌟 Halo Programming Language v0.2.0
+
+halo --help
+```
+
+Si el comando no se encuentra, usa la ruta completa:
+
+```bash
+./target/release/halo --version
+```
+
+## Instalar LLVM 23.1
+
+### Ubuntu / Debian
+
+El repositorio oficial de LLVM publica paquetes por distribución. Para Ubuntu
+24.04 (noble), por ejemplo:
+
+```bash
+wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+  | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+
+sudo add-apt-repository \
+  "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-23 main"
+sudo apt update
+sudo apt install llvm-23 llvm-23-dev libpolly-23-dev \
+  libclang-common-23-dev clang-23
+```
+
+Añade las herramientas al `PATH` y apunta `llvm-sys` al prefijo correcto:
+
+```bash
+export PATH="/usr/lib/llvm-23/bin:$PATH"
+export LLVM_SYS_231_PREFIX="/usr/lib/llvm-23"
+```
+
+Pon esas dos líneas en tu `~/.bashrc` o `~/.zshrc` para que persistan.
+
+### macOS
+
+Con [Homebrew](https://brew.sh/):
+
+```bash
+brew install llvm
+export PATH="$(brew --prefix llvm)/bin:$PATH"
+export LLVM_SYS_231_PREFIX="$(brew --prefix llvm)"
+```
+
+Comprueba que la versión sea la esperada:
+
+```bash
+llvm-config --version
+# 23.1.x
+```
+
+### Windows
+
+Descarga el archivo `clang+llvm-23.1.*-x86_64-pc-windows-msvc.tar.xz` desde
+[llvm.org](https://releases.llvm.org/), extráelo y define:
+
+```powershell
+$env:LLVM_SYS_231_PREFIX = "C:\ruta\a\llvm"
+$env:PATH = "$env:LLVM_SYS_231_PREFIX\bin;$env:PATH"
+```
+
+Necesitas además las **Build Tools de Visual Studio** con el toolchain de C++
+para que Rust pueda enlazar.
+
+## Primer contacto
+
+Crea un archivo `hola.halo`:
+
+```halo
+print("Hello, Halo!")
+```
+
+Ejecútalo con el intérprete:
+
+```bash
+halo run hola.halo
+# Hello, Halo!
+```
+
+O compílalo a un binario nativo:
+
+```bash
+halo build hola.halo
+./hola
+# Hello, Halo!
+```
+
+## Problemas frecuentes
+
+### `llvm-config` no encontrado
+
+```
+error: No suitable version of LLVM was found
+```
+
+Asegúrate de que `llvm-config` esté en el `PATH` y de que su versión sea 23.1.
+Si instalaste LLVM en una ruta no estándar, define `LLVM_SYS_231_PREFIX`.
+
+### `clang` no encontrado al compilar
+
+`halo build` usa `clang` para enlazar. Instala Clang 23.1 o usa el toolchain
+`llc`:
+
+```bash
+halo build --toolchain llc programa.halo
+```
+
+### La compilación tarda mucho
+
+`inkwell` compila código C++ de LLVM. La primera compilación puede tardar
+varios minutos; las siguientes reutilizan la caché de Cargo.
+
+### `linker 'cc' not found` en Linux
+
+Instala un compilador de C (`build-essential` en Debian/Ubuntu) y vuelve a
+intentar.
+
+## Actualizar
+
+```bash
+git pull
+cargo build --release
+```
+
+Si instalaste con `cargo install --path .`, repite el comando para reemplazar
+el binario.
+
+## Desinstalar
+
+Si usaste `cargo install`:
+
+```bash
+cargo uninstall halo
+```
+
+Si compilaste en el repositorio, basta con borrar la carpeta `target/`.
+
+## Siguiente paso
+
+- [Escribe tu primer programa](../primer-programa/).
+- [Aprende a usar la CLI](../cli/).

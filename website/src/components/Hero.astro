@@ -1,0 +1,293 @@
+---
+import { Image } from 'astro:assets';
+import { LinkButton } from '@astrojs/starlight/components';
+import halo from '../assets/halo.png';
+import { withBase } from '../lib/site';
+import { VERSION } from '../lib/version';
+
+const { data } = Astro.locals.starlightRoute.entry;
+const hero = data.hero;
+const { title = data.title, tagline, actions = [] } = hero ?? {};
+
+const resolve = (href: string) => (href.startsWith('/') ? withBase(href) : href);
+---
+
+{
+	hero && (
+		<section class="hero">
+			<div class="copy">
+				<a class="version" href={withBase('/proyecto/roadmap/')}>
+					<span class="pulse" aria-hidden="true" />
+					v{VERSION} · en desarrollo
+				</a>
+
+				<h1 id="_top" set:html={title} />
+
+				{tagline && <p class="tagline" set:html={tagline} />}
+
+				<div class="actions">
+					{actions.map(({ text, link, variant, icon }) => (
+						<LinkButton href={resolve(link)} variant={variant} icon={icon?.name}>
+							{text}
+						</LinkButton>
+					))}
+				</div>
+
+				<div class="terminal" aria-label="Ejemplo de ejecución">
+					<div class="bar" aria-hidden="true">
+						<span />
+						<span />
+						<span />
+					</div>
+					<pre>
+<code><span class="prompt">$</span> halo run hola.halo
+<span class="output">Hello, Halo!</span></code>
+					</pre>
+				</div>
+			</div>
+
+			<div class="art">
+				<div class="glow" aria-hidden="true" />
+				<div class="ring" aria-hidden="true" />
+				<Image
+					src={halo}
+					alt="Mascota de Halo: un pequeño fantasma con aureola"
+					width={420}
+					height={388}
+					loading="eager"
+					fetchpriority="high"
+					class="mascot"
+				/>
+				<span class="chip chip-a">lexer</span>
+				<span class="chip chip-b">AST</span>
+				<span class="chip chip-c">LLVM IR</span>
+			</div>
+		</section>
+	)
+}
+
+<style>
+	.hero {
+		display: grid;
+		gap: 2.5rem;
+		align-items: center;
+		padding-block: 2rem 1rem;
+	}
+
+	.copy {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 1.25rem;
+	}
+
+	.version {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.3rem 0.75rem;
+		border: 1px solid var(--sl-color-hairline);
+		border-radius: 999rem;
+		background: var(--sl-color-bg-sidebar);
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-xs);
+		font-family: var(--sl-font-mono);
+		text-decoration: none;
+	}
+
+	.version:hover {
+		border-color: var(--sl-color-accent);
+		color: var(--sl-color-white);
+	}
+
+	.pulse {
+		width: 0.45rem;
+		height: 0.45rem;
+		border-radius: 50%;
+		background: #facc15;
+		box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.45);
+		animation: pulse 2.4s ease-out infinite;
+	}
+
+	h1 {
+		margin: 0;
+		font-size: clamp(3rem, 9vw, 5.5rem);
+		line-height: 0.95;
+		letter-spacing: -0.045em;
+		background: linear-gradient(120deg, var(--sl-color-white) 20%, var(--sl-color-accent) 85%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		color: transparent;
+	}
+
+	.tagline {
+		max-width: 34rem;
+		margin: 0;
+		color: var(--sl-color-gray-2);
+		font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+		line-height: 1.6;
+	}
+
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		margin-block: 0.25rem;
+	}
+
+	.terminal {
+		width: min(100%, 27rem);
+		border: 1px solid var(--sl-color-hairline);
+		border-radius: 0.9rem;
+		background: var(--sl-color-black);
+		box-shadow: var(--sl-shadow-md);
+		overflow: hidden;
+	}
+
+	.bar {
+		display: flex;
+		gap: 0.35rem;
+		padding: 0.65rem 0.85rem;
+		border-bottom: 1px solid var(--sl-color-hairline);
+		background: var(--sl-color-bg-sidebar);
+	}
+
+	.bar span {
+		width: 0.55rem;
+		height: 0.55rem;
+		border-radius: 50%;
+		background: var(--sl-color-gray-5);
+	}
+
+	.bar span:first-child {
+		background: #f87171;
+	}
+
+	.bar span:nth-child(2) {
+		background: #facc15;
+	}
+
+	.bar span:nth-child(3) {
+		background: #4ade80;
+	}
+
+	pre {
+		margin: 0;
+		padding: 1rem 1.1rem;
+		overflow-x: auto;
+	}
+
+	code {
+		font-family: var(--sl-font-mono);
+		font-size: var(--sl-text-sm);
+		line-height: 1.7;
+		color: var(--sl-color-gray-2);
+	}
+
+	.prompt {
+		color: var(--sl-color-accent);
+	}
+
+	.output {
+		color: #facc15;
+	}
+
+	.art {
+		position: relative;
+		display: grid;
+		place-items: center;
+		min-height: 18rem;
+	}
+
+	.glow {
+		position: absolute;
+		width: min(80%, 22rem);
+		aspect-ratio: 1;
+		border-radius: 50%;
+		background: radial-gradient(circle, rgba(56, 189, 248, 0.28), transparent 65%);
+		filter: blur(18px);
+	}
+
+	.ring {
+		position: absolute;
+		width: min(72%, 19rem);
+		aspect-ratio: 1;
+		border: 1px dashed var(--sl-color-hairline-light);
+		border-radius: 50%;
+		animation: spin 40s linear infinite;
+	}
+
+	.mascot {
+		position: relative;
+		width: min(80%, 21rem);
+		height: auto;
+		filter: drop-shadow(0 18px 30px rgba(2, 12, 27, 0.45));
+		animation: float 6s ease-in-out infinite;
+	}
+
+	.chip {
+		position: absolute;
+		padding: 0.25rem 0.6rem;
+		border: 1px solid var(--sl-color-hairline);
+		border-radius: 999rem;
+		background: var(--sl-color-bg);
+		color: var(--sl-color-gray-2);
+		font-family: var(--sl-font-mono);
+		font-size: var(--sl-text-2xs);
+		box-shadow: var(--sl-shadow-sm);
+	}
+
+	.chip-a {
+		top: 14%;
+		left: 2%;
+	}
+
+	.chip-b {
+		top: 38%;
+		right: 0;
+	}
+
+	.chip-c {
+		bottom: 16%;
+		left: 8%;
+	}
+
+	@keyframes float {
+		0%,
+		100% {
+			transform: translateY(0);
+		}
+		50% {
+			transform: translateY(-10px);
+		}
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@keyframes pulse {
+		70% {
+			box-shadow: 0 0 0 0.45rem rgba(250, 204, 21, 0);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
+		}
+	}
+
+	@media (min-width: 60rem) {
+		.hero {
+			grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+			gap: 3rem;
+			padding-block: 4.5rem 3rem;
+		}
+	}
+
+	@media (max-width: 40rem) {
+		.chip {
+			display: none;
+		}
+	}
+</style>
