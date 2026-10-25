@@ -259,8 +259,10 @@ archivo → lexer → tokens → parser → AST → evaluador → stdout / error
 
 El evaluador solo recorre el AST. Los builtins y métodos viven en
 `src/stdlib` y reciben valores ya evaluados, sin conocer el AST ni el
-evaluador. El intérprete es síncrono, sin dependencias externas y sin
-código nativo.
+evaluador. Como los argumentos se evalúan antes del despacho, una llamada
+inválida puede reportar primero el error de un argumento (por ejemplo, una
+variable inexistente) y después la aridad o el método desconocido. El
+intérprete es síncrono, sin dependencias externas y sin código nativo.
 
 ## Desarrollo
 
