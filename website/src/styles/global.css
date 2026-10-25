@@ -87,7 +87,9 @@ h6,
 
 /* ── Chrome ───────────────────────────────────────────────────────────────── */
 
-.header {
+/* Only the outer page header. Starlight also uses `.header` inside it for the
+   title/search/actions row; styling that one too would paint a second border. */
+header.header {
 	background-color: var(--sl-color-bg-nav);
 	backdrop-filter: blur(14px) saturate(140%);
 	-webkit-backdrop-filter: blur(14px) saturate(140%);
