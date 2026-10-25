@@ -14,6 +14,7 @@
 pub mod args;
 pub mod ast;
 pub mod check;
+pub mod constants;
 pub mod helpers;
 pub mod run;
 pub mod tokens;

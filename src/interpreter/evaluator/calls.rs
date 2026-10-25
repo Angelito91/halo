@@ -10,7 +10,7 @@ use super::builtins;
 use super::core::{Evaluator, MAX_RECURSION_DEPTH};
 use crate::interpreter::value::Value;
 use crate::parser::ast::Expression;
-use crate::utils::find_suggestions_smart;
+use crate::diagnostics::suggestions::find_suggestions_smart;
 
 impl Evaluator {
     /// Format call stack as a readable string for error reporting
@@ -32,7 +32,7 @@ impl Evaluator {
 
         let suggestions = find_suggestions_smart(name, &candidates, 3);
 
-        let mut message = format!("{} '{name}'", crate::lang::errors::UNDEFINED_FUNCTION);
+        let mut message = format!("{} '{name}'", crate::interpreter::errors::UNDEFINED_FUNCTION);
         if !suggestions.is_empty() {
             message.push_str("\n\n  Did you mean:");
             for (i, suggestion) in suggestions.iter().enumerate() {

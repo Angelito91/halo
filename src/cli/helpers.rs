@@ -8,7 +8,7 @@ use crate::diagnostics::{location_from_source, Diagnostic};
 use crate::interpreter::Evaluator;
 use crate::lexer::{Lexer, TokenKind};
 use crate::parser::Parser;
-use crate::utils::{BANNER, VERSION};
+use crate::cli::constants::{BANNER, VERSION};
 use std::fs;
 use std::path::Path;
 

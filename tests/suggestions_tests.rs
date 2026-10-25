@@ -6,7 +6,7 @@
 
 //! Tests for string similarity and suggestion finding algorithms
 
-use halo::utils::similarity::{
+use halo::diagnostics::suggestions::{
     find_suggestions, find_suggestions_smart, levenshtein_distance, Suggestion,
 };
 

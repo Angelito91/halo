@@ -7,6 +7,7 @@
 //! Diagnostic system for error reporting with colored output and code snippets.
 
 pub mod colors;
+pub mod suggestions;
 
 use std::fmt;
 

@@ -17,7 +17,7 @@
 //     allocating path is `String` concatenation, which is unavoidable.
 // ─────────────────────────────────────────────────────────────────────────────
 
-use crate::lang::{errors, format};
+use crate::interpreter::{errors, format};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]

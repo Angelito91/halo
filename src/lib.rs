@@ -7,13 +7,11 @@
 pub mod cli;
 pub mod diagnostics;
 pub mod interpreter;
-pub mod lang;
 pub mod lexer;
 pub mod parser;
-pub mod utils;
 
 pub use diagnostics::colors;
+pub use diagnostics::suggestions::{find_suggestions, find_suggestions_smart, Suggestion};
 pub use interpreter::Evaluator;
 pub use lexer::Lexer;
 pub use parser::Parser;
-pub use utils::{find_suggestions, find_suggestions_smart, Suggestion};
