@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -22,7 +22,12 @@ fn eval_code(code: &str) -> Result<Value, String> {
     }
 
     let mut parser = Parser::new(tokens);
-    let program = parser.parse().map_err(|e| e.join(", "))?;
+    let program = parser.parse().map_err(|errs| {
+        errs.iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    })?;
 
     let mut evaluator = Evaluator::new();
     evaluator.eval_program(&program)
@@ -401,8 +406,7 @@ fn test_division_by_zero() {
 
 #[test]
 fn test_empty_program() {
-    let code = "";
-    eval_code(code).ok();
+    assert_eq!(eval_code("").unwrap(), Value::Null);
 }
 
 #[test]
@@ -435,8 +439,9 @@ while x < 100 {
     }
     x = x + 1
 }
+x
 ";
-    eval_code(code).ok();
+    assert_eq!(eval_code(code).unwrap(), Value::Number(5));
 }
 
 // ============ Comment Tests ============

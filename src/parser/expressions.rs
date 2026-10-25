@@ -1,12 +1,12 @@
 // The Halo Programming Language
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
+use super::Parser;
 use crate::lexer::TokenKind;
 use crate::parser::ast::{BinOp, Expression, IndexType};
-use super::Parser;
 
 impl Parser {
     // Expression rules (Pratt / precedence-climbing style)

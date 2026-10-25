@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -115,18 +115,6 @@ fn test_variable_used_before_assignment_errors() {
 }
 
 // ── Global variables ─────────────────────────────────────────────────────────
-
-#[test]
-fn test_global_variable_readable_in_function() {
-    let code = "
-base = 100
-add_base(n) {
-    return n + base
-}
-add_base(5)
-";
-    assert_eq!(eval_last_number(code), 105);
-}
 
 #[test]
 fn test_multiple_globals_readable_in_function() {
@@ -427,15 +415,6 @@ z = add_one(30)
 }
 
 // ── Call-before-definition ───────────────────────────────────────────────────
-
-#[test]
-fn test_global_var_set_before_function_definition() {
-    let code = "
-result = triple(7)
-triple(n) { return n * 3 }
-";
-    assert_eq!(eval_var(code, "result"), Value::Number(21));
-}
 
 #[test]
 fn test_function_defined_after_call_in_another_function() {

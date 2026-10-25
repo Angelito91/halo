@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -17,6 +17,7 @@
 //     allocating path is `String` concatenation, which is unavoidable.
 // ─────────────────────────────────────────────────────────────────────────────
 
+use crate::interpreter::{errors, format};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,10 +52,6 @@ impl Value {
 
     // ── Fast scalar extractors (no clone) ────────────────────────────────────
 
-
-
-
-
     // ── Type tag (no allocation) ─────────────────────────────────────────────
 
     /// Return the type name as a static string slice — no allocation.
@@ -83,7 +80,7 @@ impl Value {
             (Value::Number(a), Value::Number(b)) => a
                 .checked_add(*b)
                 .map(Value::Number)
-                .ok_or_else(|| "Integer overflow in addition".to_string()),
+                .ok_or_else(|| format!("{} addition", errors::INTEGER_OVERFLOW)),
             (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a + b)),
             (Value::Number(a), Value::Float(b)) => Ok(Value::Float(*a as f64 + b)),
             (Value::Float(a), Value::Number(b)) => Ok(Value::Float(a + *b as f64)),
@@ -105,7 +102,7 @@ impl Value {
             (Value::Number(a), Value::Number(b)) => a
                 .checked_sub(*b)
                 .map(Value::Number)
-                .ok_or_else(|| "Integer overflow in subtraction".to_string()),
+                .ok_or_else(|| format!("{} subtraction", errors::INTEGER_OVERFLOW)),
             (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a - b)),
             (Value::Number(a), Value::Float(b)) => Ok(Value::Float(*a as f64 - b)),
             (Value::Float(a), Value::Number(b)) => Ok(Value::Float(a - *b as f64)),
@@ -124,7 +121,7 @@ impl Value {
             (Value::Number(a), Value::Number(b)) => a
                 .checked_mul(*b)
                 .map(Value::Number)
-                .ok_or_else(|| "Integer overflow in multiplication".to_string()),
+                .ok_or_else(|| format!("{} multiplication", errors::INTEGER_OVERFLOW)),
             (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
             (Value::Number(a), Value::Float(b)) => Ok(Value::Float(*a as f64 * b)),
             (Value::Float(a), Value::Number(b)) => Ok(Value::Float(a * *b as f64)),
@@ -156,28 +153,28 @@ impl Value {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => {
                 if *b == 0 {
-                    Err("Division by zero".to_string())
+                    Err(errors::DIVISION_BY_ZERO.to_string())
                 } else {
                     Ok(Value::Number(a / b))
                 }
             }
             (Value::Float(a), Value::Float(b)) => {
                 if *b == 0.0 {
-                    Err("Division by zero".to_string())
+                    Err(errors::DIVISION_BY_ZERO.to_string())
                 } else {
                     Ok(Value::Float(a / b))
                 }
             }
             (Value::Number(a), Value::Float(b)) => {
                 if *b == 0.0 {
-                    Err("Division by zero".to_string())
+                    Err(errors::DIVISION_BY_ZERO.to_string())
                 } else {
                     Ok(Value::Float(*a as f64 / b))
                 }
             }
             (Value::Float(a), Value::Number(b)) => {
                 if *b == 0 {
-                    Err("Division by zero".to_string())
+                    Err(errors::DIVISION_BY_ZERO.to_string())
                 } else {
                     Ok(Value::Float(a / *b as f64))
                 }
@@ -196,7 +193,7 @@ impl Value {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => {
                 if *b == 0 {
-                    Err("Division by zero".to_string())
+                    Err(errors::DIVISION_BY_ZERO.to_string())
                 } else {
                     Ok(Value::Number(a % b))
                 }
@@ -347,21 +344,15 @@ impl Value {
     /// Convert value to string (allocates a new String).
     pub fn to_string_value(&self) -> String {
         match self {
-            Value::Number(n) => n.to_string(),
-            Value::Float(f) => {
-                if f.fract() == 0.0 {
-                    format!("{:.1}", f)
-                } else {
-                    f.to_string()
-                }
-            }
-            Value::Bool(b) => b.to_string(),
+            Value::Number(n) => format::format_number(*n),
+            Value::Float(f) => format::format_float(*f),
+            Value::Bool(b) => format::format_bool(*b).to_string(),
             Value::String(s) => s.clone(),
             Value::Array(arr) => {
                 let items: Vec<String> = arr.iter().map(|v| v.to_string_value()).collect();
                 format!("[{}]", items.join(", "))
             }
-            Value::Null => "null".to_string(),
+            Value::Null => format::format_null().to_string(),
         }
     }
 }

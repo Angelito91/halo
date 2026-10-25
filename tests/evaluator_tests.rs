@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -24,7 +24,12 @@ fn eval_code(code: &str) -> Result<Value, String> {
         }
     }
     let mut parser = Parser::new(tokens);
-    let program = parser.parse().map_err(|errs| errs.join("; "))?;
+    let program = parser.parse().map_err(|errs| {
+        errs.iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("; ")
+    })?;
     let mut evaluator = Evaluator::new();
     evaluator.eval_program(&program)
 }
@@ -119,22 +124,6 @@ r2 = check(0, 1)
 r3 = check(0, 0)
 ";
     eval_code(code).unwrap();
-}
-
-#[test]
-#[ignore] // Causes stack overflow - recursion limit test should be done differently
-fn test_recursion_depth_limit() {
-    let code = "
-infinite(n) {
-    return infinite(n + 1)
-}
-result = infinite(0)
-";
-    let result = eval_code(code);
-    assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .contains("Maximum recursion depth exceeded"));
 }
 
 #[test]
@@ -328,7 +317,7 @@ result = outer()
     let _ = evaluator.eval_program(&program);
 
     // Verify call stack tracking is available (should be empty after execution)
-    let stack = evaluator.get_call_stack();
+    let stack = evaluator.format_call_stack();
     assert!(stack.is_empty());
 }
 

@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -7,10 +7,10 @@
 // Expression evaluation (split out of `core`).
 
 use super::core::Evaluator;
-use super::methods;
+use crate::diagnostics::suggestions::find_suggestions_smart;
 use crate::interpreter::value::Value;
 use crate::parser::ast::{BinOp, Expression, IndexType};
-use crate::utils::find_suggestions_smart;
+use crate::stdlib;
 
 impl Evaluator {
     /// Generate an error message for an undefined variable with suggestions
@@ -21,7 +21,10 @@ impl Evaluator {
 
         let suggestions = find_suggestions_smart(name, &candidates, 3);
 
-        let mut message = format!("Undefined variable: '{name}'");
+        let mut message = format!(
+            "{} '{name}'",
+            crate::interpreter::errors::UNDEFINED_VARIABLE
+        );
         if !suggestions.is_empty() {
             message.push_str("\n\n  Did you mean:");
             for (i, suggestion) in suggestions.iter().enumerate() {
@@ -111,7 +114,8 @@ impl Evaluator {
                             (Value::Array(arr), Value::Number(idx)) => {
                                 if idx < 0 {
                                     return Err(format!(
-                                        "Array index cannot be negative, got {}",
+                                        "{} {}",
+                                        crate::interpreter::errors::NEGATIVE_INDEX,
                                         idx
                                     ));
                                 }
@@ -215,7 +219,8 @@ impl Evaluator {
                 ..
             } => {
                 let obj_value = self.eval_expr(object)?;
-                methods::try_eval_method_call(self, &obj_value, method, args)
+                let arg_values = self.eval_args(args)?;
+                stdlib::call_method(&obj_value, method, &arg_values)
             }
 
             // -- Index assignment: arr[i] = value
@@ -232,7 +237,11 @@ impl Evaluator {
                 match (arr_val, idx_val) {
                     (Value::Array(mut arr), Value::Number(idx)) => {
                         if idx < 0 {
-                            return Err(format!("Array index cannot be negative, got {}", idx));
+                            return Err(format!(
+                                "{} {}",
+                                crate::interpreter::errors::NEGATIVE_INDEX,
+                                idx
+                            ));
                         }
                         let idx_usize = idx as usize;
                         if idx_usize >= arr.len() {
@@ -304,25 +313,6 @@ impl Evaluator {
             BinOp::Ge => Ok(Value::Bool(lhs.greater_equal(&rhs)?)),
             // Already handled in the short-circuit block above.
             BinOp::And | BinOp::Or => unreachable!("&&/|| handled above"),
-        }
-    }
-
-    /// Convert a Value back to an Expression for use in method calls.
-    /// This is a helper function to adapt between the evaluator's need to pass
-    /// values to built-in functions that expect Expression arguments.
-    pub fn value_to_expression(&self, value: &Value) -> Expression {
-        let pos = crate::parser::ast::Position { line: 0, column: 0 };
-
-        match value {
-            Value::Number(n) => Expression::Number(*n, pos),
-            Value::Float(f) => Expression::Float(*f, pos),
-            Value::Bool(b) => Expression::Bool(*b, pos),
-            Value::String(s) => Expression::StringLiteral(s.clone(), pos),
-            Value::Array(arr) => {
-                let elements = arr.iter().map(|v| self.value_to_expression(v)).collect();
-                Expression::ArrayLiteral { elements, pos }
-            }
-            Value::Null => Expression::Bool(false, pos),
         }
     }
 }

@@ -1,23 +1,18 @@
 // The Halo Programming Language
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 //
 // Function-call dispatch and call-stack bookkeeping (split out of `core`).
 
-use super::builtins;
 use super::core::{Evaluator, MAX_RECURSION_DEPTH};
+use crate::diagnostics::suggestions::find_suggestions_smart;
 use crate::interpreter::value::Value;
 use crate::parser::ast::Expression;
-use crate::utils::find_suggestions_smart;
+use crate::stdlib;
 
 impl Evaluator {
-    /// Get the current call stack as a vector of function names
-    pub fn get_call_stack(&self) -> Vec<String> {
-        self.call_stack.clone()
-    }
-
     /// Format call stack as a readable string for error reporting
     pub fn format_call_stack(&self) -> String {
         if self.call_stack.is_empty() {
@@ -37,7 +32,10 @@ impl Evaluator {
 
         let suggestions = find_suggestions_smart(name, &candidates, 3);
 
-        let mut message = format!("Undefined function: '{name}'");
+        let mut message = format!(
+            "{} '{name}'",
+            crate::interpreter::errors::UNDEFINED_FUNCTION
+        );
         if !suggestions.is_empty() {
             message.push_str("\n\n  Did you mean:");
             for (i, suggestion) in suggestions.iter().enumerate() {
@@ -55,8 +53,13 @@ impl Evaluator {
     // =========================================================================
 
     pub fn eval_call(&mut self, name: &str, args: &[Expression]) -> Result<Value, String> {
-        // Built-ins never count towards the recursion limit.
-        if let Some(result) = builtins::try_eval_builtin(self, name, args)? {
+        // Built-ins never count towards the recursion limit. Their arguments
+        // are evaluated before dispatch; this is the only place where a
+        // malformed call reports an argument error before an arity error.
+        if stdlib::is_builtin(name) {
+            let values = self.eval_args(args)?;
+            let result = stdlib::call_builtin(name, &values)?
+                .expect("is_builtin and call_builtin must agree");
             return Ok(result);
         }
 

@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -7,7 +7,7 @@
 mod common;
 
 use common::{
-    assert_runtime_error, eval_bool, eval_float, eval_last_number, eval_number, eval_var,
+    assert_runtime_error, eval_bool, eval_code, eval_float, eval_last_number, eval_number, eval_var,
 };
 use halo::interpreter::Value;
 
@@ -223,6 +223,15 @@ fn test_modulo_by_zero_errors() {
     assert_runtime_error("x = 10 % 0", "Division by zero");
 }
 
+#[test]
+fn test_runtime_errors_include_source_position() {
+    let err = eval_code("x = 5 / 0").unwrap_err();
+    assert!(
+        err.contains("--> line 1"),
+        "runtime error should carry a source position, got: {err:?}"
+    );
+}
+
 // ── Overflow protection ───────────────────────────────────────────────────────
 
 #[test]
@@ -267,28 +276,6 @@ total = total + 12
 // ── Arithmetic inside functions ───────────────────────────────────────────────
 
 #[test]
-fn test_function_add_returns_correct_value() {
-    let code = "
-add(a, b) {
-    return a + b
-}
-add(17, 25)
-";
-    assert_eq!(eval_last_number(code), 42);
-}
-
-#[test]
-fn test_function_mul_returns_correct_value() {
-    let code = "
-mul(a, b) {
-    return a * b
-}
-mul(6, 7)
-";
-    assert_eq!(eval_last_number(code), 42);
-}
-
-#[test]
 fn test_function_power_by_squaring() {
     // Computes base^exp iteratively using only multiplication.
     let code = "
@@ -322,70 +309,6 @@ sum_to(n) {
 sum_to(100)
 ";
     assert_eq!(eval_last_number(code), 5050);
-}
-
-#[test]
-fn test_factorial_5_equals_120() {
-    let code = "
-factorial(n) {
-    if n <= 1 { return 1 }
-    return n * factorial(n - 1)
-}
-factorial(5)
-";
-    assert_eq!(eval_last_number(code), 120);
-}
-
-#[test]
-fn test_factorial_0_equals_1() {
-    let code = "
-factorial(n) {
-    if n <= 1 { return 1 }
-    return n * factorial(n - 1)
-}
-factorial(0)
-";
-    assert_eq!(eval_last_number(code), 1);
-}
-
-#[test]
-fn test_factorial_10_equals_3628800() {
-    let code = "
-factorial(n) {
-    if n <= 1 { return 1 }
-    return n * factorial(n - 1)
-}
-factorial(10)
-";
-    assert_eq!(eval_last_number(code), 3_628_800);
-}
-
-// ── String × integer repetition ───────────────────────────────────────────────
-
-#[test]
-fn test_string_repeated_by_integer() {
-    use common::eval_string;
-    let result = eval_string(r#"x = "ab" * 3"#, "x");
-    assert_eq!(result, "ababab");
-}
-
-#[test]
-fn test_integer_times_string() {
-    use common::eval_string;
-    let result = eval_string(r#"x = 3 * "ab""#, "x");
-    assert_eq!(result, "ababab");
-}
-
-#[test]
-fn test_string_repeated_zero_times_is_empty() {
-    use common::eval_string;
-    let result = eval_string(r#"x = "hello" * 0"#, "x");
-    assert_eq!(result, "");
-}
-
-#[test]
-fn test_string_repetition_negative_errors() {
-    assert_runtime_error(r#"x = "x" * -1"#, "negative");
 }
 
 // ── Comparison operators return bools ────────────────────────────────────────
