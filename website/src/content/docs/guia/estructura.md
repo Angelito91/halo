@@ -125,8 +125,7 @@ print("El programa empieza aquí")
 ```
 
 Si vienes de Java, C# o Rust, el cambio es liberador: no hay ceremonia de
-arranque. Por costumbre puedes crear una función `main` y llamarla al final,
-pero evita ese nombre si vas a compilar: el backend ya genera un `main` de C.
+arranque. Por costumbre puedes crear una función `main` y llamarla al final.
 
 ```halo
 principal() {

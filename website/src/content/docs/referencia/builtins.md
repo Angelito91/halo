@@ -1,59 +1,49 @@
 ---
 title: Funciones built-in
-description: "Referencia completa de funciones y métodos incorporados: aridad, tipo de retorno, soporte en cada backend y ejemplos."
+description: "Referencia completa de funciones y métodos incorporados: aridad, tipo de retorno y ejemplos."
 ---
 
 Halo incluye un conjunto pequeño de funciones y métodos. Todas las funciones
-son de **aridad fija** salvo `print` y `range`.
-
-:::note
-✅ significa que la función existe en ese backend y coincide en lo esencial;
-⚠️ indica que existe pero tiene divergencias conocidas; ❌ significa que no
-está disponible. `str()` sobre variables, `int(string)`, `float(string)`, los
-formatos de impresión y algunos métodos todavía divergen. Consulta
-[diferencias entre backends](../diferencias/).
-:::
+son de **aridad fija** salvo `print`, `println` y `range`.
 
 ## Resumen
 
-| Nombre | Aridad | Devuelve | Intérprete | Compilado |
-|---|---|:---:|:---:|:---:|
-| `print(...)` | 0+ | `null` | ✅ | ⚠️ |
-| `len(x)` | 1 | `number` | ✅ | ✅ |
-| `str(x)` | 1 | `string` | ✅ | ⚠️ |
-| `int(x)` | 1 | `number` | ✅ | ⚠️ |
-| `float(x)` | 1 | `float` | ✅ | ⚠️ |
-| `abs(x)` | 1 | `number` / `float` | ✅ | ⚠️ |
-| `type(x)` | 1 | `string` | ✅ | ✅ |
-| `range(end)` / `range(a, b)` | 1–2 | `array` | ✅ | ❌ |
-| `push(arr, x)` | 2 | `array` | ✅ | ❌ |
-| `pop(arr)` | 1 | cualquiera / `null` | ✅ | ❌ |
-| `append(a, b)` | 2 | `array` | ✅ | ❌ |
-| `first(arr)` | 1 | cualquiera / `null` | ✅ | ❌ |
-| `last(arr)` | 1 | cualquiera / `null` | ✅ | ❌ |
-| `reverse(x)` | 1 | `array` / `string` | ✅ | ✅ (solo string) |
-| `join(arr, sep)` | 2 | `string` | ✅ | ❌ |
-| `sort(arr)` | 1 | `array` | ✅ | ❌ |
-| `contains(x, y)` | 2 | `bool` | ✅ | ⚠️ (solo string) |
-| `index_of(x, y)` | 2 | `number` | ✅ | ✅ (solo string) |
-| `upper(s)` | 1 | `string` | ✅ | ✅ |
-| `lower(s)` | 1 | `string` | ✅ | ✅ |
-| `trim(s)` | 1 | `string` | ✅ | ✅ |
-| `starts_with(s, p)` | 2 | `bool` | ✅ | ✅ |
-| `ends_with(s, p)` | 2 | `bool` | ✅ | ✅ |
-| `replace(s, a, b)` | 3 | `string` | ✅ | ✅ |
-| `substr(s, i, n)` | 3 | `string` | ✅ | ✅ |
-
-Las funciones que dependen de arrays no funcionan en modo compilado porque los
-binarios nativos todavía no tienen arrays. `range()` es la excepción parcial:
-el compilador la admite directamente en un `for`.
+| Nombre | Aridad | Devuelve |
+|---|---|:---:|
+| `print(...)` | 0+ | `null` |
+| `println(...)` | 0+ | `null` |
+| `len(x)` | 1 | `number` |
+| `str(x)` | 1 | `string` |
+| `int(x)` | 1 | `number` |
+| `float(x)` | 1 | `float` |
+| `abs(x)` | 1 | `number` / `float` |
+| `type(x)` | 1 | `string` |
+| `range(end)` / `range(a, b)` | 1–2 | `array` |
+| `push(arr, x)` | 2 | `array` |
+| `pop(arr)` | 1 | cualquiera / `null` |
+| `append(a, b)` | 2 | `array` |
+| `first(arr)` | 1 | cualquiera / `null` |
+| `last(arr)` | 1 | cualquiera / `null` |
+| `reverse(x)` | 1 | `array` / `string` |
+| `join(arr, sep)` | 2 | `string` |
+| `sort(arr)` | 1 | `array` |
+| `contains(x, y)` | 2 | `bool` |
+| `index_of(x, y)` | 2 | `number` |
+| `upper(s)` | 1 | `string` |
+| `lower(s)` | 1 | `string` |
+| `trim(s)` | 1 | `string` |
+| `starts_with(s, p)` | 2 | `bool` |
+| `ends_with(s, p)` | 2 | `bool` |
+| `replace(s, a, b)` | 3 | `string` |
+| `substr(s, i, n)` | 3 | `string` |
 
 ## Entrada / salida
 
-### `print(...)`
+### `print(...)` / `println(...)`
 
-Imprime cada argumento en **su propia línea**. Acepta cualquier tipo y
-cualquier número de argumentos, incluido cero.
+Imprime todos los argumentos en **una sola línea**, separados por un espacio,
+y termina con un salto de línea. Acepta cualquier tipo y cualquier número de
+argumentos, incluido cero.
 
 ```halo
 print("hola")
@@ -61,7 +51,8 @@ print(42)
 print(3.14)
 print(true)
 print([1, 2, 3])
-print()              // línea vacía
+print("a", 1, true)   // a 1 true
+print()               // línea vacía
 ```
 
 ```text
@@ -70,13 +61,12 @@ hola
 3.14
 true
 [1, 2, 3]
+a 1 true
 
 ```
 
-`print(a, b)` imprime `a` y luego `b`, cada uno con salto de línea; no añade
-separadores. En modo compilado, los argumentos se unen con espacios y `print()`
-sin argumentos imprime una línea vacía; consulta
-[diferencias entre backends](../diferencias/).
+`println` es un alias de `print`: ambos añaden el salto de línea final. No hay
+una versión que imprima sin salto.
 
 ## Tipos y conversión
 
@@ -253,8 +243,6 @@ Invierte un array o un string y devuelve un valor nuevo.
 print([1, 2, 3].reverse())   // [3, 2, 1]
 print("abc".reverse())       // cba
 ```
-
-En modo compilado solo está disponible para strings.
 
 ### `join(arr, sep)` / `arr.join(sep)`
 

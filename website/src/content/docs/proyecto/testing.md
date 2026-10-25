@@ -3,15 +3,9 @@ title: Testing
 description: Cómo ejecutar la suite de Halo, qué cubre cada archivo y cómo añadir tests nuevos.
 ---
 
-Halo tiene **más de 800 tests** de integración, además de los tests unitarios
+Halo tiene **más de 750 tests** de integración, además de los tests unitarios
 de cada módulo. La suite es la red de seguridad del proyecto: si un cambio
-rompe el intérprete o el compilador, `cargo test` debería decirlo.
-
-:::note
-Compilar los tests requiere LLVM 23.1, igual que compilar el proyecto. Los tests
-de paridad que invocan `clang` se saltan automáticamente si el binario no está
-disponible.
-:::
+rompe el intérprete, `cargo test` debería decirlo.
 
 ## Ejecutar todo
 
@@ -67,36 +61,23 @@ todos los tests que lo contengan.
 | `scope_and_variable_tests.rs` | Shadowing, globales, frames, `for` |
 | `string_and_types_tests.rs` | Strings, métodos, truthiness, conversiones |
 | `array_functions_tests.rs` | Arrays, indexación, slicing, métodos |
+| `stdlib_tests.rs` | Built-ins y métodos de la biblioteca estándar |
 | `interpreter_tests.rs` | Programas completos de extremo a extremo |
-| `compiler_output_tests.rs` | Salida del backend LLVM |
-| `parity_freeze_tests.rs` | Intérprete vs binario compilado |
+| `examples_tests.rs` | Ejecuta todos los programas de `examples/` |
 | `cli_args_tests.rs` | Parseo de argumentos de la CLI |
 | `cli_output_tests.rs` | Formato de salida de la CLI |
-| `lang_catalog_tests.rs` | Catálogo de builtins y aridades |
-| `error_codes_tests.rs` | Códigos y mensajes de diagnóstico |
-| `style_checker_tests.rs` | Reglas de estilo |
-| `similarity_tests.rs` | Sugerencias de nombres parecidos |
+| `suggestions_tests.rs` | Sugerencias de nombres parecidos |
+| `architecture_tests.rs` | Guardas de la arquitectura interpreter-only |
 
-## Tests de paridad
+## Tests de ejemplos
 
-`parity_freeze_tests.rs` es especial: ejecuta el mismo programa en el
-intérprete y en un binario compilado, y compara la salida. El corpus está
-“congelado” para que un cambio de comportamiento no pase desapercibido.
+`examples_tests.rs` ejecuta cada archivo de `examples/` y comprueba que
+termina correctamente. La única excepción es `09_test_error.halo`, que contiene
+errores intencionados y debe fallar con un diagnóstico.
 
-```rust
-#[test]
-fn case_int_truncation() {
-    parity::assert_parity(
-        "int_truncation",
-        "print(int(3.9))\nprint(int(-2.7))",
-    );
-}
-```
-
-Si una diferencia es intencionada, se declara en `KNOWN_DIVERGENCES` con una
-razón y la fase en la que se resolverá. El harness falla si encuentra una
-divergencia no declarada o una entrada obsoleta. La lista visible para usuarios
-está en [diferencias entre backends](../../referencia/diferencias/).
+La suite recorre `examples/` automáticamente, pero el test fija el número de
+ejemplos funcionales. Si añades uno, actualiza el `assert_eq!(checked, 10, …)`
+de `tests/examples_tests.rs` además de comprobar que se ejecuta sin errores.
 
 ## Añadir un test
 
@@ -146,8 +127,8 @@ fn trim_quita_espacios() {
 - El nombre describe qué se espera, no cómo se implementa.
 - Comprueba el mensaje de error cuando el error sea parte del contrato.
 - Evita depender de detalles de formato que no estén estabilizados.
-- Si el test necesita LLVM o `clang`, sáltalo cuando no estén disponibles,
-  como hacen los tests de paridad.
+- Si el test necesita un límite de recursión bajo, ten en cuenta que los
+  tests usan un límite menor que una ejecución normal.
 
 ## Calidad de código
 
@@ -155,8 +136,8 @@ Antes de abrir un PR, ejecuta lo mismo que la CI:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
 ```
 
 Para aplicar el formato automáticamente:
@@ -182,8 +163,8 @@ contribuir, pero ayuda a encontrar ramas sin probar.
 El workflow de GitHub Actions ejecuta tres bloques:
 
 1. `cargo fmt --all -- --check`
-2. `cargo clippy --all-targets --all-features -- -D warnings`
-3. `cargo test --all -- --nocapture`
+2. `cargo clippy --all-targets --locked -- -D warnings`
+3. `cargo test --locked`
 
 La documentación tiene su propio workflow para construir y desplegar el sitio
 en GitHub Pages.

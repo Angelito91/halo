@@ -53,9 +53,7 @@ Si uno de los operandos es un string, el otro se convierte a texto:
 "hola" + " " + "mundo"   // "hola mundo"
 ```
 
-El orden importa: `+` es conmutativo para números, pero no para strings. En
-modo compilado, mezclar string y número todavía no funciona; usa el intérprete
-o consulta [diferencias entre backends](../../referencia/diferencias/).
+El orden importa: `+` es conmutativo para números, pero no para strings.
 
 ### Repetición
 
@@ -92,13 +90,6 @@ La división y el módulo por cero son errores:
 ```
 
 `%` solo acepta enteros; usarlo con floats es un error.
-
-:::caution
-En modo compilado, el overflow y la división por cero **todavía no se
-comprueban**: el binario puede hacer wrap o tener comportamiento indefinido.
-No dependas de estos errores con `halo build`; consulta
-[diferencias entre backends](../../referencia/diferencias/).
-:::
 
 ## Comparación
 

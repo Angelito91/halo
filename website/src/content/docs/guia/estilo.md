@@ -4,7 +4,7 @@ description: Convenciones de formato y nombres usadas en el proyecto Halo.
 ---
 
 Estas son las convenciones que usa Halo en sus ejemplos y en su propio código.
-No las impone el compilador, pero ayudan a que todos los programas se lean
+No las impone el intérprete, pero ayudan a que todos los programas se lean
 igual.
 
 ## Indentación
@@ -169,7 +169,7 @@ variables intermedias:
 
 ```halo
 nombre = "Halo"
-version = "0.2"
+version = "0.3"
 mensaje = "Lenguaje: " + nombre + " v" + version
 print(mensaje)
 ```

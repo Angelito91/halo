@@ -45,9 +45,7 @@ print("valor: " + 42)   // valor: 42
 print(42 + " items")    // 42 items
 ```
 
-Si uno de los operandos es string, el otro se convierte a texto. En modo
-compilado esta conversión todavía no funciona con números; consulta
-[diferencias entre backends](../../referencia/diferencias/).
+Si uno de los operandos es string, el otro se convierte a texto.
 
 ### Repetir
 
@@ -200,10 +198,6 @@ print(str([1, 2]))   // "[1, 2]"
 
 `str()` sobre un string devuelve el mismo string.
 
-En modo compilado, `str()` solo formatea constantes por ahora; las variables
-todavía no se convierten correctamente. Consulta
-[diferencias entre backends](../../referencia/diferencias/).
-
 ## Formatear salida
 
 No hay interpolación de strings ni `printf`. Concatena con `+` y convierte con
@@ -211,7 +205,7 @@ No hay interpolación de strings ni `printf`. Concatena con `+` y convierte con
 
 ```halo
 nombre = "Halo"
-version = 0.2
+version = 0.3
 print("Lenguaje: " + nombre + " v" + str(version))
 ```
 

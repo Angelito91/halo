@@ -6,11 +6,6 @@ description: Creación, indexación, slicing, métodos y limitaciones de los arr
 Los arrays son colecciones ordenadas y **heterogéneas**: pueden mezclar
 números, strings, booleanos y otros arrays en la misma lista.
 
-:::caution
-Los arrays están implementados en el **intérprete**. El backend compilado
-todavía no los soporta, así que `halo run` es la forma de probarlos.
-:::
-
 ## Crear arrays
 
 ```halo
@@ -194,9 +189,6 @@ while i < len(nombres) {
 }
 ```
 
-En modo compilado solo funciona `for i in range(...)`; iterar sobre el array
-directamente no está soportado todavía.
-
 ## Arrays como valores
 
 Los arrays se pasan por valor, como el resto de tipos. Una función recibe una
@@ -232,7 +224,6 @@ Consulta [bucles](../bucles/#range) para los límites y el tamaño máximo.
 - No hay indexación negativa.
 - No hay asignación por índice (`arr[0] = x`).
 - No hay métodos que muten el array in-place.
-- En modo compilado, los arrays no existen todavía.
 
 ## Siguiente paso
 

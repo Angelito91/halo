@@ -1,15 +1,17 @@
 ---
 title: ¿Qué es Halo?
-description: Un lenguaje de programación pequeño, dinámico y educativo, escrito en Rust para aprender compiladores de principio a fin.
+description: Un lenguaje interpretado, dinámico y educativo, escrito en Rust para aprender cómo funciona un lenguaje y escribir scripts simples.
 ---
 
-Halo es un lenguaje de programación **dinámico y minimalista** creado con un
-objetivo educativo: que puedas seguir el viaje completo de un programa, desde
-el texto fuente hasta el binario nativo, sin perderte en capas de magia.
+Halo es un lenguaje de programación **dinámico, interpretado y minimalista**
+creado con un objetivo educativo: que puedas seguir el viaje completo de un
+programa, desde el texto fuente hasta su ejecución, sin perderte en capas de
+magia.
 
 Está escrito en Rust y cabe en una tarde de lectura. No pretende competir con
 lenguajes de producción; pretende ser un laboratorio donde experimentar con
-lexers, parsers, intérpretes y generación de código LLVM.
+lexers, parsers, AST y evaluación, y a la vez un lenguaje cómodo para escribir
+scripts cortos.
 
 ```halo
 // Un programa Halo completo
@@ -23,26 +25,27 @@ print(factorial(10))   // 3628800
 
 ## Por qué existe
 
-Muchos cursos de compiladores terminan en un intérprete de juguete o en un
-generador de código incompleto. Halo conecta las dos orillas:
+Muchos proyectos educativos terminan en un intérprete de juguete o en un
+conjunto de piezas que nunca llegan a ejecutarse. Halo conecta las dos orillas:
 
-- Tiene un **intérprete tree-walking** que ejecuta el AST directamente, ideal
-  para entender la semántica sin esperar a compilar.
-- Tiene un **backend LLVM** que produce binarios nativos reales, con niveles de
-  optimización `-O0` a `-O3`.
-- La suite de tests de paridad vigila las diferencias entre ambos caminos y
-  las registra mientras se corrigen. Consulta
-  [diferencias entre backends](../../referencia/diferencias/).
+- Tiene un **lexer** y un **parser** que puedes inspeccionar por separado con
+  `halo tokens` y `halo ast`.
+- Tiene un **intérprete tree-walking** que ejecuta el AST directamente, sin
+  binarios intermedios ni pasos ocultos.
+- Tiene una **suite de tests** que fija el comportamiento del lenguaje y sirve
+  de red de seguridad al modificarlo.
+- Está pensado para **scripts y programas simples**: no necesitas un proyecto,
+  un gestor de paquetes ni una fase de compilación.
 
 El resultado es un proyecto lo bastante pequeño para leerlo entero y lo
-bastante real para ver código máquina al final.
+bastante real para ejecutar programas útiles.
 
 ## Cómo se ve
 
 ```halo
 // Variables dinámicas: sin tipos ni palabras clave
 nombre = "Halo"
-version = 0.2
+version = 0.3
 activo = true
 
 // Control de flujo
@@ -74,8 +77,7 @@ print(saludar("mundo"))
 | Funciones | Parámetros, retorno, recursión directa y mutua, call-before-definition |
 | Colecciones | Arrays con literales, indexación, slicing y métodos |
 | Intérprete | Ejecución directa del AST con límites de recursión e iteraciones |
-| Compilador | AST → LLVM IR → binario nativo con `clang` o `llc + cc` |
-| CLI | `run`, `build`, `check`, `tokens`, `ast`, `llvm` |
+| CLI | `run`, `check`, `tokens`, `ast`, `help` y `version` |
 
 Consulta la [guía del lenguaje](../../guia/estructura/) para los detalles y la
 [referencia de built-ins](../../referencia/builtins/) para la lista completa.
@@ -85,26 +87,27 @@ Consulta la [guía del lenguaje](../../guia/estructura/) para los detalles y la
 Halo está en desarrollo activo. Estas son las limitaciones que conviene
 conocer antes de escribir tu primer programa:
 
-- **El modo compilado no soporta arrays.** El intérprete sí; los binarios
-  nativos todavía no. `for` compilado solo acepta `range()`.
+- **No genera binarios nativos.** Es un intérprete: ejecutas el archivo con
+  `halo run` y nada más.
 - **No hay diccionarios ni maps.** Están planificados.
-- **Los errores de runtime no siempre incluyen línea y columna.** Es una de las
-  prioridades del próximo hito.
+- **No hay closures ni funciones de primera clase.**
 - **No hay REPL ni gestor de paquetes.** La CLI es pequeña y directa.
 - **No hay comentarios multilínea.** Solo `//`.
+- **No hay asignación por índice** (`arr[0] = x`). Los métodos de array
+  devuelven un array nuevo en lugar de mutar el original.
 
 Puedes seguir el estado en el [roadmap](../../proyecto/roadmap/).
 
 ## Para quién es
 
-- **Estudiantes de compiladores** que quieren un código base legible y
-  ejecutable, no un esqueleto incompleto.
+- **Estudiantes de lenguajes e intérpretes** que quieren un código base
+  legible y ejecutable, no un esqueleto incompleto.
 - **Desarrolladores curiosos** que quieren entender qué pasa entre un archivo
-  `.halo` y un ejecutable.
+  `.halo` y su salida.
 - **Docentes** que buscan un ejemplo real para explicar lexer, parser, AST,
-  scoping, evaluación y codegen.
-- **Gente que disfruta** de los lenguajes pequeños y de las implementaciones
-  honestas.
+  scoping y evaluación.
+- **Gente que quiere escribir scripts cortos** y prefiere un lenguaje pequeño,
+  sin configuración y sin dependencias.
 
 ## Siguiente paso
 

@@ -14,12 +14,12 @@ const cargoPath = candidates.find((path) => existsSync(path));
 
 if (!cargoPath) {
 	throw new Error(
-		`Could not find the compiler's Cargo.toml. Looked in:\n${candidates.join('\n')}`,
+		`Could not find the project's Cargo.toml. Looked in:\n${candidates.join('\n')}`,
 	);
 }
 
 const cargoToml = readFileSync(cargoPath, 'utf8');
 const match = /^version\s*=\s*"([^"]+)"/m.exec(cargoToml);
 
-/** Version declared by the compiler's Cargo.toml, read at build time. */
+/** Version declared by the project's Cargo.toml, read at build time. */
 export const VERSION = match?.[1] ?? '0.0.0';

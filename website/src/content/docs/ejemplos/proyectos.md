@@ -220,8 +220,7 @@ parámetros.
 - Convierte cada proyecto en una función que reciba parámetros y devuelva un
   string.
 - Escribe tests manuales con `print()` y compara salidas.
-- Cuando los arrays funcionen en modo compilado, compila estos programas con
-  `halo build -O3`.
+- Inspecciona el AST con `halo ast` y los tokens con `halo tokens`.
 
 ## Siguiente paso
 

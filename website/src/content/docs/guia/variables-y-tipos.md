@@ -79,9 +79,7 @@ No hay notación científica, sufijos (`42i64`, `1.5f`) ni literales
 hexadecimales en la sintaxis actual.
 
 La aritmética entera usa operaciones comprobadas: si un resultado se sale del
-rango de `i64`, el programa falla en vez de dar la vuelta silenciosamente. En
-modo compilado esta comprobación todavía no existe; consulta
-[diferencias entre backends](../../referencia/diferencias/).
+rango de `i64`, el programa falla en vez de dar la vuelta silenciosamente.
 
 ```halo
 x = 9223372036854775807 + 1   // Error: Integer overflow in addition

@@ -1,10 +1,10 @@
 ---
 title: Tu primer programa
-description: Crea, ejecuta y compila tu primer programa en Halo paso a paso.
+description: Crea, ejecuta e inspecciona tu primer programa en Halo paso a paso.
 ---
 
-En cinco minutos vas a tener un programa Halo ejecutándose en el intérprete y
-compilado a un binario nativo.
+En cinco minutos vas a tener un programa Halo ejecutándose y vas a poder mirar
+por dentro de cada fase del intérprete.
 
 ## 1. Crea el archivo
 
@@ -42,8 +42,8 @@ halo hola.halo
 
 ```halo title="hola.halo"
 nombre = "Halo"
-version = 0.2
-anio = 2024
+version = 0.3
+anio = 2026
 
 print("Lenguaje: " + nombre)
 print("Versión: " + str(version))
@@ -54,8 +54,8 @@ Salida:
 
 ```text
 Lenguaje: Halo
-Versión: 0.2
-Año: 2024
+Versión: 0.3
+Año: 2026
 ```
 
 La concatenación con `+` convierte el otro operando a string automáticamente.
@@ -83,63 +83,55 @@ Las funciones se definen con `nombre(parámetros) { … }`, sin palabra clave.
 Puedes llamarlas antes de que aparezcan en el archivo: el intérprete registra
 todas las definiciones en un primer pase.
 
-## 5. Compila a binario
-
-El backend nativo todavía tiene divergencias conocidas: `str()` sobre variables,
-la concatenación de string con número y los arrays no se comportan igual que en
-el intérprete. Para probar `halo build`, usa un programa escalar sencillo:
-
-```halo title="saludo.halo"
-nombre = "Halo"
-print("Hola, " + nombre)
-```
-
-Si tienes LLVM 23.1 y Clang instalados:
-
-```bash
-halo build saludo.halo
-./saludo
-# Hola, Halo
-```
-
-En Windows:
-
-```powershell
-halo build saludo.halo
-.\saludo.exe
-# Hola, Halo
-```
-
-El binario es independiente del intérprete de Halo. Por defecto se genera con
-optimización `-O2`; puedes cambiarla:
-
-```bash
-halo build -O3 -o saludo saludo.halo
-halo build --run saludo.halo    # compila y ejecuta
-```
-
-Consulta [diferencias entre backends](../../referencia/diferencias/) antes de
-compilar programas más grandes.
-
-## 6. Inspecciona el proceso
+## 5. Inspecciona el proceso
 
 Una de las ventajas de Halo es que puedes ver cada fase:
 
 ```bash
-halo tokens hola.halo    # tokens del lexer
+halo tokens hola.halo    # tokens del lexer, con línea y columna
 halo ast hola.halo       # árbol de sintaxis
 halo check hola.halo     # solo valida sintaxis
-halo llvm hola.halo      # emite hola.ll (LLVM IR)
 ```
 
-Prueba `halo ast` con una función y observa cómo se representa el cuerpo.
+`halo ast` es especialmente útil para entender cómo se representa una función
+o un `if`. Prueba a ejecutarlo con el archivo que acabas de escribir.
+
+También puedes pedir información de progreso mientras ejecutas:
+
+```bash
+halo run --verbose hola.halo
+```
+
+## 6. Escribe un script corto
+
+Los arrays y los bucles permiten resolver tareas pequeñas sin salir del
+lenguaje:
+
+```halo title="notas.halo"
+notas = [7, 9, 6, 10]
+
+total = 0
+for nota in notas {
+    total = total + nota
+}
+
+print("Notas:", notas)
+print("Media:", total / len(notas))
+```
+
+```bash
+halo run notas.halo
+# Notas: [7, 9, 6, 10]
+# Media: 8
+```
 
 ## Errores comunes al empezar
 
 ### `Undefined variable: 'x'`
 
-Leíste una variable antes de asignarla. Halo no tiene `undefined`; toda
-variable debe existir antes de usarse.
+Leíste una variable antes de asignarla. Halo no tiene un valor `undefined`;
+toda variable debe existir antes de usarse y `null` representa la ausencia de
+valor. El error incluye la línea y la columna:
 
 ```halo
 print(x)   // Error

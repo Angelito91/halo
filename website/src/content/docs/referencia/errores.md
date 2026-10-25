@@ -9,15 +9,9 @@ programa parsea bien, pero una operación no es válida con los valores que
 recibe.
 
 :::note
-Los errores de runtime todavía no incluyen una traza con línea y columna en
-todos los casos. Para localizar el problema, combina `print()` con
-`halo check`, `halo tokens` y `halo ast`.
-:::
-
-:::caution
-Este catálogo describe el **intérprete**. El backend compilado todavía no
-comprueba overflow ni división por cero, y algunas conversiones no están
-soportadas. Consulta [diferencias entre backends](../diferencias/).
+Los errores de runtime incluyen la posición de la sentencia que falló y, cuando
+aplica, una sugerencia de nombre parecido. Para localizar el problema también
+puedes combinar `print()` con `halo check`, `halo tokens` y `halo ast`.
 :::
 
 ## Errores de sintaxis
@@ -30,7 +24,8 @@ El lexer y el parser fallan antes de ejecutar nada. Algunos mensajes típicos:
 | `Expected ')' after arguments` | Falta cerrar un paréntesis |
 | `Expected ']' after array index` | Falta cerrar un corchete |
 | `Expected '{' after if condition` | El `{` no está en la misma línea o falta |
-| `Expected '=' in variable declaration` | Asignación incompleta |
+| `Expected '{' before function body` | Falta la llave de una función |
+| `Expected '=' in global variable declaration` | Asignación incompleta en el nivel superior |
 | `Expected an expression` | Operador sin operando |
 | `Expected a function definition, global variable, or statement` | Token inesperado al inicio de una declaración |
 
@@ -139,9 +134,6 @@ while true { }        // Loop iteration limit exceeded (1000000)
 range(1.5)            // range() expects integer arguments, got 'float'
 ```
 
-En modo compilado, `for` sobre un array produce un error de “not yet
-supported” aunque el array exista.
-
 ## Arrays
 
 | Error | Causa |
@@ -194,7 +186,7 @@ sort([1, "a"]) // sort() cannot mix strings and numbers in the same array
 3. **Valida sintaxis**: `halo check archivo.halo`.
 4. **Inspecciona tokens**: `halo tokens archivo.halo`.
 5. **Inspecciona el AST**: `halo ast archivo.halo`.
-6. **Prueba en el intérprete**: `halo run` antes de `halo build`.
+6. **Reproduce el fallo**: ejecuta el caso mínimo con `halo run`.
 
 ```halo
 valor = "42"
@@ -207,7 +199,7 @@ print(int(valor))    // 42
 | Código | Significado |
 |---|---|
 | `0` | Éxito |
-| `1` | Error de lexer, parser, runtime o compilación |
+| `1` | Error de lexer, parser o runtime |
 
 Los errores se escriben en `stderr`, así que puedes separar la salida normal:
 

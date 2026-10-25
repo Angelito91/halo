@@ -31,15 +31,16 @@ git switch -c feat/mi-caracteristica
 cargo test
 ```
 
-Necesitas Rust estable reciente y LLVM 23.1 + Clang. Consulta
-[Instalación](../../empezando/instalacion/) si algo falla.
+Necesitas Rust estable reciente. No hace falta ningún compilador nativo ni
+bibliotecas del sistema. Consulta [Instalación](../../empezando/instalacion/)
+si algo falla.
 
 ## Ciclo de trabajo
 
 ```bash
 cargo fmt --all
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
 ```
 
 Repite hasta que todo pase. Antes del PR, ejecuta también la comprobación de
@@ -53,11 +54,11 @@ cargo fmt --all -- --check
 
 | Área | Ideas |
 |---|---|
-| Tests | Casos límite, errores, paridad intérprete/compilador |
+| Tests | Casos límite, errores, programas completos |
 | Documentación | Ejemplos nuevos, aclaraciones, errores corregidos |
-| Diagnósticos | Mensajes más claros, línea/columna en runtime |
+| Diagnósticos | Mensajes más claros, posición y sugerencias |
 | Intérprete | Builtins, métodos, semántica de arrays |
-| Compilador | Arrays, `for` sobre arrays, optimizaciones |
+| Stdlib | Nuevas funciones y métodos sobre valores |
 | CLI | Salida, flags, ayuda |
 | Ejemplos | Programas completos y comentados |
 
@@ -66,30 +67,26 @@ Si no sabes por dónde empezar, busca issues etiquetados como
 
 ## Añadir un builtin
 
-El catálogo es la fuente de verdad. Los pasos típicos:
+Los pasos típicos:
 
-1. **Registra el builtin** en `src/lang/catalog.rs` con su nombre, aridad y
-   `Support` (`Both`, `InterpreterOnly` o `CompilerOnly`).
-2. **Implementa la función** en
-   `src/interpreter/evaluator/builtins.rs` o en el módulo de métodos que
-   corresponda (`methods/arrays.rs`, `methods/strings.rs`).
-3. **Añade el método**, si tiene sentido, en
-   `src/interpreter/evaluator/methods/mod.rs`.
-4. **Implementa el codegen** si el builtin debe funcionar en binarios
-   (`src/compiler/codegen/builtins/`). Si no, márcalo como
-   `InterpreterOnly`.
-5. **Añade tests** de valor, aridad, tipos inválidos y, si aplica, paridad.
-6. **Documenta** el builtin en `website/src/content/docs/referencia/builtins.md`
-   y, si es una característica del lenguaje, en la guía correspondiente.
+1. **Registra el nombre** en `BUILTIN_NAMES` dentro de
+   `src/stdlib/builtins.rs`.
+2. **Añade el despacho** en `call_builtin` (`src/stdlib/builtins.rs`).
+3. **Implementa la función** en `src/stdlib/arrays.rs` o
+   `src/stdlib/strings.rs`, según el tipo sobre el que trabaje, o directamente
+   en `src/stdlib/builtins.rs` si es una operación escalar.
+4. **Añade el método**, si tiene sentido, en `src/stdlib/mod.rs`
+   (`call_method`).
+5. **Añade tests** de valor, aridad y tipos inválidos en `tests/stdlib_tests.rs`
+   o en la suite del tipo correspondiente.
+6. **Documenta** el builtin en
+   `website/src/content/docs/referencia/builtins.md` y, si es una
+   característica del lenguaje, en la guía correspondiente.
 
-Ejemplo de entrada en el catálogo:
+Ejemplo de despacho:
 
 ```rust
-Builtin {
-    name: "min",
-    arity: 2..=2,
-    support: Both,
-},
+"min" => super::arrays::builtin_min(args)?,
 ```
 
 No olvides comprobar el mensaje de aridad: los tests lo usan como contrato.
@@ -98,17 +95,19 @@ No olvides comprobar el mensaje de aridad: los tests lo usan como contrato.
 
 El recorrido completo suele ser:
 
-1. **Lexer**: nuevo `TokenKind` y su regla de escaneo.
-2. **Parser**: nodo en `ast.rs`, regla en `declarations.rs` o `statements.rs`,
-   y precedencia si es una expresión.
-3. **Intérprete**: evaluación en `evaluator/`.
-4. **Compilador**: codegen en `compiler/codegen/`.
-5. **Tests**: lexer, parser, evaluador, compilador y paridad.
-6. **Documentación**: guía, referencia y, si cambia la sintaxis, `SYNTAX.md`.
+1. **Lexer**: nuevo `TokenKind` en `src/lexer/token.rs` y su regla de escaneo
+   en `src/lexer/lexer.rs`.
+2. **Parser**: nodo en `src/parser/ast.rs`, regla en `declarations.rs`,
+   `statements.rs` o `expressions.rs`, y precedencia si es una expresión.
+3. **Evaluador**: evaluación en `src/interpreter/evaluator/`.
+4. **Stdlib**: si la característica es una operación sobre valores, añádela en
+   `src/stdlib/`.
+5. **Tests**: lexer, parser, evaluador y, si aplica, CLI y ejemplos.
+6. **Documentación**: guía y referencia.
 
-Si la característica no está lista para el compilador, declárala como
-`InterpreterOnly` y documenta la limitación. Es mejor un backend honesto que
-uno que falla en silencio.
+Halo es interpreter-only. No hay una segunda implementación que mantener en
+paralelo, así que el comportamiento que documentas es el que ejecuta
+`halo run`.
 
 ## Documentación
 
@@ -130,7 +129,7 @@ en `website/astro.config.mjs`. Los enlaces internos son relativos
 
 - Español claro y directo.
 - Ejemplos ejecutables; si algo no funciona, no lo publiques.
-- Distingue lo que hace el intérprete de lo que hace el compilador.
+- Describe el comportamiento del intérprete, sin comparaciones con otras implementaciones.
 - Usa `halo` en los bloques de código para el resaltado.
 - Enlaza a la referencia en lugar de repetir tablas enteras.
 
@@ -156,8 +155,8 @@ Antes de abrir el PR:
 
 - [ ] La rama está actualizada con `upstream/main`.
 - [ ] `cargo fmt --all -- --check` pasa.
-- [ ] `cargo clippy --all-targets --all-features -- -D warnings` pasa.
-- [ ] `cargo test` pasa.
+- [ ] `cargo clippy --all-targets --locked -- -D warnings` pasa.
+- [ ] `cargo test --locked` pasa.
 - [ ] Hay tests para el comportamiento nuevo.
 - [ ] La documentación está actualizada.
 - [ ] El PR explica el problema y la solución.

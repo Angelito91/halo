@@ -1,6 +1,6 @@
 ---
 title: Bucles
-description: while, for … in, range, break y continue, con sus límites y diferencias entre intérprete y compilador.
+description: while, for … in, range, break y continue, con sus límites y ejemplos.
 ---
 
 Halo tiene dos bucles: `while` y `for … in`. No hay `do … while`, `loop` ni
@@ -53,10 +53,6 @@ for nombre in nombres {
     print("Hola, " + nombre)
 }
 ```
-
-> En modo compilado (`halo build`) `for` solo acepta `range(n)` o
-> `range(a, b)` **directamente** en la cabecera. Iterar sobre un array o una
-> variable que contiene un array produce un error de “not yet supported”.
 
 ## `range`
 

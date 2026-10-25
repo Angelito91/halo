@@ -1,12 +1,14 @@
 ---
 title: Arquitectura
-description: Cómo está construido Halo por dentro, desde el lexer hasta LLVM, y por qué el código está organizado así.
+description: Cómo está construido Halo por dentro, desde el lexer hasta el evaluador, y por qué el código está organizado así.
 ---
 
 Halo es un proyecto pequeño a propósito. La idea es que puedas abrir cualquier
 archivo de `src/` y entender qué hace sin un mapa. Esta página es ese mapa.
 
 ## Pipeline
+
+Halo tiene un solo motor: un intérprete tree-walking.
 
 ```text
 Código fuente (.halo)
@@ -28,22 +30,22 @@ Código fuente (.halo)
 │ · Errores con posición        │
 └───────────────────────────────┘
         │ AST
-        ├─────────────────────────────┐
-        ▼                             ▼
-┌───────────────────────┐   ┌───────────────────────────────┐
-│ INTÉRPRETE            │   │ COMPILADOR     src/compiler/  │
-│ src/interpreter/      │   │ · AST → LLVM IR               │
-│ · Tree-walking        │   │ · Optimización O0–O3          │
-│ · Valores dinámicos   │   │ · Toolchain clang o llc+cc    │
-│ · Arrays y métodos    │   │ · Strings (sin arrays)        │
-└───────────────────────┘   └───────────────────────────────┘
-        │                             │
-        ▼                             ▼
-   Resultado                    Binario nativo
+        ▼
+┌───────────────────────────────┐
+│ EVALUADOR    src/interpreter/ │
+│ · Tree-walking                │
+│ · Valores dinámicos           │
+│ · Entorno plano con frames    │
+│ · Built-ins en src/stdlib/    │
+└───────────────────────────────┘
+        │
+        ▼
+   stdout / error
 ```
 
-Los dos caminos comparten lexer, parser y AST. La diferencia es qué se hace con
-el árbol: recorrerlo o convertirlo en IR.
+No hay backend nativo, bytecode, VM ni artefactos intermedios. Esa decisión
+mantiene el proyecto legible y hace que el comportamiento documentado sea el
+mismo que se ejecuta.
 
 ## Estructura del repositorio
 
@@ -60,31 +62,27 @@ halo/
 │   │   ├── declarations.rs  # Funciones y globales
 │   │   ├── statements.rs    # if, while, for, return…
 │   │   ├── expressions.rs   # Precedencia y expresiones
-│   │   ├── ast.rs           # Nodos del AST
-│   │   └── visitor.rs       # Recorrido genérico
+│   │   └── ast.rs           # Nodos del AST
 │   ├── interpreter/
 │   │   ├── environment.rs   # Tabla plana + frames
 │   │   ├── value.rs         # Value y operaciones
+│   │   ├── errors.rs        # Mensajes de runtime
+│   │   ├── format.rs        # Formato canónico de valores
 │   │   └── evaluator/       # Evaluación del AST
 │   │       ├── core.rs
 │   │       ├── statements.rs
 │   │       ├── expressions.rs
-│   │       ├── calls.rs
-│   │       ├── builtins.rs
-│   │       └── methods/     # Métodos de arrays y strings
-│   ├── compiler/
-│   │   ├── mod.rs           # Orquestación y toolchains
-│   │   ├── builder.rs       # Contexto LLVM
-│   │   ├── types.rs         # Tipos del codegen
-│   │   └── codegen/         # AST → LLVM IR
+│   │       └── calls.rs
+│   ├── stdlib/
+│   │   ├── builtins.rs      # Despacho de funciones globales
+│   │   ├── arrays.rs        # Operaciones de arrays
+│   │   ├── strings.rs       # Operaciones de strings
+│   │   └── mod.rs           # Despacho de métodos
 │   ├── cli/                 # Un módulo por subcomando
-│   ├── diagnostics/         # Códigos y estilo de errores
-│   ├── lang/                # Catálogo de builtins y errores
-│   └── utils/               # Constantes y helpers
+│   └── diagnostics/         # Errores, colores y sugerencias
 ├── tests/                   # Suite de integración
 ├── examples/                # Programas .halo comentados
 ├── website/                 # Esta documentación (Astro + Starlight)
-├── SYNTAX.md                # Referencia histórica de sintaxis
 └── Cargo.toml
 ```
 
@@ -95,7 +93,7 @@ estado para strings y comentarios.
 
 - Cada token lleva su **posición** (línea y columna) para los diagnósticos.
 - El **salto de línea** es un token significativo: separa sentencias en el
-  flujo de tokens, aunque el parser actual no exige un separador entre ellas.
+  flujo de tokens. El parser lo consume entre declaraciones.
 - Los comentarios `//` se descartan.
 - Los strings aceptan comillas simples y dobles, con escapes.
 
@@ -122,7 +120,8 @@ parse_expression
                           └── parse_term  + -
                                 └── parse_factor  * / %
                                       └── parse_unary  - !
-                                            └── parse_primary
+                                            └── parse_postfix  llamadas, índices, métodos
+                                                  └── parse_primary
 ```
 
 El resultado es un AST tipado:
@@ -141,12 +140,12 @@ pub enum Statement {
 ```
 
 Las funciones se guardan aparte, en una lista de declaraciones. Antes de
-ejecutar el programa, el intérprete las registra todas: de ahí viene
+ejecutar el programa, el evaluador las registra todas: de ahí viene
 *call-before-definition*.
 
-## Intérprete
+## Evaluador
 
-El intérprete recorre el AST y evalúa cada nodo. Es un **tree-walking
+El evaluador recorre el AST y evalúa cada nodo. Es un **tree-walking
 interpreter** clásico, con dos decisiones de diseño destacables.
 
 ### Valores dinámicos
@@ -186,100 +185,78 @@ Ventajas:
 - No hay allocaciones de `HashMap` por llamada.
 
 `set` escribe en el frame actual; `update` busca desde dentro hacia fuera y
-actualiza donde encuentra la variable. El `for` usa `update` para que los
-acumuladores funcionen, y por eso las variables nuevas del cuerpo desaparecen
-al salir del bucle.
+actualiza donde encuentra la variable. El `for` crea un frame propio para su
+variable, así que esta no pisa una variable externa. Las asignaciones dentro
+del cuerpo siguen actualizando la variable que encuentran, y las variables
+nuevas del cuerpo desaparecen al salir del bucle.
 
 ### Llamadas y recursión
 
 Cada llamada a función hace `push_scope`, evalúa el cuerpo y hace `pop_scope`.
-Un contador limita la profundidad a **500** llamadas para evitar desbordar el
-stack de Rust.
+Un contador limita la profundidad a **500** llamadas fuera de los tests para
+evitar desbordar el stack de Rust. Los tests usan un límite menor para que el
+fallo llegue antes que el desbordamiento nativo.
 
-## Compilador
+Los bucles tienen además un límite de **1 000 000 de iteraciones** por
+programa, pensado para cortar bucles infinitos sin bloquear la máquina.
 
-El compilador recorre el AST y emite LLVM IR usando `inkwell`. Después invoca
-un toolchain para producir el binario:
+### Built-ins y métodos
 
-| Toolchain | Pasos |
-|---|---|
-| `clang` (por defecto) | `clang programa.ll -o programa` |
-| `llc` | `llc programa.ll` → `cc programa.s -o programa` |
+`src/stdlib/` implementa las funciones globales y los métodos. Reciben
+**valores ya evaluados**, no nodos del AST, así que no conocen el evaluador ni
+el parser. Añadir una función empieza en `builtins.rs` y termina en `arrays.rs`
+o `strings.rs`.
 
-Los niveles `-O0` a `-O3` se aplican con los pases de optimización de LLVM. Por
-defecto se usa `-O2`.
-
-### Qué soporta hoy
-
-| Característica | Intérprete | Compilado |
-|---|:---:|:---:|
-| Números, floats, bools, strings | ✅ | ✅ |
-| `if`, `while`, `break`, `continue` | ✅ | ✅ |
-| Funciones y recursión | ✅ | ✅ |
-| `for i in range(...)` | ✅ | ✅ |
-| Arrays | ✅ | ❌ |
-| `for` sobre arrays | ✅ | ❌ |
-| Métodos de string | ✅ | ✅ |
-| `range` como valor | ✅ | ❌ |
-
-Esta tabla resume **disponibilidad**, no paridad exacta. Hay divergencias de
-formato y de comprobaciones en el backend nativo; están listadas en
-[diferencias entre backends](../../referencia/diferencias/).
-
-El compilador genera una función `main` de C (`i32 main()`) que envuelve las
-sentencias globales. Las funciones de usuario se convierten en funciones LLVM
-con firmas estáticas: todos los parámetros son `i64` (los strings se pasan como
-puntero convertido a entero); el retorno es `i64`, `f64` o un puntero a `i8`
-para strings.
+En los built-ins, los argumentos se evalúan antes del despacho. Por eso una
+llamada a un builtin puede reportar primero el error de un argumento (por
+ejemplo, una variable inexistente) y después la aridad o el método
+desconocido. En funciones de usuario, la aridad se comprueba antes de evaluar
+los argumentos.
 
 ## Diagnósticos
 
-`src/diagnostics/` centraliza el estilo de los errores y los códigos. El
-objetivo es que los mensajes sean consistentes y apunten a la causa, no solo al
-síntoma.
+`src/diagnostics/` centraliza el estilo de los errores, los colores y las
+sugerencias. El objetivo es que los mensajes sean consistentes y apunten a la
+causa, no solo al síntoma.
 
 ```text
-Error: Undefined variable: 'x'
+error: Undefined variable: 'nombra'
+  → script.halo:3:7
+  Did you mean 'nombre'?
 ```
 
-Los errores de parser incluyen posición. Los de runtime todavía no siempre
-incluyen línea y columna; es una tarea pendiente del roadmap.
-
-## Catálogo de builtins
-
-`src/lang/catalog.rs` es la **fuente de verdad** de las funciones y métodos:
-
-```rust
-pub struct Builtin {
-    pub name: &'static str,
-    pub arity: RangeInclusive<usize>,
-    pub support: Support,
-}
-```
-
-`Support` distingue `Both`, `InterpreterOnly` y `CompilerOnly`. Los tests usan
-este catálogo para validar aridad y soporte; el intérprete y el compilador son
-quienes implementan el comportamiento. Añadir un builtin empieza ahí.
+Los errores del parser incluyen posición. Los errores de runtime se anotan con
+la posición de la sentencia que falló y, cuando aplica, con una sugerencia de
+nombre parecido.
 
 ## Decisiones de diseño
 
-- **Sin dependencias pesadas.** Solo `inkwell`, `serde` y lo mínimo.
+- **Sin dependencias externas.** El `Cargo.toml` no declara ninguna.
 - **Un binario.** Todos los subcomandos viven en `halo`.
-- **Dos backends, diferencias explícitas.** La suite de paridad compara
-  intérprete y binario, y registra las divergencias conocidas hasta corregirlas.
-  El intérprete es la referencia semántica actual.
+- **Interpreter-only.** No hay backend nativo. Cualquier backend futuro sería
+  un proyecto separado, no una dependencia del intérprete.
 - **Legibilidad antes que microoptimización.** Salvo el entorno, que está
   diseñado para evitar allocaciones en el camino caliente.
 - **Errores explícitos.** Mejor fallar con un mensaje claro que devolver un
   valor raro.
 
+## Nota histórica
+
+Hasta la versión 0.2.0 el proyecto incluía un backend LLVM que generaba
+binarios nativos. Se eliminó en 0.3.0 para simplificar el código y centrar el
+proyecto en el intérprete. El backend anterior está preservado en la rama
+`archive/llvm-backend` y en el tag `llvm-backend-final`; no forma parte de la
+versión actual.
+
 ## Limitaciones conocidas
 
-- El compilador no soporta arrays ni `for` sobre arrays.
 - No hay maps, closures ni funciones de primera clase.
-- Los errores de runtime no siempre tienen línea/columna.
+- No hay asignación por índice (`arr[0] = x`); los métodos devuelven un array
+  nuevo.
 - No hay REPL ni package manager.
-- La stdlib es el catálogo de builtins, no una biblioteca separada.
+- No hay comentarios multilínea `/* … */`.
+- La posición de un error de runtime apunta a la sentencia, no siempre a la
+  expresión exacta.
 
 ## Siguiente paso
 

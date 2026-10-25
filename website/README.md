@@ -3,6 +3,8 @@
 Sitio oficial de documentación del lenguaje Halo, construido con
 [Astro](https://astro.build/) y [Starlight](https://starlight.astro.build/).
 
+Documenta Halo **0.3.0**, la versión interpreter-only del lenguaje.
+
 - **Producción:** <https://angelito91.github.io/halo/>
 - **Contenido:** español
 - **Base path:** `/halo`
@@ -97,7 +99,7 @@ URL coincide con su directorio y los enlaces relativos funcionan tal cual.
 ## Versión
 
 El badge de versión y el aviso de estado de la portada leen `../Cargo.toml` en
-build time (`src/lib/version.ts`). Si cambias la versión del compilador, esos
+build time (`src/lib/version.ts`). Si cambias la versión del proyecto, esos
 elementos se actualizan solos en el siguiente build.
 
 ## Despliegue

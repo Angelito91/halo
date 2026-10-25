@@ -1,10 +1,10 @@
 ---
 title: Documentación
-description: Un lenguaje dinámico y minimalista para aprender cómo funcionan los compiladores, desde el lexer hasta LLVM.
+description: Un lenguaje interpretado, dinámico y minimalista para aprender cómo funciona un lenguaje y escribir scripts simples.
 template: splash
 hero:
   title: Halo
-  tagline: Un lenguaje pequeño, legible y hackeable para aprender compiladores construyendo uno. Sin frameworks, sin magia y sin semicolons.
+  tagline: Un lenguaje pequeño y legible para aprender cómo funciona un lenguaje y escribir tus primeros scripts. Sin frameworks, sin magia y sin punto y coma.
   image:
     file: ../../assets/halo.png
     alt: Mascota de Halo
@@ -21,11 +21,11 @@ hero:
 import { Aside, Card, CardGrid, LinkCard, TabItem, Tabs } from '@astrojs/starlight/components';
 import { VERSION } from '../../lib/version';
 
-## Empieza en dos comandos
+## Empieza en un par de minutos
 
-Halo se compila con Rust. Compilar el proyecto desde fuente requiere LLVM porque
-`inkwell` es una dependencia obligatoria, aunque solo vayas a usar `halo run`.
-Clang solo hace falta para enlazar binarios con `halo build`.
+Halo está escrito en Rust y no tiene dependencias externas. Solo necesitas un
+toolchain de Rust estable: no hay LLVM, Clang ni bibliotecas del sistema que
+instalar.
 
 <Tabs>
 	<TabItem label="Linux / macOS">
@@ -51,25 +51,25 @@ o salta directamente al [primer programa](empezando/primer-programa/).
 
 ## Todo el pipeline, a la vista
 
-Halo no esconde las fases: puedes inspeccionar los tokens, el AST, el IR de LLVM
-y el binario final con un solo ejecutable.
+Halo no esconde las fases: puedes inspeccionar los tokens, el AST y la
+evaluación con un solo ejecutable.
 
 <CardGrid>
-	<Card title="Lexer + parser" icon="pencil">
-		Escaneo lineal, parser recursivo descendente y un AST tipado que puedes
-		imprimir con `halo ast`.
+	<Card title="Lexer" icon="pencil">
+		Escaneo lineal que convierte el texto en tokens con su posición exacta.
+		Míralos con `halo tokens`.
 	</Card>
-	<Card title="Intérprete tree-walking" icon="rocket">
-		Ejecuta el AST directamente con `halo run`. Ideal para experimentar sin
-		compilar.
+	<Card title="Parser" icon="approve-check">
+		Parser recursivo descendente que construye un AST legible. Imprímelo con
+		`halo ast`.
 	</Card>
-	<Card title="Backend LLVM" icon="setting">
-		Genera IR optimizado (O0–O3) y enlaza con `clang` o `llc` para producir
-		un binario nativo.
+	<Card title="Intérprete" icon="rocket">
+		Evaluador tree-walking que ejecuta el AST directamente con `halo run`.
+		Sin binarios intermedios ni pasos ocultos.
 	</Card>
 	<Card title="Errores claros" icon="error">
 		Variables inexistentes, aridad incorrecta, overflow, recursión excesiva y
-		bucles infinitos se detectan con mensajes explícitos.
+		bucles infinitos se detectan con mensajes y posición.
 	</Card>
 </CardGrid>
 
@@ -92,30 +92,31 @@ $ halo run factorial.halo
 3628800
 ```
 
-Cuando quieras velocidad, el mismo programa se compila a un ejecutable nativo:
+Es un lenguaje pensado para **programas cortos y scripts**: automatizar una
+tarea, convertir datos, practicar un algoritmo o enseñar cómo se evalúa una
+expresión. No necesitas montar un proyecto ni aprender un ecosistema entero
+antes de escribir tu primera línea.
 
-```bash
-halo build -O3 --run factorial.halo
+## Un solo motor
+
+Halo es **interpreter-only** desde la versión 0.3.0. El flujo es siempre el
+mismo:
+
+```text
+archivo.halo → lexer → tokens → parser → AST → evaluador → stdout
 ```
 
-## Dos backends, con diferencias conocidas
+No hay backend nativo, ni máquina virtual, ni artefactos que compilar. Esa
+decisión mantiene el proyecto pequeño y hace que el comportamiento documentado
+sea exactamente el que ves al ejecutar `halo run`.
 
-El intérprete es la referencia completa. El compilador todavía no comparte toda
-la semántica; las divergencias están documentadas en
-[diferencias entre backends](referencia/diferencias/).
-
-| | Intérprete (`halo run`) | Compilado (`halo build`) |
-|---|---|---|
-| Arranque | Inmediato | Requiere LLVM + Clang |
-| Arrays y métodos de array | ✅ | ❌ todavía no |
-| `for` sobre `range()` | ✅ | ✅ (solo esa forma) |
-| `range()` como valor | ✅ | ❌ |
-| Optimización | — | `-O0` a `-O3` |
-| Ideal para | Aprender y prototipar | Ver el código máquina y medir |
-
-La suite de tests de paridad compara ambos backends y registra las diferencias
-conocidas mientras se corrigen. Puedes leer más en
-[arquitectura](proyecto/arquitectura/) y [testing](proyecto/testing/).
+| Pieza | Qué hace |
+|---|---|
+| Lexer | Texto → tokens con línea y columna |
+| Parser | Tokens → AST |
+| Evaluador | Recorre el AST y ejecuta el programa |
+| Stdlib | Built-ins y métodos sobre valores ya evaluados |
+| CLI | `run`, `check`, `tokens` y `ast` en un único binario |
 
 ## Explora la documentación
 
@@ -137,13 +138,13 @@ conocidas mientras se corrigen. Puedes leer más en
 	/>
 	<LinkCard
 		title="Roadmap"
-		description="Qué está hecho, qué viene en la próxima versión y cómo contribuir."
+		description="Qué está hecho, qué viene después y cómo contribuir."
 		href="proyecto/roadmap/"
 	/>
 </CardGrid>
 
 <Aside type="note" title="Estado del proyecto">
 	Halo está en desarrollo activo. La documentación corresponde a la versión
-	**v{VERSION}** y se actualiza junto con el compilador. Si algo no coincide con el
-	código, [abre un issue](https://github.com/Angelito91/halo/issues).
+	**v{VERSION}** y se actualiza junto con el intérprete. Si algo no coincide con
+	el código, [abre un issue](https://github.com/Angelito91/halo/issues).
 </Aside>

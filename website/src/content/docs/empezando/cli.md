@@ -1,6 +1,6 @@
 ---
 title: La CLI de Halo
-description: Referencia de los subcomandos run, build, check, tokens, ast y llvm, con sus flags y códigos de salida.
+description: Referencia de los subcomandos run, check, tokens, ast, help y version, con sus flags y códigos de salida.
 ---
 
 Halo expone un único binario, `halo`, que cubre todas las fases del lenguaje:
@@ -14,8 +14,10 @@ halo <archivo.halo>          # atajo para `halo run`
 
 | Flag | Alias | Descripción |
 |---|---|---|
-| `--help` | `-h` | Muestra la ayuda |
+| `--help` | `-h` | Muestra la ayuda completa |
 | `--version` | `-V` | Muestra la versión |
+
+También puedes usar `halo help` y `halo version` como subcomandos.
 
 ## `halo run` — Intérprete
 
@@ -33,73 +35,24 @@ halo run --verbose programa.halo
 halo run -v programa.halo
 ```
 
-El intérprete no necesita LLVM ni genera archivos. Es la forma más rápida de
-probar ideas y la única que hoy soporta arrays y la mayoría de métodos.
+El intérprete no genera archivos ni necesita herramientas externas. Es la
+única forma de ejecutar un programa Halo.
 
-## `halo build` — Compilar a binario nativo
-
-Genera un ejecutable pasando por LLVM IR.
-
-```bash
-# Compila a ./programa (toolchain clang por defecto)
-halo build programa.halo
-
-# Nombre de salida
-halo build -o mi_programa programa.halo
-
-# Optimización
-halo build -O0 programa.halo
-halo build -O3 programa.halo
-
-# Compila y ejecuta
-halo build --run programa.halo
-halo build -r programa.halo
-
-# Conserva el .ll intermedio
-halo build --emit-llvm programa.halo
-
-# Toolchain alternativo
-halo build --toolchain llc programa.halo
-
-# Verbose
-halo build --verbose programa.halo
-```
-
-| Flag | Alias | Descripción |
-|---|---|---|
-| `-o, --output <ruta>` | | Ruta del binario de salida. Por defecto usa el nombre del fuente |
-| `-O0` / `-O1` / `-O2` / `-O3` | `--opt <N>` | Nivel de optimización LLVM. Por defecto `-O2` |
-| `--toolchain <nombre>` | | `clang` (por defecto) o `llc` |
-| `--emit-llvm` | | Conserva el archivo `.ll` intermedio |
-| `--run` | `-r` | Ejecuta el binario al terminar |
-| `--verbose` | `-v` | Muestra cada fase del pipeline |
-
-### Toolchains
-
-| Toolchain | Comando interno | Cuándo usarlo |
-|---|---|---|
-| `clang` | `clang <archivo.ll> -o <salida>` | Entorno habitual con Clang |
-| `llc` | `llc <archivo.ll>` → `cc <archivo.s> -o <salida>` | Solo hay `llc` y un compilador C |
-
-:::caution
-El modo compilado todavía no soporta arrays. `for` solo acepta `range(...)`
-directamente; iterar sobre un array o una variable produce un error de
-“not yet supported”. También hay divergencias de formato y de comprobaciones
-en el backend nativo: consulta
-[diferencias entre backends](../../referencia/diferencias/).
-:::
+`--verbose` muestra el archivo, el número de tokens, el número de elementos de
+nivel superior y el resultado de la ejecución.
 
 ## `halo check` — Validar sintaxis
 
-Lexea y parsea el archivo sin ejecutar ni generar código. Útil en CI o como
-paso previo a un commit.
+Lexea y parsea el archivo sin ejecutar nada. Útil en CI o como paso previo a un
+commit.
 
 ```bash
 halo check programa.halo
 # ✅ programa.halo — OK (2 top-level item(s))
 ```
 
-El código de salida es `0` si no hay errores y `1` si el parse falla.
+El código de salida es `0` si no hay errores y `1` si el parse falla. Los
+errores se muestran con su posición.
 
 ## `halo tokens` — Inspeccionar el lexer
 
@@ -112,12 +65,14 @@ halo tokens programa.halo
 Salida abreviada:
 
 ```text
-📋 Token Stream — programa
+╔════════════════════════════════════════╗
+║       📋 Token Stream — programa       ║
+╚════════════════════════════════════════╝
 
-   0  Identifier   'programa'    1:1
-   1  LParen       '('           1:9
-   2  RParen       ')'           1:10
-   3  LBrace       '{'           1:12
+   0  Identifier      'programa'    1:1
+   1  LeftParen       '('           1:9
+   2  RightParen      ')'           1:10
+   3  LeftBrace       '{'           1:12
    ...
 ```
 
@@ -135,7 +90,9 @@ halo ast programa.halo
 Salida abreviada:
 
 ```text
-🌳 Abstract Syntax Tree — programa
+╔════════════════════════════════════════╗
+║   🌳 Abstract Syntax Tree — programa   ║
+╚════════════════════════════════════════╝
 
 [0] Function
     name   : factorial
@@ -148,47 +105,42 @@ Salida abreviada:
 Compara esta salida con el código fuente: cada nodo del AST corresponde a una
 construcción del lenguaje.
 
-## `halo llvm` — Emitir LLVM IR
-
-Genera el archivo `.ll` sin enlazar ni ejecutar.
+## `halo help` / `halo version`
 
 ```bash
-# Emite programa.ll
-halo llvm programa.halo
-
-# Nombre de salida
-halo llvm -o salida.ll programa.halo
-
-# Optimización
-halo llvm -O3 programa.halo
-
-# Verbose
-halo llvm --verbose programa.halo
+halo help       # ayuda completa
+halo version    # versión del intérprete
 ```
 
-| Flag | Alias | Descripción |
-|---|---|---|
-| `-o, --output <ruta>` | | Ruta del `.ll`. Por defecto `<stem>.ll` |
-| `-O0` / `-O1` / `-O2` / `-O3` | `--opt <N>` | Nivel de optimización. Por defecto `-O2` |
-| `--verbose` | `-v` | Muestra el progreso del codegen |
+`halo` sin argumentos muestra un resumen de uso.
+
+## Subcomandos retirados
+
+Halo es **interpreter-only** desde la versión 0.3.0. Los antiguos `build` y
+`llvm` ya no existen, igual que las opciones `-o`, `-O`, `--toolchain`,
+`--emit-llvm` y `--run`. Si un script antiguo los usa, la CLI falla con un
+mensaje explícito en lugar de intentar abrir un archivo llamado `build`:
+
+```text
+❌ The 'build' subcommand was removed: Halo is interpreter-only.
+Use 'halo run <file.halo>' to execute the file.
+```
 
 ## Fases por subcomando
 
-| Subcomando | Lex | Parse | Interpreta | Codegen | Enlaza |
-|---|:---:|:---:|:---:|:---:|:---:|
-| `run` | ✅ | ✅ | ✅ | — | — |
-| `build` | ✅ | ✅ | — | ✅ | ✅ |
-| `check` | ✅ | ✅ | — | — | — |
-| `tokens` | ✅ | — | — | — | — |
-| `ast` | ✅ | ✅ | — | — | — |
-| `llvm` | ✅ | ✅ | — | ✅ | — |
+| Subcomando | Lex | Parse | Interpreta |
+|---|:---:|:---:|:---:|
+| `run` | ✅ | ✅ | ✅ |
+| `check` | ✅ | ✅ | — |
+| `tokens` | ✅ | — | — |
+| `ast` | ✅ | ✅ | — |
 
 ## Códigos de salida
 
 | Código | Significado |
 |---|---|
 | `0` | Éxito |
-| `1` | Error de lexer, parser, runtime o compilación |
+| `1` | Error de lexer, parser o runtime |
 
 Los errores se escriben en `stderr`; la salida normal del programa va a
 `stdout`.
@@ -198,7 +150,6 @@ Los errores se escriben en `stderr`; la salida normal del programa va a
 ```bash
 halo check programa.halo      # 1. valida
 halo run programa.halo        # 2. prueba la semántica
-halo ast programa.halo        # 3. inspecciona si algo no cuadra
-halo llvm programa.halo       # 4. mira el IR
-halo build -O3 programa.halo  # 5. genera el binario
+halo tokens programa.halo     # 3. mira los tokens si algo no cuadra
+halo ast programa.halo        # 4. mira el AST
 ```

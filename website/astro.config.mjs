@@ -16,7 +16,7 @@ export default defineConfig({
 		starlight({
 			title: 'Halo',
 			description:
-				'Un lenguaje dinámico y minimalista para aprender cómo funcionan los compiladores, desde el lexer hasta LLVM.',
+				'Un lenguaje interpretado, dinámico y minimalista para aprender cómo funciona un lenguaje y escribir scripts simples.',
 			logo: {
 				src: './src/assets/halo.png',
 				alt: 'Halo',
@@ -78,7 +78,6 @@ export default defineConfig({
 						{ slug: 'referencia/builtins' },
 						{ slug: 'referencia/errores' },
 						{ slug: 'referencia/precedencia' },
-						{ slug: 'referencia/diferencias' },
 					],
 				},
 				{
