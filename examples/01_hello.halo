@@ -14,7 +14,7 @@ print("Welcome to the Halo Programming Language")
 
 // Create and print variables
 name = "Halo"
-version = 0.2
+version = 0.3
 year = 2024
 
 print("Language: " + name)

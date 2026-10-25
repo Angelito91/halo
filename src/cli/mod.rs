@@ -1,5 +1,5 @@
 // The Halo Programming Language CLI Module
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0

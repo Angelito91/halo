@@ -155,7 +155,7 @@ fn help_lists_only_interpreter_commands() {
 fn version_subcommand_is_available() {
     let out = run_args(&["version"]);
     assert_eq!(out.code, Some(0), "halo version failed: {out:?}");
-    assert!(out.stdout.contains("0.2.0"), "unexpected version: {out:?}");
+    assert!(out.stdout.contains("0.3.0"), "unexpected version: {out:?}");
 }
 
 #[test]

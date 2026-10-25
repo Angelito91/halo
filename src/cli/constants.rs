@@ -1,5 +1,5 @@
 // The Halo Programming Language
-// Version: 0.2.0
+// Version: 0.3.0
 // Author: Angel A. Portuondo H.
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
@@ -10,7 +10,7 @@
 //! constants to ensure consistency across the codebase.
 
 /// The version of the Halo programming language.
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = "0.3.0";
 
 /// The banner text displayed in CLI output.
 pub const BANNER: &str = "🌟 Halo Programming Language";

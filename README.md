@@ -5,7 +5,7 @@
 
   **Un lenguaje de scripting interpretado, educativo y minimalista.**
 
-  <sub>Versión 0.2.0 · Licencia MPL 2.0</sub>
+  <sub>Versión 0.3.0 · Licencia MPL 2.0</sub>
 </div>
 
 ---
@@ -75,7 +75,7 @@ No hay `;` ni función `main`.
 ```halo
 // Comentario de línea
 nombre = "Halo"
-version = 0.2
+version = 0.3
 activo = true
 
 saludar() {
@@ -284,7 +284,7 @@ Tests relevantes:
 
 ## Estado y roadmap
 
-Estado actual (v0.2.0): intérprete estable con funciones, recursión,
+Estado actual (v0.3.0): intérprete estable con funciones, recursión,
 arrays, strings, slicing, bucles, diagnóstico con posición y CLI
 `run`/`check`/`tokens`/`ast`.
 
