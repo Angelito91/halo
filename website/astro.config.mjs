@@ -10,7 +10,7 @@ const haloGrammar = JSON.parse(
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://angelito91.github.io',
-	base: '/halo',
+	base: '/',
 	trailingSlash: 'always',
 	integrations: [
 		starlight({
@@ -102,7 +102,7 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						property: 'og:image',
-						content: 'https://angelito91.github.io/halo/og.png',
+						content: 'https://angelito91.github.io/og.png',
 					},
 				},
 				{
@@ -117,7 +117,7 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						name: 'twitter:image',
-						content: 'https://angelito91.github.io/halo/og.png',
+						content: 'https://angelito91.github.io/og.png',
 					},
 				},
 				{

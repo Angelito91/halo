@@ -1,10 +1,10 @@
 ---
 title: Documentación
-description: Un lenguaje interpretado, dinámico y minimalista para aprender cómo funciona un lenguaje y escribir scripts simples.
+description: Un lenguaje interpretado y minimalista para aprender y escribir scripts simples.
 template: splash
 hero:
   title: Halo
-  tagline: Un lenguaje pequeño y legible para aprender cómo funciona un lenguaje y escribir tus primeros scripts. Sin frameworks, sin magia y sin punto y coma.
+  tagline: Un lenguaje pequeño y legible para aprender cómo funciona un lenguaje y escribir tus primeros scripts.
   image:
     file: ../../assets/halo.png
     alt: Mascota de Halo
@@ -15,7 +15,7 @@ hero:
     - text: Ver en GitHub
       link: https://github.com/Angelito91/halo
       icon: github
-      variant: minimal
+      variant: secondary
 ---
 
 import { Aside, Card, CardGrid, LinkCard, TabItem, Tabs } from '@astrojs/starlight/components';
@@ -24,8 +24,7 @@ import { VERSION } from '../../lib/version';
 ## Empieza en un par de minutos
 
 Halo está escrito en Rust y no tiene dependencias externas. Solo necesitas un
-toolchain de Rust estable: no hay dependencias nativas del proyecto, ni LLVM o
-Clang que instalar.
+toolchain estable de Rust.
 
 <Tabs>
 	<TabItem label="Linux / macOS">
@@ -51,25 +50,21 @@ o salta directamente al [primer programa](empezando/primer-programa/).
 
 ## Todo el pipeline, a la vista
 
-Halo no esconde las fases: puedes inspeccionar los tokens, el AST y la
-evaluación con un solo ejecutable.
+Puedes inspeccionar cada fase del intérprete con un solo ejecutable.
 
 <CardGrid>
 	<Card title="Lexer" icon="pencil">
-		Escaneo lineal que convierte el texto en tokens con su posición exacta.
-		Míralos con `halo tokens`.
+		Convierte el texto en tokens con posición. Míralos con `halo tokens`.
 	</Card>
 	<Card title="Parser" icon="approve-check">
-		Parser recursivo descendente que construye un AST legible. Imprímelo con
-		`halo ast`.
+		Construye un AST legible. Imprímelo con `halo ast`.
 	</Card>
 	<Card title="Intérprete" icon="rocket">
-		Evaluador tree-walking que ejecuta el AST directamente con `halo run`.
-		Sin binarios intermedios ni pasos ocultos.
+		Ejecuta el AST directamente con `halo run`.
 	</Card>
 	<Card title="Errores claros" icon="error">
-		Variables inexistentes, aridad incorrecta, overflow, recursión excesiva y
-		bucles infinitos se detectan con mensajes y posición.
+		Variables, aridad, overflow, recursión y bucles infinitos se detectan con
+		posición.
 	</Card>
 </CardGrid>
 
@@ -92,59 +87,56 @@ $ halo run factorial.halo
 3628800
 ```
 
-Es un lenguaje pensado para **programas cortos y scripts**: automatizar una
-tarea, convertir datos, practicar un algoritmo o enseñar cómo se evalúa una
-expresión. No necesitas montar un proyecto ni aprender un ecosistema entero
-antes de escribir tu primera línea.
+Pensado para **programas cortos y scripts**: automatizar tareas, convertir
+datos o practicar algoritmos. No necesitas montar un proyecto ni aprender un
+ecosistema entero.
 
 ## Un solo motor
 
-Halo es **interpreter-only** desde la versión 0.3.0. El flujo es siempre el
-mismo:
+Desde la versión 0.3.0, Halo es **interpreter-only**:
 
 ```text
 archivo.halo → lexer → tokens → parser → AST → evaluador → stdout
 ```
 
-No hay backend nativo, ni máquina virtual, ni artefactos que compilar. Esa
-decisión mantiene el proyecto pequeño y hace que el comportamiento documentado
-sea exactamente el que ves al ejecutar `halo run`.
+No hay backend nativo, VM ni artefactos que compilar. El proyecto se mantiene
+pequeño y el comportamiento documentado es el que ves al ejecutar `halo run`.
 
 | Pieza | Qué hace |
 |---|---|
-| Lexer | Texto → tokens con línea y columna |
+| Lexer | Texto → tokens con posición |
 | Parser | Tokens → AST |
-| Evaluador | Recorre el AST y ejecuta el programa |
-| Stdlib | Built-ins y métodos sobre valores ya evaluados |
-| CLI | `run`, `check`, `tokens` y `ast` en un único binario |
+| Evaluador | Ejecuta el AST |
+| Stdlib | Built-ins y métodos |
+| CLI | `run`, `check`, `tokens` y `ast` |
 
 ## Explora la documentación
 
-<CardGrid stagger>
+<CardGrid>
 	<LinkCard
 		title="Guía del lenguaje"
-		description="Variables, operadores, control de flujo, funciones, arrays y strings."
+		description="Variables, operadores, control de flujo, funciones y colecciones."
 		href="guia/estructura/"
 	/>
 	<LinkCard
 		title="Referencia"
-		description="Built-ins, errores de runtime y precedencia de operadores."
+		description="Built-ins, errores y precedencia."
 		href="referencia/builtins/"
 	/>
 	<LinkCard
 		title="Ejemplos"
-		description="Programas completos y proyectos pequeños para practicar."
+		description="Programas completos para practicar."
 		href="ejemplos/"
 	/>
 	<LinkCard
 		title="Roadmap"
-		description="Qué está hecho, qué viene después y cómo contribuir."
+		description="Estado actual y próximos pasos."
 		href="proyecto/roadmap/"
 	/>
 </CardGrid>
 
 <Aside type="note" title="Estado del proyecto">
-	Halo está en desarrollo activo. La documentación corresponde a la versión
-	**v{VERSION}** y se actualiza junto con el intérprete. Si algo no coincide con
-	el código, [abre un issue](https://github.com/Angelito91/halo/issues).
+	Halo está en desarrollo activo. Esta documentación corresponde a **v{VERSION}**.
+	Si algo no coincide con el código,
+	[abre un issue](https://github.com/Angelito91/halo/issues).
 </Aside>

@@ -5,10 +5,13 @@ Sitio oficial de documentación del lenguaje Halo, construido con
 
 Documenta Halo **0.3.0**, la versión interpreter-only del lenguaje.
 
-- **Producción:** <https://angelito91.github.io/halo/>
+- **Producción:** <https://angelito91.github.io/>
 - **Contenido:** español
-- **Base path:** `/halo`
+- **Base path:** `/`
 - **Fuente de datos:** `../examples/` y `../Cargo.toml` (se leen en build time)
+
+> GitHub Pages sirve los repositorios de proyecto bajo `/<repo>/`. Para publicar
+> en `/` hace falta un dominio propio o un repositorio de usuario.
 
 ## Desarrollo local
 
@@ -18,7 +21,7 @@ bun install
 bun run dev
 ```
 
-El servidor arranca en <http://localhost:4321/halo/>.
+El servidor arranca en <http://localhost:4321/>.
 
 ## Comandos
 
@@ -75,8 +78,8 @@ website/
 
 ### Enlaces internos
 
-El sitio se sirve con `trailingSlash: 'always'` y base `/halo`. Cada página es
-una URL con barra final (`/halo/guia/arrays/`), así que los enlaces relativos
+El sitio se sirve con `trailingSlash: 'always'` y base `/`. Cada página es
+una URL con barra final (`/guia/arrays/`), así que los enlaces relativos
 deben llevar **un `../` extra** respecto a la ruta del archivo fuente:
 
 ```md

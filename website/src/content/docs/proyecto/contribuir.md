@@ -123,7 +123,7 @@ bun run check    # comprobación de tipos y contenido
 
 Las páginas están en `website/src/content/docs/`. La barra lateral se define
 en `website/astro.config.mjs`. Los enlaces internos son relativos
-(`../guia/estructura/`), porque el sitio se publica bajo `/halo`.
+(`../guia/estructura/`), porque el sitio se publica en la raíz `/`.
 
 ### Reglas de estilo de la documentación
 
