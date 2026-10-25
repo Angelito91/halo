@@ -10,6 +10,7 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  workflow_dispatch:
 
 # Cancel any in-progress run for the same branch / PR so we don't waste minutes.
 concurrency:
@@ -25,6 +26,24 @@ permissions:
   contents: read
 
 jobs:
+  # ── Workflow lint ────────────────────────────────────────────────────────────
+  actionlint:
+    name: Lint workflows
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download actionlint
+        run: |
+          curl -sSfL -o actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          tar -xzf actionlint.tar.gz actionlint
+
+      - name: Run actionlint
+        run: ./actionlint -color
+
   # ── Format ───────────────────────────────────────────────────────────────────
   fmt:
     name: Format (cargo fmt)
@@ -32,7 +51,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust stable + rustfmt
         uses: dtolnay/rust-toolchain@stable
@@ -49,7 +68,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust stable + clippy
         uses: dtolnay/rust-toolchain@stable
@@ -62,14 +81,30 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --locked -- -D warnings
 
-  # ── Tests ────────────────────────────────────────────────────────────────────
-  test:
-    name: Test (cargo test)
+  # ── Supply chain ─────────────────────────────────────────────────────────────
+  deny:
+    name: Supply chain (cargo deny)
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+
+      - name: Run cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+
+  # ── Tests ────────────────────────────────────────────────────────────────────
+  test:
+    name: Test · ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -79,3 +114,21 @@ jobs:
 
       - name: Run tests
         run: cargo test --locked
+
+  # ── Release tests ────────────────────────────────────────────────────────────
+  test-release:
+    name: Test release (cargo test --release)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run tests in release mode
+        run: cargo test --release --locked

@@ -28,6 +28,64 @@ Si necesitas consultar el backend anterior, está preservado en la rama
 
 ## Instalación
 
+### Descargar un binario
+
+Cada release publica binarios nativos para estas plataformas:
+
+| Plataforma | Archivo |
+|---|---|
+| Linux x86_64 (estático) | `halo-x86_64-unknown-linux-musl.tar.gz` |
+| Linux ARM64 (estático) | `halo-aarch64-unknown-linux-musl.tar.gz` |
+| macOS Apple Silicon | `halo-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `halo-x86_64-apple-darwin.tar.gz` |
+| Windows x86_64 | `halo-x86_64-pc-windows-msvc.zip` |
+| Windows ARM64 | `halo-aarch64-pc-windows-msvc.zip` |
+
+Descárgalos desde la página de [Releases](https://github.com/Angelito91/halo/releases).
+
+Linux x86_64:
+
+```bash
+curl -LO https://github.com/Angelito91/halo/releases/download/v0.3.0/halo-x86_64-unknown-linux-musl.tar.gz
+tar -xzf halo-x86_64-unknown-linux-musl.tar.gz
+sudo install -m 755 halo-x86_64-unknown-linux-musl/halo /usr/local/bin/halo
+```
+
+macOS Apple Silicon:
+
+```bash
+curl -LO https://github.com/Angelito91/halo/releases/download/v0.3.0/halo-aarch64-apple-darwin.tar.gz
+tar -xzf halo-aarch64-apple-darwin.tar.gz
+sudo install -m 755 halo-aarch64-apple-darwin/halo /usr/local/bin/halo
+```
+
+Windows (PowerShell):
+
+```powershell
+Invoke-WebRequest `
+  https://github.com/Angelito91/halo/releases/download/v0.3.0/halo-x86_64-pc-windows-msvc.zip `
+  -OutFile halo.zip
+Expand-Archive halo.zip -DestinationPath .
+.\halo-x86_64-pc-windows-msvc\halo.exe version
+```
+
+Verifica la descarga con el archivo `SHA256SUMS` del release:
+
+```bash
+sha256sum -c SHA256SUMS
+# macOS: shasum -a 256 -c SHA256SUMS
+```
+
+Los binarios también incluyen una attestation de build de GitHub. Si tienes
+[GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify halo-x86_64-unknown-linux-musl.tar.gz \
+  --repo Angelito91/halo
+```
+
+### Compilar desde el código fuente
+
 Requiere Rust stable (2021 edition). No requiere LLVM ni un compilador de C.
 
 ```bash

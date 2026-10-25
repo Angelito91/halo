@@ -1,31 +1,45 @@
 # The Halo Programming Language
-# Release — triggers when a vX.Y.Z tag is pushed.
+# Release — builds native binaries for every supported platform and publishes
+# them as a GitHub Release.
 #
-# Jobs:
-#   build   — compile for each target platform (matrix)
-#   release — create a GitHub Release and upload all artifacts
+# Triggers:
+#   push tag vX.Y.Z      → build + publish
+#   workflow_dispatch    → dry-run by default; publish only with publish=true
 #
-# Supported targets (all built natively):
-#   Linux   x86_64   (ubuntu-24.04)
-#   Linux   aarch64  (ubuntu-24.04-arm)
-#   macOS   x86_64   (macos-13, Intel)
-#   macOS   aarch64  (macos-14, Apple Silicon)
-#   Windows x86_64   (windows-2022)
+# Pipeline:
+#   validate → build (matrix) → release
 #
-# Halo is a pure-Rust interpreter with no native dependencies. The matrix
-# stays native because it keeps the build and smoke test identical to the
-# platform the artifact runs on; no cross-compilation sysroot is needed.
+# Targets (all built natively, no cross-compilation sysroot):
+#   Linux   x86_64   (musl, static)   ubuntu-24.04
+#   Linux   aarch64  (musl, static)   ubuntu-24.04-arm
+#   macOS   aarch64                   macos-15
+#   macOS   x86_64                    macos-15-intel
+#   Windows x86_64                    windows-2022
+#   Windows aarch64                   windows-11-arm
+#
+# Linux artifacts use musl so they do not depend on the runner's glibc.
 
 name: Release
 
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]*"
+      - "v[0-9]*.[0-9]*.[0-9]*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build (e.g. v0.3.0). Empty = current ref."
+        required: false
+        type: string
+      publish:
+        description: "Create/update the GitHub Release (requires a tag)."
+        required: false
+        type: boolean
+        default: false
 
-# Only one release pipeline should run at a time for the same tag.
+# Never run two release pipelines for the same tag at once.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 env:
@@ -33,148 +47,270 @@ env:
   RUST_BACKTRACE: 1
   BINARY_NAME: halo
 
-# Default to minimal permissions; the release job overrides with contents: write.
+# Least privilege by default. The release job overrides with contents: write.
 permissions:
   contents: read
 
 jobs:
+  # ── Validate ──────────────────────────────────────────────────────────────────
+  validate:
+    name: Validate release
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      publish: ${{ steps.meta.outputs.publish }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Full history is needed to verify the tag is an ancestor of main.
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+
+          CARGO_VERSION="$(cargo metadata --no-deps --locked --format-version 1 \
+            | jq -r '.packages[] | select(.name == "halo") | .version')"
+
+          if [ -n "${INPUT_TAG}" ]; then
+            TAG="${INPUT_TAG}"
+          elif [ "${EVENT_NAME}" = "push" ]; then
+            TAG="${REF_NAME}"
+          else
+            TAG="v${CARGO_VERSION}"
+          fi
+
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '${TAG}' does not match vMAJOR.MINOR.PATCH[-prerelease]."
+            exit 1
+          fi
+
+          TAG_VERSION="${TAG#v}"
+          if [ "${TAG_VERSION}" != "${CARGO_VERSION}" ]; then
+            echo "::error::Tag '${TAG}' does not match Cargo.toml version '${CARGO_VERSION}'."
+            exit 1
+          fi
+
+          if [[ "${TAG_VERSION}" == *-* ]]; then
+            PRERELEASE=true
+          else
+            PRERELEASE=false
+          fi
+
+          if [ "${EVENT_NAME}" = "push" ]; then
+            PUBLISH=true
+          else
+            PUBLISH="${INPUT_PUBLISH:-false}"
+          fi
+
+          if [ "${EVENT_NAME}" != "push" ] && [ "${PUBLISH}" = "true" ] && [ -z "${INPUT_TAG}" ]; then
+            echo "::error::workflow_dispatch with publish=true requires a tag input."
+            exit 1
+          fi
+
+          # A published release must point to a commit that is already on main.
+          # Dry-runs from a feature branch are allowed.
+          if [ "${EVENT_NAME}" = "push" ] || [ -n "${INPUT_TAG}" ]; then
+            git fetch --no-tags origin main:refs/remotes/origin/main
+            if ! git merge-base --is-ancestor HEAD origin/main; then
+              echo "::error::Tag '${TAG}' is not reachable from origin/main."
+              exit 1
+            fi
+          fi
+
+          {
+            echo "version=${CARGO_VERSION}"
+            echo "tag=${TAG}"
+            echo "prerelease=${PRERELEASE}"
+            echo "publish=${PUBLISH}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Release metadata: tag=${TAG} version=${CARGO_VERSION} prerelease=${PRERELEASE} publish=${PUBLISH}"
+
+      - name: Run tests on the release commit
+        run: cargo test --locked
+
   # ── Build ─────────────────────────────────────────────────────────────────────
   build:
     name: Build · ${{ matrix.target }}
+    needs: validate
     runs-on: ${{ matrix.runner }}
-    continue-on-error: ${{ matrix.continue-on-error == true }}
+
+    permissions:
+      contents: read
+      # Required by actions/attest to sign build provenance.
+      id-token: write
+      attestations: write
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          # ── Linux x86_64 ──────────────────────────────────────────────────────
-          - target: x86_64-unknown-linux-gnu
+          # ── Linux (static musl) ───────────────────────────────────────────────
+          - target: x86_64-unknown-linux-musl
             runner: ubuntu-24.04
-            archive_ext: tar.gz
+            archive: tar.gz
 
-          # ── Linux aarch64 — native ARM runner ────────────────────────────────
-          - target: aarch64-unknown-linux-gnu
+          - target: aarch64-unknown-linux-musl
             runner: ubuntu-24.04-arm
-            archive_ext: tar.gz
+            archive: tar.gz
 
-          # ── macOS aarch64 (Apple Silicon, native) ─────────────────────────────
+          # ── macOS ─────────────────────────────────────────────────────────────
           - target: aarch64-apple-darwin
-            runner: macos-14
-            archive_ext: tar.gz
+            runner: macos-15
+            archive: tar.gz
+            deployment_target: "11.0"
 
-          # ── macOS x86_64 (Intel, native) ──────────────────────────────────────
-          # Must use macos-13, the last Intel runner. continue-on-error guards
-          # against transient provisioning failures.
           - target: x86_64-apple-darwin
-            runner: macos-13
-            continue-on-error: true
-            archive_ext: tar.gz
+            runner: macos-15-intel
+            archive: tar.gz
+            deployment_target: "11.0"
 
-          # ── Windows x86_64 ────────────────────────────────────────────────────
+          # ── Windows ───────────────────────────────────────────────────────────
           - target: x86_64-pc-windows-msvc
             runner: windows-2022
-            archive_ext: zip
+            archive: zip
+
+          - target: aarch64-pc-windows-msvc
+            runner: windows-11-arm
+            archive: zip
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-      # ── Rust toolchain ───────────────────────────────────────────────────────
       - name: Install Rust stable + target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      # ── Cargo cache ──────────────────────────────────────────────────────────
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
         with:
           key: release-${{ matrix.target }}
 
-      # ── Compile ──────────────────────────────────────────────────────────────
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }}
 
-      # ── Quick smoke test (verify the binary is runnable) ─────────────────────
       - name: Smoke test binary (Unix)
         if: runner.os != 'Windows'
         shell: bash
-        run: ./target/${{ matrix.target }}/release/${BINARY_NAME} --version
+        env:
+          TARGET: ${{ matrix.target }}
+        run: ./target/"${TARGET}"/release/"${BINARY_NAME}" --version
 
       - name: Smoke test binary (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: .\target\${{ matrix.target }}\release\${{ env.BINARY_NAME }}.exe --version
 
-      # ── Package — Linux / macOS (tar.gz) ─────────────────────────────────────
+      # ── Package — Linux / macOS ──────────────────────────────────────────────
       - name: Package (tar.gz)
-        if: matrix.archive_ext == 'tar.gz'
+        if: matrix.archive == 'tar.gz'
         shell: bash
         run: |
-          BIN="target/${{ matrix.target }}/release/${BINARY_NAME}"
-          ARCHIVE="${BINARY_NAME}-${{ github.ref_name }}-${{ matrix.target }}.tar.gz"
-          tar -czf "${ARCHIVE}" -C "$(dirname "${BIN}")" "$(basename "${BIN}")"
-          echo "ASSET=${ARCHIVE}" >> "$GITHUB_ENV"
+          set -euo pipefail
+          NAME="${BINARY_NAME}-${{ matrix.target }}"
+          STAGE="dist/${NAME}"
 
-      # ── Package — Windows (zip) ───────────────────────────────────────────────
+          mkdir -p "${STAGE}"
+          cp "target/${{ matrix.target }}/release/${BINARY_NAME}" "${STAGE}/${BINARY_NAME}"
+          cp README.md LICENSE "${STAGE}/"
+
+          tar -czf "${NAME}.tar.gz" -C dist "${NAME}"
+          echo "ASSET=${NAME}.tar.gz" >> "$GITHUB_ENV"
+
+      # ── Package — Windows ────────────────────────────────────────────────────
       - name: Package (zip)
-        if: matrix.archive_ext == 'zip'
+        if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          $bin  = "target\${{ matrix.target }}\release\${{ env.BINARY_NAME }}.exe"
-          $name = "${{ env.BINARY_NAME }}-${{ github.ref_name }}-${{ matrix.target }}.zip"
-          Compress-Archive -Path $bin -DestinationPath $name
-          Add-Content $env:GITHUB_ENV "ASSET=$name"
+          $name  = "${{ env.BINARY_NAME }}-${{ matrix.target }}"
+          $stage = "dist\$name"
+
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item "target\${{ matrix.target }}\release\${{ env.BINARY_NAME }}.exe" "$stage\${{ env.BINARY_NAME }}.exe"
+          Copy-Item README.md, LICENSE $stage
+
+          Compress-Archive -Path $stage -DestinationPath "$name.zip"
+          Add-Content $env:GITHUB_ENV "ASSET=$name.zip"
 
       # ── SHA-256 checksum ─────────────────────────────────────────────────────
-      - name: Checksum (Linux / macOS)
+      - name: Checksum (Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          if command -v sha256sum &>/dev/null; then
-            sha256sum "${{ env.ASSET }}" > "${{ env.ASSET }}.sha256"
+          set -euo pipefail
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${ASSET}" > "${ASSET}.sha256"
           else
-            shasum -a 256 "${{ env.ASSET }}" > "${{ env.ASSET }}.sha256"
+            shasum -a 256 "${ASSET}" > "${ASSET}.sha256"
           fi
 
       - name: Checksum (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $hash = (Get-FileHash "${{ env.ASSET }}" -Algorithm SHA256).Hash.ToLower()
-          "$hash  ${{ env.ASSET }}" | Out-File -Encoding ascii "${{ env.ASSET }}.sha256"
+          $hash = (Get-FileHash $env:ASSET -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($env:ASSET)" | Out-File -Encoding ascii "$($env:ASSET).sha256"
 
-      # ── Upload artifacts for the release job ─────────────────────────────────
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      # ── Build provenance ─────────────────────────────────────────────────────
+      - name: Attest build provenance
+        uses: actions/attest@v4
         with:
-          name: ${{ env.ASSET }}
+          subject-path: ${{ env.ASSET }}
+
+      # ── Upload for the release job ───────────────────────────────────────────
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}
           path: |
             ${{ env.ASSET }}
             ${{ env.ASSET }}.sha256
           if-no-files-found: error
+          retention-days: 7
 
   # ── Release ───────────────────────────────────────────────────────────────────
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [validate, build]
+    if: needs.validate.outputs.publish == 'true'
     runs-on: ubuntu-24.04
 
-    # This job needs write access to create the GitHub Release.
     permissions:
       contents: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
-          # Fetch full history so `git tag --format` can read the annotation body.
+          # The annotated tag body becomes the release notes.
           fetch-depth: 0
+          ref: ${{ needs.validate.outputs.tag }}
 
-      # Download every artifact produced by the build matrix
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
@@ -182,39 +318,46 @@ jobs:
       - name: List artifacts
         run: ls -lh artifacts/
 
-      # Derive a human-readable changelog from the annotated tag message.
-      # %(contents:body) is the multi-line description after the subject line.
-      # %(contents:subject) is the first line of the annotation.
-      # Falls back to a plain title for lightweight tags.
-      - name: Extract tag release notes
+      - name: Generate and verify checksums
+        shell: bash
         run: |
-          # Try to get the annotation body of the current tag.
-          NOTES="$(git tag -l --format='%(contents:body)' "${{ github.ref_name }}" 2>/dev/null || true)"
+          set -euo pipefail
+          cd artifacts
+          sort -k2 ./*.sha256 > SHA256SUMS
+          sha256sum -c SHA256SUMS
 
-          # Fall back to the tag subject line if the body is empty.
-          if [ -z "$NOTES" ]; then
-            NOTES="$(git tag -l --format='%(contents:subject)' "${{ github.ref_name }}" 2>/dev/null || true)"
+      - name: Extract tag release notes
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          NOTES="$(git tag -l --format='%(contents:body)' "${TAG}" 2>/dev/null || true)"
+          if [ -z "${NOTES}" ]; then
+            NOTES="$(git tag -l --format='%(contents:subject)' "${TAG}" 2>/dev/null || true)"
+          fi
+          if [ -z "${NOTES}" ]; then
+            NOTES="Release ${TAG}"
           fi
 
-          # Final fallback: a plain release title.
-          if [ -z "$NOTES" ]; then
-            NOTES="Release ${{ github.ref_name }}"
-          fi
-
-          printf '%s\n' "$NOTES" > release_notes.md
+          printf '%s\n' "${NOTES}" > release_notes.md
           echo "--- release_notes.md ---"
           cat release_notes.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          name: "Halo ${{ github.ref_name }}"
+          name: "Halo ${{ needs.validate.outputs.tag }}"
           body_path: release_notes.md
+          generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ needs.validate.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.validate.outputs.prerelease == 'false' && 'true' || 'false' }}
           files: |
-            artifacts/**/*.tar.gz
-            artifacts/**/*.zip
-            artifacts/**/*.sha256
+            artifacts/*.tar.gz
+            artifacts/*.zip
+            artifacts/*.sha256
+            artifacts/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
