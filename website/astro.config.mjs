@@ -7,10 +7,19 @@ const haloGrammar = JSON.parse(
 	readFileSync(new URL('./grammars/halo.tmLanguage.json', import.meta.url), 'utf8'),
 );
 
+// The docs deploy as a GitHub Pages project site at `/halo/`. The workflow
+// overrides these values from the Pages metadata; set `DOCS_BASE=/` for a user
+// site or a custom domain.
+const site = process.env.DOCS_SITE ?? 'https://angelito91.github.io';
+const rawBase = process.env.DOCS_BASE ?? '/halo/';
+const base =
+	rawBase === '/' ? '/' : `/${rawBase.replace(/^\/+|\/+$/g, '')}/`;
+const ogImage = new URL(`${base.replace(/^\//, '')}og.png`, `${site.replace(/\/$/, '')}/`).href;
+
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://angelito91.github.io',
-	base: '/',
+	site,
+	base,
 	trailingSlash: 'always',
 	integrations: [
 		starlight({
@@ -102,7 +111,7 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						property: 'og:image',
-						content: 'https://angelito91.github.io/og.png',
+						content: ogImage,
 					},
 				},
 				{
@@ -117,7 +126,7 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						name: 'twitter:image',
-						content: 'https://angelito91.github.io/og.png',
+						content: ogImage,
 					},
 				},
 				{
