@@ -6,9 +6,7 @@
 //
 // Array built-ins (split out of a single `methods.rs`).
 
-use super::super::core::Evaluator;
-use crate::interpreter::value::Value;
-use crate::parser::ast::Expression;
+use crate::interpreter::Value;
 
 /// Maximum number of elements `range()` will materialise.
 ///
@@ -21,7 +19,7 @@ const MAX_RANGE_LENGTH: i64 = 1_000_000;
 ///
 /// Both bounds must be integers. `end <= start` yields an empty array; Halo
 /// has no negative steps yet.
-pub fn builtin_range(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_range(args: &[Value]) -> Result<Value, String> {
     if args.is_empty() || args.len() > 2 {
         return Err(format!(
             "range() expects 1 or 2 arguments, got {}",
@@ -31,8 +29,8 @@ pub fn builtin_range(evaluator: &mut Evaluator, args: &[Expression]) -> Result<V
 
     let mut bounds = Vec::with_capacity(args.len());
     for arg in args {
-        match evaluator.eval_expr(arg)? {
-            Value::Number(n) => bounds.push(n),
+        match arg {
+            Value::Number(n) => bounds.push(*n),
             other => {
                 return Err(format!(
                     "range() expects integer arguments, got '{}'",
@@ -77,15 +75,15 @@ pub fn push_value(array: Value, element: Value) -> Result<Value, String> {
 }
 
 /// Builtin form of [`push_value`].
-pub fn builtin_push(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_push(args: &[Value]) -> Result<Value, String> {
     if args.len() != 2 {
         return Err(format!(
             "push() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let array = evaluator.eval_expr(&args[0])?;
-    let element = evaluator.eval_expr(&args[1])?;
+    let array = args[0].clone();
+    let element = args[1].clone();
     push_value(array, element)
 }
 
@@ -101,14 +99,14 @@ pub fn pop_value(array: Value) -> Result<Value, String> {
 }
 
 /// Builtin form of [`pop_value`].
-pub fn builtin_pop(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_pop(args: &[Value]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
             "pop() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    pop_value(evaluator.eval_expr(&args[0])?)
+    pop_value(args[0].clone())
 }
 
 /// `append(array, array)` - Combines two arrays and returns a new array.
@@ -130,15 +128,15 @@ pub fn append_value(left: Value, right: Value) -> Result<Value, String> {
 }
 
 /// Builtin form of [`append_value`].
-pub fn builtin_append(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_append(args: &[Value]) -> Result<Value, String> {
     if args.len() != 2 {
         return Err(format!(
             "append() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let left = evaluator.eval_expr(&args[0])?;
-    let right = evaluator.eval_expr(&args[1])?;
+    let left = args[0].clone();
+    let right = args[1].clone();
     append_value(left, right)
 }
 
@@ -154,14 +152,14 @@ pub fn first_value(array: Value) -> Result<Value, String> {
 }
 
 /// Builtin form of [`first_value`].
-pub fn builtin_first(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_first(args: &[Value]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
             "first() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    first_value(evaluator.eval_expr(&args[0])?)
+    first_value(args[0].clone())
 }
 
 /// `last(array)` - Returns the last element of the array (null if empty).
@@ -176,14 +174,14 @@ pub fn last_value(array: Value) -> Result<Value, String> {
 }
 
 /// Builtin form of [`last_value`].
-pub fn builtin_last(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_last(args: &[Value]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
             "last() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    last_value(evaluator.eval_expr(&args[0])?)
+    last_value(args[0].clone())
 }
 
 /// `reverse(array or string)` - Returns a new array with elements in reverse order, or reversed string.
@@ -202,14 +200,14 @@ pub fn reverse_value(value: Value) -> Result<Value, String> {
 }
 
 /// Builtin form of [`reverse_value`].
-pub fn builtin_reverse(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_reverse(args: &[Value]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
             "reverse() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    reverse_value(evaluator.eval_expr(&args[0])?)
+    reverse_value(args[0].clone())
 }
 
 /// `join(array, separator)` - Converts array elements to a string joined by separator.
@@ -237,15 +235,15 @@ pub fn join_value(array: Value, separator: Value) -> Result<Value, String> {
 }
 
 /// Builtin form of [`join_value`].
-pub fn builtin_join(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_join(args: &[Value]) -> Result<Value, String> {
     if args.len() != 2 {
         return Err(format!(
             "join() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let array = evaluator.eval_expr(&args[0])?;
-    let separator = evaluator.eval_expr(&args[1])?;
+    let array = args[0].clone();
+    let separator = args[1].clone();
     join_value(array, separator)
 }
 
@@ -305,12 +303,12 @@ pub fn sort_value(array: Value) -> Result<Value, String> {
 }
 
 /// Builtin form of [`sort_value`].
-pub fn builtin_sort(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_sort(args: &[Value]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
             "sort() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    sort_value(evaluator.eval_expr(&args[0])?)
+    sort_value(args[0].clone())
 }

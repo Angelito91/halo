@@ -6,9 +6,7 @@
 //
 // String built-ins and their helpers (split out of a single `methods.rs`).
 
-use super::super::core::Evaluator;
-use crate::interpreter::value::Value;
-use crate::parser::ast::Expression;
+use crate::interpreter::Value;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -166,117 +164,114 @@ pub fn substr_value(text: Value, start: Value, length: Value) -> Result<Value, S
 // ──────────────────────────────────────────────────────────────────────────────
 
 /// `contains(array or string, value)` - Returns true if the array/string contains the value/substring.
-pub fn builtin_contains(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_contains(args: &[Value]) -> Result<Value, String> {
     if args.len() != 2 {
         return Err(format!(
             "contains() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let container = evaluator.eval_expr(&args[0])?;
-    let search = evaluator.eval_expr(&args[1])?;
+    let container = args[0].clone();
+    let search = args[1].clone();
     contains_value(container, search)
 }
 
 /// `index_of(array or string, value)` - Returns the index of the value/substring (-1 if not found).
-pub fn builtin_index_of(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_index_of(args: &[Value]) -> Result<Value, String> {
     if args.len() != 2 {
         return Err(format!(
             "index_of() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let container = evaluator.eval_expr(&args[0])?;
-    let search = evaluator.eval_expr(&args[1])?;
+    let container = args[0].clone();
+    let search = args[1].clone();
     index_of_value(container, search)
 }
 
 /// `upper(text)` - Converts a string to uppercase.
-pub fn builtin_upper(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_upper(args: &[Value]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
             "upper() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    upper_value(evaluator.eval_expr(&args[0])?)
+    upper_value(args[0].clone())
 }
 
 /// `lower(text)` - Converts a string to lowercase.
-pub fn builtin_lower(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_lower(args: &[Value]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
             "lower() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    lower_value(evaluator.eval_expr(&args[0])?)
+    lower_value(args[0].clone())
 }
 
 /// `trim(text)` - Removes leading and trailing whitespace from a string.
-pub fn builtin_trim(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_trim(args: &[Value]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
             "trim() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    trim_value(evaluator.eval_expr(&args[0])?)
+    trim_value(args[0].clone())
 }
 
 /// `starts_with(text, prefix)` - Returns true if the string starts with the prefix.
-pub fn builtin_starts_with(
-    evaluator: &mut Evaluator,
-    args: &[Expression],
-) -> Result<Value, String> {
+pub fn builtin_starts_with(args: &[Value]) -> Result<Value, String> {
     if args.len() != 2 {
         return Err(format!(
             "starts_with() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let text = evaluator.eval_expr(&args[0])?;
-    let prefix = evaluator.eval_expr(&args[1])?;
+    let text = args[0].clone();
+    let prefix = args[1].clone();
     starts_with_value(text, prefix)
 }
 
 /// `ends_with(text, suffix)` - Returns true if the string ends with the suffix.
-pub fn builtin_ends_with(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_ends_with(args: &[Value]) -> Result<Value, String> {
     if args.len() != 2 {
         return Err(format!(
             "ends_with() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let text = evaluator.eval_expr(&args[0])?;
-    let suffix = evaluator.eval_expr(&args[1])?;
+    let text = args[0].clone();
+    let suffix = args[1].clone();
     ends_with_value(text, suffix)
 }
 
 /// `replace(text, old, new)` - Replaces all occurrences of old with new.
-pub fn builtin_replace(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_replace(args: &[Value]) -> Result<Value, String> {
     if args.len() != 3 {
         return Err(format!(
             "replace() expects exactly 3 arguments, got {}",
             args.len()
         ));
     }
-    let text = evaluator.eval_expr(&args[0])?;
-    let old = evaluator.eval_expr(&args[1])?;
-    let new = evaluator.eval_expr(&args[2])?;
+    let text = args[0].clone();
+    let old = args[1].clone();
+    let new = args[2].clone();
     replace_value(text, old, new)
 }
 
 /// `substr(text, start, length)` - Extracts a substring starting at start with given length.
-pub fn builtin_substr(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+pub fn builtin_substr(args: &[Value]) -> Result<Value, String> {
     if args.len() != 3 {
         return Err(format!(
             "substr() expects exactly 3 arguments, got {}",
             args.len()
         ));
     }
-    let text = evaluator.eval_expr(&args[0])?;
-    let start = evaluator.eval_expr(&args[1])?;
-    let length = evaluator.eval_expr(&args[2])?;
+    let text = args[0].clone();
+    let start = args[1].clone();
+    let length = args[2].clone();
     substr_value(text, start, length)
 }

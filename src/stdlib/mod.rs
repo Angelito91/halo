@@ -4,26 +4,23 @@
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 //
-// Array and string method implementations, plus the method dispatcher
-// (split out of a single `methods.rs`).
+// Built-in functions and methods. This module knows `Value` and nothing
+// about the AST or the evaluator: the evaluator evaluates every argument
+// first and passes the resulting values in. Invalid calls therefore report
+// argument errors before arity/type errors; valid calls are unchanged.
 
-use super::super::value::Value;
-use super::core::Evaluator;
-use crate::parser::ast::Expression;
+use crate::interpreter::Value;
 
-mod arrays;
-mod strings;
+pub mod arrays;
+pub mod builtins;
+pub mod strings;
 
 pub use arrays::*;
+pub use builtins::{call_builtin, is_builtin, BUILTIN_NAMES};
 pub use strings::*;
 
-/// Try to evaluate a method call on an object.
-pub fn try_eval_method_call(
-    evaluator: &mut Evaluator,
-    object: &Value,
-    method: &str,
-    args: &[Expression],
-) -> Result<Value, String> {
+/// Dispatch a method call on an already-evaluated object and arguments.
+pub fn call_method(object: &Value, method: &str, args: &[Value]) -> Result<Value, String> {
     match (object, method) {
         // String methods
         (Value::String(s), "upper") => {
@@ -69,7 +66,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            starts_with_value(object.clone(), evaluator.eval_expr(&args[0])?)
+            starts_with_value(object.clone(), args[0].clone())
         }
         (Value::String(_), "ends_with") => {
             if args.len() != 1 {
@@ -78,7 +75,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            ends_with_value(object.clone(), evaluator.eval_expr(&args[0])?)
+            ends_with_value(object.clone(), args[0].clone())
         }
         (Value::String(_), "contains") => {
             if args.len() != 1 {
@@ -87,7 +84,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            contains_value(object.clone(), evaluator.eval_expr(&args[0])?)
+            contains_value(object.clone(), args[0].clone())
         }
         (Value::String(_), "index_of") => {
             if args.len() != 1 {
@@ -96,7 +93,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            index_of_value(object.clone(), evaluator.eval_expr(&args[0])?)
+            index_of_value(object.clone(), args[0].clone())
         }
         (Value::String(_), "replace") => {
             if args.len() != 2 {
@@ -105,8 +102,8 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let old = evaluator.eval_expr(&args[0])?;
-            let new = evaluator.eval_expr(&args[1])?;
+            let old = args[0].clone();
+            let new = args[1].clone();
             replace_value(object.clone(), old, new)
         }
         (Value::String(_), "substr") => {
@@ -116,8 +113,8 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let start = evaluator.eval_expr(&args[0])?;
-            let length = evaluator.eval_expr(&args[1])?;
+            let start = args[0].clone();
+            let length = args[1].clone();
             substr_value(object.clone(), start, length)
         }
 
@@ -129,7 +126,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let element = evaluator.eval_expr(&args[0])?;
+            let element = args[0].clone();
             push_value(object.clone(), element)
         }
         (Value::Array(_), "pop") => {
@@ -175,7 +172,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            join_value(object.clone(), evaluator.eval_expr(&args[0])?)
+            join_value(object.clone(), args[0].clone())
         }
         (Value::Array(_), "contains") => {
             if args.len() != 1 {
@@ -184,7 +181,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            contains_value(object.clone(), evaluator.eval_expr(&args[0])?)
+            contains_value(object.clone(), args[0].clone())
         }
         (Value::Array(_), "index_of") => {
             if args.len() != 1 {
@@ -193,7 +190,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            index_of_value(object.clone(), evaluator.eval_expr(&args[0])?)
+            index_of_value(object.clone(), args[0].clone())
         }
         (Value::Array(_), "sort") => {
             if !args.is_empty() {
