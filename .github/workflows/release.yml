@@ -133,10 +133,12 @@ jobs:
             fi
           fi
 
-          echo "version=${CARGO_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
-          echo "publish=${PUBLISH}" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=${CARGO_VERSION}"
+            echo "tag=${TAG}"
+            echo "prerelease=${PRERELEASE}"
+            echo "publish=${PUBLISH}"
+          } >> "$GITHUB_OUTPUT"
 
           echo "Release metadata: tag=${TAG} version=${CARGO_VERSION} prerelease=${PRERELEASE} publish=${PUBLISH}"
 
@@ -213,7 +215,9 @@ jobs:
       - name: Smoke test binary (Unix)
         if: runner.os != 'Windows'
         shell: bash
-        run: ./target/${{ matrix.target }}/release/${BINARY_NAME} --version
+        env:
+          TARGET: ${{ matrix.target }}
+        run: ./target/"${TARGET}"/release/"${BINARY_NAME}" --version
 
       - name: Smoke test binary (Windows)
         if: runner.os == 'Windows'
