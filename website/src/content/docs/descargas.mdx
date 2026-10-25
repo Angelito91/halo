@@ -1,0 +1,79 @@
+---
+title: Descargas
+description: Descarga un binario de Halo para Linux, macOS o Windows, o descarga el repositorio y compílalo con Rust.
+---
+
+import { Aside, TabItem, Tabs } from '@astrojs/starlight/components';
+import DownloadBinaries from '../../components/DownloadBinaries.astro';
+import SourceDownload from '../../components/SourceDownload.astro';
+import { VERSION } from '../../lib/version';
+
+La versión actual de Halo es **v{VERSION}**. Puedes usar un binario
+precompilado o compilar el proyecto desde el código fuente. Los binarios se
+publican desde GitHub Actions para Linux, macOS y Windows, tanto en x86_64 como
+en ARM64.
+
+## Binarios precompilados
+
+<DownloadBinaries />
+
+### Instalar el binario
+
+<Tabs>
+	<TabItem label="Linux x86_64">
+		```bash
+		tar -xzf halo-x86_64-unknown-linux-musl.tar.gz
+		sudo install -m 755 halo-x86_64-unknown-linux-musl/halo /usr/local/bin/halo
+		```
+	</TabItem>
+
+	<TabItem label="macOS Apple Silicon">
+		```bash
+		tar -xzf halo-aarch64-apple-darwin.tar.gz
+		sudo install -m 755 halo-aarch64-apple-darwin/halo /usr/local/bin/halo
+		```
+	</TabItem>
+
+	<TabItem label="Windows x86_64">
+		```powershell
+		Expand-Archive halo-x86_64-pc-windows-msvc.zip -DestinationPath .
+		.\halo-x86_64-pc-windows-msvc\halo.exe version
+		```
+	</TabItem>
+</Tabs>
+
+<Aside type="tip">
+	Si descargaste la versión ARM64 de Linux, la versión Intel de macOS o la
+	versión ARM64 de Windows, sustituye el nombre del archivo por el que aparece
+	en la tarjeta correspondiente. El archivo incluye el binario, el README y la
+	licencia.
+</Aside>
+
+### Verificar la descarga
+
+Cada release publica un archivo `SHA256SUMS` con el hash de todos los assets.
+Descárgalo y comprueba los archivos que hayas descargado:
+
+```bash
+sha256sum -c SHA256SUMS
+# macOS: shasum -a 256 -c SHA256SUMS
+```
+
+También puedes verificar la attestation de build con [GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify halo-x86_64-unknown-linux-musl.tar.gz \
+  --repo Angelito91/halo
+```
+
+## Código fuente
+
+<SourceDownload />
+
+Si prefieres el paso a paso, incluidos los requisitos y la instalación con
+Cargo, consulta la [guía de instalación](../empezando/instalacion/).
+
+## Siguiente paso
+
+- [Escribe tu primer programa](../empezando/primer-programa/).
+- [Aprende a usar la CLI](../empezando/cli/).
