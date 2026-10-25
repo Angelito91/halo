@@ -77,7 +77,7 @@ halo/
 │   │   ├── builtins.rs      # Despacho de funciones globales
 │   │   ├── arrays.rs        # Operaciones de arrays
 │   │   ├── strings.rs       # Operaciones de strings
-│   │   └── mod.rs           # Despacho de métodos
+│   │   └── mod.rs           # Reexporta la stdlib
 │   ├── cli/                 # Un módulo por subcomando
 │   └── diagnostics/         # Errores, colores y sugerencias
 ├── tests/                   # Suite de integración
@@ -121,7 +121,7 @@ parse_expression
                           └── parse_term  + -
                                 └── parse_factor  * / %
                                       └── parse_unary  - !
-                                            └── parse_postfix  llamadas, índices, métodos
+                                            └── parse_postfix  llamadas, índices y asignación
                                                   └── parse_primary
 ```
 
@@ -207,18 +207,18 @@ fallo llegue antes que el desbordamiento nativo.
 Los bucles tienen además un límite de **1 000 000 de iteraciones** por
 programa, pensado para cortar bucles infinitos sin bloquear la máquina.
 
-### Built-ins y métodos
+### Built-ins
 
-`src/stdlib/` implementa las funciones globales y los métodos. Reciben
-**valores ya evaluados**, no nodos del AST, así que no conocen el evaluador ni
-el parser. Añadir una función empieza en `builtins.rs` y termina en `arrays.rs`
-o `strings.rs`.
+`src/stdlib/` implementa las funciones globales. Reciben **valores ya
+evaluados**, no nodos del AST, así que no conocen el evaluador ni el parser.
+Añadir una función empieza en `builtins.rs` y termina en `arrays.rs` o
+`strings.rs`.
 
 En los built-ins, los argumentos se evalúan antes del despacho. Por eso una
 llamada a un builtin puede reportar primero el error de un argumento (por
-ejemplo, una variable inexistente) y después la aridad o el método
-desconocido. En funciones de usuario, la aridad se comprueba antes de evaluar
-los argumentos.
+ejemplo, una variable inexistente) y después la aridad. En funciones de
+usuario, la aridad se comprueba antes de evaluar los argumentos. El parser
+rechaza la sintaxis de métodos con punto (`obj.metodo()`).
 
 ## Diagnósticos
 
@@ -257,8 +257,9 @@ proyecto en el intérprete. El backend anterior está preservado en el tag
 ## Limitaciones conocidas
 
 - No hay maps, closures ni funciones de primera clase.
-- No hay asignación por índice (`arr[0] = x`); los métodos no mutan el array
-  original. `push`, `append`, `reverse` y `sort` devuelven uno nuevo.
+- No hay métodos con punto: todas las operaciones son funciones.
+- La única mutación de arrays es `arr[i] = value`; `push`, `pop`, `append`,
+  `reverse` y `sort` devuelven arrays nuevos.
 - No hay REPL ni package manager.
 - No hay comentarios multilínea `/* … */`.
 - La posición de un error de runtime apunta a la sentencia, no siempre a la

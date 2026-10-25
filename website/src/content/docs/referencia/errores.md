@@ -28,6 +28,8 @@ El lexer y el parser fallan antes de ejecutar nada. Algunos mensajes típicos:
 | `Expected '=' in global variable declaration` | Asignación incompleta en el nivel superior |
 | `Expected an expression` | Operador sin operando o salto de línea dentro de `[...]` |
 | `Expected a function definition, global variable, or statement` | Token inesperado al inicio de una declaración |
+| `Cannot assign to a slice; index a single element` | Se intentó asignar a un slice |
+| `Method calls are not supported; use function syntax, e.g. upper(text)` | Se usó `objeto.metodo()` |
 
 Ejemplos:
 
@@ -146,13 +148,16 @@ range(1.5)            // range() expects integer arguments, got 'float'
 | `Slice end index N out of bounds for array of length M` | Fin de slice inválido |
 | `Slice start index N cannot be greater than end index M` | Rango invertido |
 | `sort() cannot mix strings and numbers in the same array` | Mezcla en `sort()` |
+| `Cannot assign through a slice; index a single element` | Se intentó asignar a través de un slice |
+| `Cannot assign to this expression; expected a variable or an indexed array` | Destino de asignación no válido |
 
 ```halo
 arr = [1, 2, 3]
-arr[-1]        // Array index cannot be negative, got -1
-arr[10]        // Array index 10 out of bounds (length 3)
-arr[0:9]       // Slice end index 9 out of bounds for array of length 3
-sort([1, "a"]) // sort() cannot mix strings and numbers in the same array
+arr[0] = 9          // válido: [9, 2, 3]
+arr[-1] = 0         // Array index cannot be negative, got -1
+arr[10] = 0         // Array index 10 out of bounds (length 3)
+arr[0:1] = [9]      // Cannot assign to a slice; index a single element
+arr[0:1][0] = 9     // Cannot assign through a slice; index a single element
 ```
 
 ## Strings
@@ -164,20 +169,6 @@ sort([1, "a"]) // sort() cannot mix strings and numbers in the same array
 | `join() expects second argument to be a string, got 'T'` | Separador no string |
 
 `substr()` con un inicio mayor que la longitud **no** falla: devuelve `""`.
-
-## Métodos
-
-| Error | Causa |
-|---|---|
-| `Array method push() expects 1 argument, got N` | Aridad del método |
-| `String method upper() expects 0 arguments, got N` | Aridad del método |
-| `Unknown method 'push' for type 'number'` | Método de array sobre otro tipo |
-| `Unknown method 'upper' for type 'number'` | Método de string sobre otro tipo |
-
-```halo
-print([1, 2].push())        // Array method push() expects 1 argument, got 0
-print("hola".upper("x"))    // String method upper() expects 0 arguments, got 1
-```
 
 ## Cómo depurar
 

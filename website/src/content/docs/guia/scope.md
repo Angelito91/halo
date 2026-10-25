@@ -177,11 +177,11 @@ print(resultado)   // 14
 ```
 
 Los arrays también son valores. Pasar un array a una función pasa una copia
-del valor; los métodos no mutan el original. `push` devuelve un array nuevo:
+del valor; las funciones no mutan el original. `push` devuelve un array nuevo:
 
 ```halo
 modificar(arr) {
-    arr = arr.push(99)
+    arr = push(arr, 99)
     return arr
 }
 

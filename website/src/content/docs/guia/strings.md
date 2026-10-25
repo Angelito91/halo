@@ -1,10 +1,10 @@
 ---
 title: Strings
-description: Literales, escapes, concatenación, comparación y métodos de string en Halo.
+description: Literales, escapes, concatenación, comparación y funciones de string en Halo.
 ---
 
 Los strings son secuencias UTF-8 inmutables. Se pueden crear con comillas
-dobles o simples y tienen un conjunto de métodos para transformarlos.
+dobles o simples y tienen un conjunto de funciones para transformarlos.
 
 ## Literales y escapes
 
@@ -87,29 +87,32 @@ caracteres, así que hay una pequeña asimetría que conviene tener presente.
 Los strings **no** se pueden indexar con `texto[0]` ni recorrer con `for`. Para
 extraer partes, usa `substr()`.
 
-## Métodos de string
+## Funciones de string
 
-Igual que con los arrays, hay dos formas: función y método. Los métodos no
-mutan el string; devuelven uno nuevo.
+No hay métodos con punto. Todas las operaciones son funciones que reciben el
+string como primer argumento:
 
-| Operación | Función | Método | Ejemplo |
-|---|---|---|---|
-| Mayúsculas | `upper(s)` | `s.upper()` | `"hola".upper()` → `HOLA` |
-| Minúsculas | `lower(s)` | `s.lower()` | `"HOLA".lower()` → `hola` |
-| Quitar espacios | `trim(s)` | `s.trim()` | `"  hola  ".trim()` → `hola` |
-| Prefijo | `starts_with(s, p)` | `s.starts_with(p)` | `"hola".starts_with("ho")` → `true` |
-| Sufijo | `ends_with(s, p)` | `s.ends_with(p)` | `"hola".ends_with("la")` → `true` |
-| Contiene | `contains(s, p)` | `s.contains(p)` | `"hola".contains("ol")` → `true` |
-| Índice | `index_of(s, p)` | `s.index_of(p)` | `"hola".index_of("l")` → `2` |
-| Reemplazar | `replace(s, a, b)` | `s.replace(a, b)` | `"a-b".replace("-", "_")` → `a_b` |
-| Substring | `substr(s, i, n)` | `s.substr(i, n)` | `"hola".substr(1, 2)` → `ol` |
-| Invertir | `reverse(s)` | `s.reverse()` | `"abc".reverse()` → `cba` |
+| Operación | Función | Ejemplo |
+|---|---|---|
+| Mayúsculas | `upper(s)` | `upper("hola")` → `HOLA` |
+| Minúsculas | `lower(s)` | `lower("HOLA")` → `hola` |
+| Quitar espacios | `trim(s)` | `trim("  hola  ")` → `hola` |
+| Prefijo | `starts_with(s, p)` | `starts_with("hola", "ho")` → `true` |
+| Sufijo | `ends_with(s, p)` | `ends_with("hola", "la")` → `true` |
+| Contiene | `contains(s, p)` | `contains("hola", "ol")` → `true` |
+| Índice | `index_of(s, p)` | `index_of("hola", "l")` → `2` |
+| Reemplazar | `replace(s, a, b)` | `replace("a-b", "-", "_")` → `a_b` |
+| Substring | `substr(s, i, n)` | `substr("hola", 1, 2)` → `ol` |
+| Invertir | `reverse(s)` | `reverse("abc")` → `cba` |
+
+`"hola".upper()` no es válido: el parser rechaza los métodos con punto y
+sugiere `upper("hola")`.
 
 ### `upper` / `lower`
 
 ```halo
-print("Hola".upper())   // HOLA
-print("HOLA".lower())   // hola
+print(upper("Hola"))   // HOLA
+print(lower("HOLA"))   // hola
 ```
 
 ### `trim`
@@ -117,21 +120,21 @@ print("HOLA".lower())   // hola
 Elimina espacios, tabs y saltos de línea al principio y al final:
 
 ```halo
-print("  hola  ".trim())   // hola
+print(trim("  hola  "))   // hola
 ```
 
 ### `starts_with` / `ends_with`
 
 ```halo
-print("programa.halo".ends_with(".halo"))   // true
-print("https://".starts_with("http"))       // true
+print(ends_with("programa.halo", ".halo"))   // true
+print(starts_with("https://", "http"))       // true
 ```
 
 ### `contains`
 
 ```halo
-print("hola mundo".contains("mundo"))   // true
-print("hola".contains(""))              // true
+print(contains("hola mundo", "mundo"))   // true
+print(contains("hola", ""))              // true
 ```
 
 ### `index_of`
@@ -139,15 +142,15 @@ print("hola".contains(""))              // true
 Devuelve el índice de la primera aparición o `-1`:
 
 ```halo
-print("hola".index_of("l"))    // 2
-print("hola".index_of("z"))    // -1
+print(index_of("hola", "l"))    // 2
+print(index_of("hola", "z"))    // -1
 ```
 
 El índice es un **offset de bytes**. Con texto no ASCII puede no coincidir con
 la posición visual:
 
 ```halo
-print("añb".index_of("b"))   // 3
+print(index_of("añb", "b"))   // 3
 ```
 
 ### `replace`
@@ -155,7 +158,7 @@ print("añb".index_of("b"))   // 3
 Reemplaza **todas** las apariciones:
 
 ```halo
-print("a-b-a".replace("a", "x"))   // x-b-x
+print(replace("a-b-a", "a", "x"))   // x-b-x
 ```
 
 ### `substr`
@@ -163,17 +166,17 @@ print("a-b-a".replace("a", "x"))   // x-b-x
 `substr(texto, inicio, longitud)` trabaja con caracteres:
 
 ```halo
-print("hola mundo".substr(0, 4))   // hola
-print("hola mundo".substr(5, 5))   // mundo
-print("hola".substr(1, 2))         // ol
+print(substr("hola mundo", 0, 4))   // hola
+print(substr("hola mundo", 5, 5))   // mundo
+print(substr("hola", 1, 2))         // ol
 ```
 
 Si `inicio` está fuera del string, devuelve `""`. Si la longitud se pasa del
 final, se recorta:
 
 ```halo
-print("hola".substr(99, 3))   // (vacío)
-print("hola".substr(2, 99))   // la
+print(substr("hola", 99, 3))   // (vacío)
+print(substr("hola", 2, 99))   // la
 ```
 
 Un inicio o una longitud negativos son errores.
@@ -181,8 +184,8 @@ Un inicio o una longitud negativos son errores.
 ### `reverse`
 
 ```halo
-print("abc".reverse())   // cba
-print("añb".reverse())   // bña
+print(reverse("abc"))   // cba
+print(reverse("añb"))   // bña
 ```
 
 ## Convertir a string
@@ -212,6 +215,7 @@ print("Lenguaje: " + nombre + " v" + str(version))
 ## Limitaciones
 
 - No hay indexación (`texto[0]`).
+- No hay métodos con punto (`texto.upper()` no es válido); usa funciones.
 - No hay `split()`, `format()`, `char_at()` ni expresiones regulares.
 - No hay interpolación (`"Hola, ${nombre}"`).
 - No hay recorrido directo con `for`; usa `substr()` y `range()`.

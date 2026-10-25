@@ -53,10 +53,13 @@ El segundo hito convirtió el intérprete en algo usable.
 La versión actual amplía el lenguaje y simplifica el proyecto.
 
 - ✅ Arrays con literales e indexación
+- ✅ Asignación por índice `arr[i] = value`, incluidos índices anidados
 - ✅ Slicing `arr[inicio:fin]`
 - ✅ `push`, `pop`, `append`, `first`, `last`, `reverse`, `join`, `sort`
 - ✅ `contains` e `index_of` para arrays y strings
-- ✅ Métodos de string: `upper`, `lower`, `trim`, `starts_with`,
+- ✅ API function-first: sin métodos con punto
+- ✅ `pop` devuelve un array nuevo; `last` lee el último elemento
+- ✅ Funciones de string: `upper`, `lower`, `trim`, `starts_with`,
   `ends_with`, `contains`, `index_of`, `replace`, `substr`, `reverse`
 - ✅ Strings con comillas simples y dobles
 - ✅ `for` sobre arrays y sobre `range()`

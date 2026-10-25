@@ -59,9 +59,10 @@ todos los tests que lo contengan.
 | `control_flow_tests.rs` | `if`, `while`, `for`, `break`, `continue` |
 | `function_tests.rs` | Llamadas, retorno, recursión, aridad |
 | `scope_and_variable_tests.rs` | Shadowing, globales, frames, `for` |
-| `string_and_types_tests.rs` | Strings, métodos, truthiness, conversiones |
-| `array_functions_tests.rs` | Arrays, indexación, slicing, métodos |
-| `stdlib_tests.rs` | Built-ins y métodos de la biblioteca estándar |
+| `string_and_types_tests.rs` | Strings, funciones, truthiness, conversiones |
+| `array_functions_tests.rs` | Arrays, indexación, slicing y funciones |
+| `language_hardening_tests.rs` | Asignación por índice, API function-first, `pop`/`last` |
+| `stdlib_tests.rs` | Built-ins puros de la biblioteca estándar |
 | `interpreter_tests.rs` | Programas completos de extremo a extremo |
 | `examples_tests.rs` | Ejecuta todos los programas de `examples/` |
 | `cli_args_tests.rs` | Parseo de argumentos de la CLI |
@@ -116,7 +117,7 @@ use halo::interpreter::Value;
 
 #[test]
 fn trim_quita_espacios() {
-    let value = eval_var(r#"x = "  hola  ".trim()"#, "x");
+    let value = eval_var(r#"x = trim("  hola  ")"#, "x");
     assert_eq!(value, Value::String("hola".to_string()));
 }
 ```

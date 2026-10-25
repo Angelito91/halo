@@ -1,6 +1,6 @@
 ---
 title: Arrays
-description: Creación, indexación, slicing, métodos y limitaciones de los arrays en Halo.
+description: Creación, indexación, asignación, slicing, funciones y limitaciones de los arrays en Halo.
 ---
 
 Los arrays son colecciones ordenadas y **heterogéneas**: pueden mezclar
@@ -45,6 +45,39 @@ frutas[3]    // Error: Array index 3 out of bounds (length 3)
 
 No hay acceso circular ni `at()`.
 
+## Asignación por índice
+
+`arr[i] = valor` muta el array que vive en la variable y devuelve el valor
+asignado:
+
+```halo
+nums = [10, 20, 30]
+nums[0] = 99
+print(nums)   // [99, 20, 30]
+
+resultado = nums[1] = 7
+print(resultado)   // 7
+print(nums)        // [99, 7, 30]
+```
+
+También funciona con índices anidados:
+
+```halo
+matrix = [[1, 2], [3, 4]]
+matrix[1][0] = 42
+print(matrix)   // [[1, 2], [42, 4]]
+```
+
+El destino debe ser una variable o una cadena de índices simples. No se puede
+asignar a un slice, a un literal ni al resultado de una llamada:
+
+```halo
+nums[0:1] = [9]   // Error: Cannot assign to a slice; index a single element
+```
+
+Los índices negativos o fuera de rango producen los mismos errores que en la
+lectura.
+
 ## Slicing
 
 Puedes extraer una porción con `[inicio:fin]`. El índice `fin` es **exclusivo**:
@@ -75,70 +108,67 @@ print(len([]))          // 0
 
 No hay propiedad `.length`; usa `len()`.
 
-## Métodos y built-ins
+## Funciones de array
 
-Los arrays tienen dos formas equivalentes: **función** (el array es el primer
-argumento) y **método** (el array va antes del punto).
+No hay métodos con punto. Todas las operaciones son funciones que reciben el
+array como primer argumento:
 
-| Operación | Función | Método | Devuelve |
-|---|---|---|---|
-| Añadir al final | `push(arr, x)` | `arr.push(x)` | Array nuevo |
-| Concatenar | `append(a, b)` | — | Array nuevo |
-| Quitar el último | `pop(arr)` | `arr.pop()` | Último elemento |
-| Primero | `first(arr)` | `arr.first()` | Elemento o `null` |
-| Último | `last(arr)` | `arr.last()` | Elemento o `null` |
-| Invertir | `reverse(arr)` | `arr.reverse()` | Array nuevo |
-| Unir en string | `join(arr, sep)` | `arr.join(sep)` | String |
-| Ordenar | `sort(arr)` | `arr.sort()` | Array nuevo |
-| Contiene | `contains(arr, x)` | `arr.contains(x)` | `bool` |
-| Índice de | `index_of(arr, x)` | `arr.index_of(x)` | `number` (`-1` si no está) |
+| Operación | Función | Devuelve |
+|---|---|---|
+| Añadir al final | `push(arr, x)` | Array nuevo |
+| Concatenar | `append(a, b)` | Array nuevo |
+| Quitar el último | `pop(arr)` | Array nuevo sin el último elemento |
+| Primero | `first(arr)` | Elemento o `null` |
+| Último | `last(arr)` | Elemento o `null` |
+| Invertir | `reverse(arr)` | Array nuevo |
+| Unir en string | `join(arr, sep)` | String |
+| Ordenar | `sort(arr)` | Array nuevo |
+| Contiene | `contains(arr, x)` | `bool` |
+| Índice de | `index_of(arr, x)` | `number` (`-1` si no está) |
 
-### Los métodos no mutan
+### Las funciones no mutan
 
-Esta es la trampa más importante: **los métodos devuelven un valor nuevo y no
-modifican el receptor**. Si escribes:
-
-```halo
-arr = [1, 2]
-arr.push(3)
-print(arr)   // [1, 2]  ← no cambió
-```
-
-El array original sigue igual. Tienes que quedarte con el resultado:
-
-```halo
-arr = [1, 2]
-arr = arr.push(3)
-print(arr)   // [1, 2, 3]
-```
-
-O usar la forma funcional:
+Todas las funciones de array devuelven un valor nuevo y no modifican el
+original. La única forma de mutar un array es la asignación por índice:
 
 ```halo
 arr = [1, 2]
 arr = push(arr, 3)
 print(arr)   // [1, 2, 3]
+
+arr[0] = 9
+print(arr)   // [9, 2, 3]
 ```
+
+`arr.push(3)` no es válido: el parser rechaza los métodos con punto. La forma
+correcta es `arr = push(arr, 3)`.
+
+`pop` devuelve un array nuevo sin el último elemento; `last` lee el último
+elemento sin modificar el array:
+
+```halo
+arr = [1, 2, 3]
+print(pop(arr))    // [1, 2]
+print(arr)         // [1, 2, 3]
+print(last(arr))   // 3
+```
+
+`pop([])` devuelve `[]`. `first` y `last` devuelven `null` en arrays vacíos.
 
 ### Ejemplos
 
 ```halo
 arr = [1, 2, 3]
 
-arr = arr.push(4)          // [1, 2, 3, 4]
-arr = append(arr, [5, 6])  // [1, 2, 3, 4, 5, 6]
+arr = push(arr, 4)          // [1, 2, 3, 4]
+arr = append(arr, [5, 6])   // [1, 2, 3, 4, 5, 6]
 
-print(arr.pop())           // 6
-print(arr.first())         // 1
-print(arr.last())          // 5
-print(arr.reverse())       // [5, 4, 3, 2, 1]
-print(arr.join("-"))       // 1-2-3-4-5
+print(pop(arr))       // [1, 2, 3, 4, 5]
+print(first(arr))     // 1
+print(last(arr))      // 6
+print(reverse(arr))   // [6, 5, 4, 3, 2, 1]
+print(join(arr, "-")) // 1-2-3-4-5-6
 ```
-
-`pop()` devuelve el último elemento, no un array nuevo. Si el array está
-vacío, devuelve `null`.
-
-`first()` y `last()` también devuelven `null` en arrays vacíos.
 
 ### Ordenar
 
@@ -156,10 +186,10 @@ sort([1, "dos"])   // Error: sort() cannot mix strings and numbers in the same a
 ```halo
 nums = [10, 20, 30]
 
-print(nums.contains(20))    // true
-print(nums.contains(99))    // false
-print(nums.index_of(30))    // 2
-print(nums.index_of(99))    // -1
+print(contains(nums, 20))    // true
+print(contains(nums, 99))    // false
+print(index_of(nums, 30))    // 2
+print(index_of(nums, 99))    // -1
 ```
 
 ## Recorrer arrays
@@ -198,13 +228,27 @@ copia y no puede mutar el array del caller:
 
 ```halo
 agregar(arr, x) {
-    return arr.push(x)
+    return push(arr, x)
 }
 
 original = [1, 2]
 nuevo = agregar(original, 3)
 print(original)   // [1, 2]
 print(nuevo)      // [1, 2, 3]
+```
+
+La asignación por índice dentro de una función modifica solo la copia local:
+
+```halo
+mutar(arr) {
+    arr[0] = 99
+    return arr
+}
+
+original = [1, 2]
+nuevo = mutar(original)
+print(original)   // [1, 2]
+print(nuevo)      // [99, 2]
 ```
 
 ## `range`
@@ -224,12 +268,14 @@ Consulta [bucles](../bucles/#range) para los límites y el tamaño máximo.
 - No hay arrays asociativos ni diccionarios.
 - No hay `arr.length`; usa `len(arr)`.
 - No hay indexación negativa.
-- No hay asignación por índice (`arr[0] = x`).
+- No hay métodos con punto: usa `push(arr, x)`, `upper(text)`, etc.
+- No se puede asignar a un slice (`arr[0:2] = ...`).
 - No hay igualdad estructural: `[1, 2] == [1, 2]` devuelve `false`, y
   `contains`/`index_of` no encuentran arrays anidados por su contenido.
 - Los literales de array deben ir en una sola línea; el parser no acepta saltos
   de línea dentro de `[...]`.
-- No hay métodos que muten el array in-place.
+- `push`, `pop`, `reverse` y `sort` no mutan el array: devuelven uno nuevo.
+  La única mutación es `arr[i] = value`.
 
 ## Siguiente paso
 

@@ -72,10 +72,10 @@ print(saludar("mundo"))
 |---|---|
 | Tipos | `number` (entero de 64 bits), `float`, `bool`, `string`, `null` y arrays |
 | Aritmética | `+`, `-`, `*`, `/`, `%` con promoción automática y overflow comprobado |
-| Strings | Concatenación, repetición, comparación, escapes y métodos |
+| Strings | Concatenación, repetición, comparación, escapes y funciones |
 | Control de flujo | `if / else if / else`, `while`, `for … in`, `break`, `continue` |
 | Funciones | Parámetros, retorno, recursión directa y mutua, call-before-definition |
-| Colecciones | Arrays con literales, indexación, slicing y métodos |
+| Colecciones | Arrays con literales, indexación, asignación por índice, slicing y funciones |
 | Intérprete | Ejecución directa del AST con límites de recursión e iteraciones |
 | CLI | `run`, `check`, `tokens`, `ast`, `help` y `version` |
 
@@ -93,9 +93,11 @@ conocer antes de escribir tu primer programa:
 - **No hay closures ni funciones de primera clase.**
 - **No hay REPL ni gestor de paquetes.** La CLI es pequeña y directa.
 - **No hay comentarios multilínea.** Solo `//`.
-- **No hay asignación por índice** (`arr[0] = x`). Los métodos de array no
-  mutan el original: `push`, `append`, `reverse` y `sort` devuelven un array
-  nuevo, mientras que `pop`, `first` y `last` devuelven un elemento.
+- **No hay métodos con punto.** Todas las operaciones son funciones:
+  `upper(texto)`, `push(arr, x)`, etc.
+- **La única mutación de arrays es la asignación por índice**
+  (`arr[i] = value`). `push`, `pop`, `append`, `reverse` y `sort` devuelven
+  arrays nuevos; `first` y `last` solo leen.
 
 Puedes seguir el estado en el [roadmap](../../proyecto/roadmap/).
 

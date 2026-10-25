@@ -57,8 +57,8 @@ cargo fmt --all -- --check
 | Tests | Casos límite, errores, programas completos |
 | Documentación | Ejemplos nuevos, aclaraciones, errores corregidos |
 | Diagnósticos | Mensajes más claros, posición y sugerencias |
-| Intérprete | Builtins, métodos, semántica de arrays |
-| Stdlib | Nuevas funciones y métodos sobre valores |
+| Intérprete | Builtins, semántica de arrays y asignación por índice |
+| Stdlib | Nuevas funciones sobre valores |
 | CLI | Salida, flags, ayuda |
 | Ejemplos | Programas completos y comentados |
 
@@ -75,13 +75,13 @@ Los pasos típicos:
 3. **Implementa la función** en `src/stdlib/arrays.rs` o
    `src/stdlib/strings.rs`, según el tipo sobre el que trabaje, o directamente
    en `src/stdlib/builtins.rs` si es una operación escalar.
-4. **Añade el método**, si tiene sentido, en `src/stdlib/mod.rs`
-   (`call_method`).
-5. **Añade tests** de valor, aridad y tipos inválidos en `tests/stdlib_tests.rs`
+4. **Añade tests** de valor, aridad y tipos inválidos en `tests/stdlib_tests.rs`
    o en la suite del tipo correspondiente.
-6. **Documenta** el builtin en
+5. **Documenta** el builtin en
    `website/src/content/docs/referencia/builtins.md` y, si es una
    característica del lenguaje, en la guía correspondiente.
+
+No hay despacho de métodos: todas las operaciones nuevas deben ser funciones.
 
 Ejemplo de despacho:
 

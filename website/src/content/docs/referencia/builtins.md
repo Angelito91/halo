@@ -1,10 +1,10 @@
 ---
 title: Funciones built-in
-description: "Referencia completa de funciones y métodos incorporados: aridad, tipo de retorno y ejemplos."
+description: "Referencia completa de funciones incorporadas: aridad, tipo de retorno y ejemplos."
 ---
 
-Halo incluye un conjunto pequeño de funciones y métodos. Todas las funciones
-son de **aridad fija** salvo `print`, `println` y `range`.
+Halo incluye un conjunto pequeño de funciones. Todas son de **aridad fija**
+salvo `print`, `println` y `range`.
 
 ## Resumen
 
@@ -20,7 +20,7 @@ son de **aridad fija** salvo `print`, `println` y `range`.
 | `type(x)` | 1 | `string` |
 | `range(end)` / `range(a, b)` | 1–2 | `array` |
 | `push(arr, x)` | 2 | `array` |
-| `pop(arr)` | 1 | cualquiera / `null` |
+| `pop(arr)` | 1 | `array` |
 | `append(a, b)` | 2 | `array` |
 | `first(arr)` | 1 | cualquiera / `null` |
 | `last(arr)` | 1 | cualquiera / `null` |
@@ -189,25 +189,26 @@ El tamaño máximo es 1 000 000 de elementos.
 
 ## Arrays
 
-### `push(arr, x)` / `arr.push(x)`
+### `push(arr, x)`
 
 Devuelve un array **nuevo** con `x` al final.
 
 ```halo
 arr = [1, 2]
 arr = push(arr, 3)    // [1, 2, 3]
-arr = arr.push(4)     // [1, 2, 3, 4]
+arr = push(arr, 4)    // [1, 2, 3, 4]
 ```
 
-### `pop(arr)` / `arr.pop()`
+### `pop(arr)`
 
-Devuelve el último elemento, o `null` si el array está vacío. No devuelve un
-array nuevo.
+Devuelve un array **nuevo** sin su último elemento. No muta el original.
+`pop([])` devuelve `[]`.
 
 ```halo
 arr = [10, 20, 30]
-print(arr.pop())     // 30
-print([].pop())      // null
+print(pop(arr))     // [10, 20]
+print(arr)          // [10, 20, 30]
+print(pop([]))      // []
 ```
 
 ### `append(a, b)`
@@ -218,154 +219,156 @@ Concatena dos arrays y devuelve uno nuevo.
 print(append([1, 2], [3, 4]))   // [1, 2, 3, 4]
 ```
 
-### `first(arr)` / `arr.first()`
+### `first(arr)`
 
 Primer elemento, o `null` si está vacío.
 
 ```halo
-print([10, 20].first())   // 10
-print([].first())         // null
+print(first([10, 20]))   // 10
+print(first([]))         // null
 ```
 
-### `last(arr)` / `arr.last()`
+### `last(arr)`
 
-Último elemento, o `null` si está vacío.
+Último elemento, o `null` si está vacío. Es una lectura: no modifica el array.
 
 ```halo
-print([10, 20].last())   // 20
+print(last([10, 20]))   // 20
+print(last([]))         // null
 ```
 
-### `reverse(x)` / `x.reverse()`
+### `reverse(x)`
 
 Invierte un array o un string y devuelve un valor nuevo.
 
 ```halo
-print([1, 2, 3].reverse())   // [3, 2, 1]
-print("abc".reverse())       // cba
+print(reverse([1, 2, 3]))   // [3, 2, 1]
+print(reverse("abc"))       // cba
 ```
 
-### `join(arr, sep)` / `arr.join(sep)`
+### `join(arr, sep)`
 
 Convierte cada elemento a string y los une con `sep`.
 
 ```halo
-print([1, 2, 3].join("-"))     // 1-2-3
-print(["a", "b"].join(", "))   // a, b
+print(join([1, 2, 3], "-"))     // 1-2-3
+print(join(["a", "b"], ", "))   // a, b
 ```
 
-### `sort(arr)` / `arr.sort()`
+### `sort(arr)`
 
 Ordena números (enteros y floats) o strings. No mezcla tipos.
 
 ```halo
-print([3, 1, 2].sort())            // [1, 2, 3]
-print(["pera", "manzana"].sort())  // [manzana, pera]
-sort([1, "dos"])                   // Error
+print(sort([3, 1, 2]))            // [1, 2, 3]
+print(sort(["pera", "manzana"]))  // [manzana, pera]
+sort([1, "dos"])                  // Error
 ```
 
 ## Búsqueda
 
-### `contains(x, y)` / `x.contains(y)`
+### `contains(x, y)`
 
 Para strings, comprueba si `y` es un substring. Para arrays, comprueba si hay
 un elemento igual a `y` usando `==`. Como los arrays no tienen igualdad
 estructural, no encuentra arrays anidados por su contenido.
 
 ```halo
-print("hola".contains("ol"))    // true
-print([1, 2, 3].contains(2))    // true
+print(contains("hola", "ol"))    // true
+print(contains([1, 2, 3], 2))    // true
 ```
 
-### `index_of(x, y)` / `x.index_of(y)`
+### `index_of(x, y)`
 
 Para strings, devuelve el offset de bytes de la primera aparición o `-1`. Para
 arrays, devuelve el índice del elemento o `-1`; al igual que `contains`, usa
 `==` y no encuentra arrays anidados por su contenido.
 
 ```halo
-print("hola".index_of("l"))     // 2
-print("hola".index_of("z"))     // -1
-print([10, 20].index_of(20))    // 1
+print(index_of("hola", "l"))     // 2
+print(index_of("hola", "z"))     // -1
+print(index_of([10, 20], 20))    // 1
 ```
 
 ## Strings
 
-### `upper(s)` / `s.upper()`
+### `upper(s)`
 
 ```halo
-print("Hola".upper())   // HOLA
+print(upper("Hola"))   // HOLA
 ```
 
-### `lower(s)` / `s.lower()`
+### `lower(s)`
 
 ```halo
-print("HOLA".lower())   // hola
+print(lower("HOLA"))   // hola
 ```
 
-### `trim(s)` / `s.trim()`
+### `trim(s)`
 
 Quita espacios, tabs y saltos de línea al inicio y al final.
 
 ```halo
-print("  hola  ".trim())   // hola
+print(trim("  hola  "))   // hola
 ```
 
-### `starts_with(s, p)` / `s.starts_with(p)`
+### `starts_with(s, p)`
 
 ```halo
-print("programa.halo".starts_with("programa"))   // true
+print(starts_with("programa.halo", "programa"))   // true
 ```
 
-### `ends_with(s, p)` / `s.ends_with(p)`
+### `ends_with(s, p)`
 
 ```halo
-print("programa.halo".ends_with(".halo"))   // true
+print(ends_with("programa.halo", ".halo"))   // true
 ```
 
-### `replace(s, a, b)` / `s.replace(a, b)`
+### `replace(s, a, b)`
 
 Reemplaza **todas** las apariciones de `a` por `b`.
 
 ```halo
-print("a-b-a".replace("a", "x"))   // x-b-x
+print(replace("a-b-a", "a", "x"))   // x-b-x
 ```
 
-### `substr(s, i, n)` / `s.substr(i, n)`
+### `substr(s, i, n)`
 
 Extrae `n` caracteres a partir de `i`. Trabaja con caracteres, no bytes.
 
 ```halo
-print("hola mundo".substr(0, 4))   // hola
-print("hola".substr(2, 99))        // la
-print("hola".substr(99, 1))        // (vacío)
+print(substr("hola mundo", 0, 4))   // hola
+print(substr("hola", 2, 99))        // la
+print(substr("hola", 99, 1))        // (vacío)
 ```
 
 Un `i` o `n` negativo es un error.
 
-## Métodos y pureza
+## Pureza y mutación
 
-Los métodos son azúcar sintáctico sobre las funciones. **No mutan el
-receptor**; devuelven un valor nuevo:
+Todas las funciones son puras: no mutan sus argumentos. Los arrays se pasan por
+valor, así que `push`, `pop`, `reverse` y `sort` devuelven arrays nuevos.
 
 ```halo
 s = "hola"
-s.upper()
-print(s)          // hola (sin cambios)
+print(upper(s))   // HOLA
+print(s)          // hola
 
-s = s.upper()
-print(s)          // HOLA
-```
-
-Lo mismo aplica a arrays:
-
-```halo
 arr = [1, 2]
-arr.push(3)
-print(arr)        // [1, 2]
-
-arr = arr.push(3)
+arr = push(arr, 3)
 print(arr)        // [1, 2, 3]
 ```
+
+La única mutación de un array es la asignación por índice:
+
+```halo
+arr = [1, 2, 3]
+arr[0] = 99
+print(arr)        // [99, 2, 3]
+```
+
+No hay métodos con punto: `s.upper()` o `arr.push(3)` no son válidos. Usa
+`upper(s)` y `push(arr, 3)`.
 
 ## Errores de aridad
 

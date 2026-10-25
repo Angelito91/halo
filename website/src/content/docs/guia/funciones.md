@@ -240,7 +240,8 @@ print(contador)   // 1
 - **Sobrecarga:** no hay resolución por número de argumentos; evita definir dos
   funciones con el mismo nombre.
 - **Parámetros por defecto o variádicos.**
-- **Métodos definidos por el usuario:** los métodos son built-ins.
+- **Métodos definidos por el usuario:** no existen; las operaciones son
+  funciones built-in.
 
 ## Buenas prácticas
 

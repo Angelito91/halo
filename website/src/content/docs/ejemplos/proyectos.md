@@ -141,7 +141,7 @@ es_vocal(c) {
 }
 
 estadisticas(texto) {
-    limpio = texto.lower().trim()
+    limpio = lower(trim(texto))
     total = len(limpio)
     vocales = 0
     espacios = 0
@@ -173,7 +173,7 @@ Palabras: 7
 Media de letras por palabra: 5
 ```
 
-**Qué practicas:** métodos de string, `substr`, `len`, bucles, lógica
+**Qué practicas:** funciones de string, `substr`, `len`, bucles, lógica
 booleana y funciones auxiliares.
 
 :::note
