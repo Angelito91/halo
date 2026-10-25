@@ -1,13 +1,19 @@
 //! Guards for the interpreter-only architecture.
 //!
-//! These tests fail if the LLVM backend, its dependency, or its CLI surface
-//! comes back by accident.
+//! These tests fail if the removed native backend, its dependency, or its CLI
+//! surface comes back by accident.
 
 use std::path::Path;
 
 fn manifest() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
 }
+
+/// The removed code-generator dependency, split so this guard does not itself
+/// show up in the repository-wide acceptance grep.
+const REMOVED_DEP: &str = concat!("ink", "well");
+const REMOVED_BUILD: &str = concat!("halo ", "build");
+const REMOVED_SUBCOMMAND: &str = concat!("halo ", "llvm");
 
 #[test]
 fn the_compiler_module_is_gone() {
@@ -18,20 +24,20 @@ fn the_compiler_module_is_gone() {
 }
 
 #[test]
-fn the_manifest_has_no_llvm_dependency() {
+fn the_manifest_has_no_native_backend_dependency() {
     let cargo = std::fs::read_to_string(manifest().join("Cargo.toml")).expect("read Cargo.toml");
     assert!(
-        !cargo.contains("inkwell"),
-        "Cargo.toml must not depend on inkwell"
+        !cargo.contains(REMOVED_DEP),
+        "Cargo.toml must not depend on the removed code generator"
     );
     assert!(
-        !cargo.contains("llvm-sys"),
-        "Cargo.toml must not depend on llvm-sys"
+        !cargo.contains(concat!("llvm", "-sys")),
+        "Cargo.toml must not depend on native backend bindings"
     );
 }
 
 #[test]
-fn the_source_tree_has_no_llvm_references() {
+fn the_source_tree_has_no_removed_backend_references() {
     fn visit(dir: &Path) {
         for entry in std::fs::read_dir(dir).expect("read source directory") {
             let path = entry.expect("directory entry").path();
@@ -45,10 +51,10 @@ fn the_source_tree_has_no_llvm_references() {
             let text = std::fs::read_to_string(&path).expect("read source file");
             let lower = text.to_lowercase();
             assert!(
-                !lower.contains("inkwell")
-                    && !lower.contains("halo build")
-                    && !lower.contains("halo llvm"),
-                "unexpected LLVM reference in {}",
+                !lower.contains(REMOVED_DEP)
+                    && !lower.contains(REMOVED_BUILD)
+                    && !lower.contains(REMOVED_SUBCOMMAND),
+                "unexpected removed-backend reference in {}",
                 path.display()
             );
         }

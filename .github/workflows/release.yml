@@ -5,38 +5,16 @@
 #   build   — compile for each target platform (matrix)
 #   release — create a GitHub Release and upload all artifacts
 #
-# Supported targets (all built natively, no cross-compilation):
+# Supported targets (all built natively):
 #   Linux   x86_64   (ubuntu-24.04)
 #   Linux   aarch64  (ubuntu-24.04-arm)
 #   macOS   x86_64   (macos-13, Intel)
 #   macOS   aarch64  (macos-14, Apple Silicon)
 #   Windows x86_64   (windows-2022)
 #
-# Why native runners? inkwell/llvm-sys compiles C++ glue code and links against
-# libLLVM at build time. Both the compiled objects and the linked library must
-# match the host architecture. Cross-compilation from ARM64 → x86_64 would
-# require a full x86_64 sysroot + libLLVM, which is equivalent to a native runner.
-#
-# macos-13 note: this is the last GitHub-hosted Intel runner. It may occasionally
-# be slow to provision; continue-on-error: true is set so a transient shortage
-# does not block the rest of the release.
-#
-# Windows LLVM note: llvm-sys links against LLVM at build time and needs the
-# full development archive (headers + import libs + llvm-config), NOT the
-# end-user installer. The official release provides two Windows packages:
-#
-#   LLVM-<ver>-win64.exe          — toolchain installer (clang, lld, etc.)
-#                                   does NOT contain LLVM static/import libs
-#                                   or headers → useless for building llvm-sys
-#
-#   clang+llvm-<ver>-x86_64-pc-windows-msvc.tar.xz
-#                                 — full developer archive: headers, .lib files,
-#                                   llvm-config.exe, libclang.lib → this is what
-#                                   llvm-sys / inkwell require
-#
-# We therefore download and unpack the clang+llvm dev archive.
-# LIBCLANG_PATH must point to the directory that contains libclang.lib
-# (that is <prefix>\lib, not <prefix>\bin).
+# Halo is a pure-Rust interpreter with no native dependencies. The matrix
+# stays native because it keeps the build and smoke test identical to the
+# platform the artifact runs on; no cross-compilation sysroot is needed.
 
 name: Release
 
@@ -73,15 +51,11 @@ jobs:
           # ── Linux x86_64 ──────────────────────────────────────────────────────
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-24.04
-            llvm_pkg: llvm-23 llvm-23-dev libpolly-23-dev libclang-common-23-dev clang-23
-            llvm_prefix: /usr/lib/llvm-23
             archive_ext: tar.gz
 
           # ── Linux aarch64 — native ARM runner ────────────────────────────────
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
-            llvm_pkg: llvm-23 llvm-23-dev libpolly-23-dev libclang-common-23-dev clang-23
-            llvm_prefix: /usr/lib/llvm-23
             archive_ext: tar.gz
 
           # ── macOS aarch64 (Apple Silicon, native) ─────────────────────────────
@@ -106,139 +80,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── LLVM setup — Linux ───────────────────────────────────────────────────
-      - name: Install LLVM 23 (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
-            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-23 main" \
-            | sudo tee /etc/apt/sources.list.d/llvm-23.list
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ${{ matrix.llvm_pkg }}
-
-      - name: Set LLVM env (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          echo "LLVM_SYS_231_PREFIX=${{ matrix.llvm_prefix }}" >> "$GITHUB_ENV"
-          echo "${{ matrix.llvm_prefix }}/bin"                 >> "$GITHUB_PATH"
-
-      # ── LLVM setup — macOS ───────────────────────────────────────────────────
-      - name: Install LLVM 23 (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew update
-          brew install llvm@23
-
-      - name: Set LLVM env (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          LLVM_PREFIX="$(brew --prefix llvm@23)"
-          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
-          echo "${LLVM_PREFIX}/bin"                 >> "$GITHUB_PATH"
-          echo "LDFLAGS=-L${LLVM_PREFIX}/lib"       >> "$GITHUB_ENV"
-          echo "CPPFLAGS=-I${LLVM_PREFIX}/include"  >> "$GITHUB_ENV"
-
-      # ── LLVM setup — Windows ─────────────────────────────────────────────────
-      #
-      # We download the official "clang+llvm" developer archive from the LLVM
-      # GitHub releases page. This is the only Windows package that ships:
-      #   • include/   — LLVM/Clang C API headers (needed by llvm-sys build.rs)
-      #   • lib/       — LLVM import libs + libclang.lib (needed by the linker)
-      #   • bin/       — llvm-config.exe, clang.exe, libclang.dll
-      #
-      # The other Windows artifact (LLVM-<ver>-win64.exe / .7z) is an end-user
-      # toolchain installer and does NOT contain headers or import libraries.
-      # Using it would cause llvm-sys to fail at the "llvm-config --libs" step.
-      #
-      # Archive name pattern (official LLVM releases):
-      #   clang+llvm-<ver>-x86_64-pc-windows-msvc.tar.xz
-      #
-      # Environment variables required by llvm-sys / inkwell on Windows:
-      #   LLVM_SYS_231_PREFIX  — root of the unpacked archive (contains bin/
-      #                          include/ lib/); llvm-sys runs
-      #                          `llvm-config --prefix` as a sanity-check
-      #   LIBCLANG_PATH        — directory that contains libclang.lib;
-      #                          this is <prefix>\lib, NOT <prefix>\bin
-      #                          (bindgen / llvm-sys look for the .lib here)
-      - name: Resolve latest LLVM 23 version (Windows)
-        if: runner.os == 'Windows'
-        id: llvm-version
-        shell: pwsh
-        run: |
-          # Query the GitHub API for llvmorg-23.* releases.
-          # We send an Accept header for the v3 API and honour GitHub's
-          # recommendation to pass a User-Agent string.
-          $headers  = @{ "Accept" = "application/vnd.github+json"; "X-GitHub-Api-Version" = "2022-11-28" }
-          $releases = Invoke-RestMethod `
-            -Uri     "https://api.github.com/repos/llvm/llvm-project/releases?per_page=30" `
-            -Headers $headers
-
-          $latest23 = $releases |
-            Where-Object { $_.tag_name -match '^llvmorg-23\.\d+\.\d+$' } |
-            Select-Object -First 1
-
-          if (-not $latest23) {
-            Write-Error "No stable LLVM 23 release found via GitHub API."
-            exit 1
-          }
-
-          $version = $latest23.tag_name -replace '^llvmorg-', ''
-          Write-Host "Resolved LLVM version: $version"
-          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-      - name: Download LLVM 23 dev archive (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $version = "${{ steps.llvm-version.outputs.version }}"
-
-          # "clang+llvm" is the developer archive that contains headers, .lib
-          # files, and llvm-config.exe — everything llvm-sys needs to build.
-          $archiveName = "clang+llvm-${version}-x86_64-pc-windows-msvc.tar.xz"
-          $url         = "https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/${archiveName}"
-          $archive     = "$env:TEMP\${archiveName}"
-
-          Write-Host "Downloading $url"
-          Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing
-
-          Write-Host "Extracting to C:\LLVM ..."
-          Remove-Item -Path "C:\LLVM" -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item    -ItemType Directory -Path "C:\LLVM" -Force | Out-Null
-
-          # tar (from Git for Windows / BusyBox) can handle .tar.xz on
-          # Windows Server 2022 runners without any extra tooling.
-          tar -xf $archive --strip-components=1 -C "C:\LLVM"
-
-          # Sanity-check: llvm-config must be present for llvm-sys to work.
-          if (-not (Test-Path "C:\LLVM\bin\llvm-config.exe")) {
-            Write-Error "llvm-config.exe not found after extraction — archive layout may have changed."
-            exit 1
-          }
-
-          $ver = & "C:\LLVM\bin\llvm-config.exe" --version
-          Write-Host "Extracted LLVM $ver"
-
-          # Sanity-check: libclang.lib must be present for LIBCLANG_PATH.
-          if (-not (Test-Path "C:\LLVM\lib\libclang.lib")) {
-            Write-Error "libclang.lib not found in C:\LLVM\lib — LIBCLANG_PATH will be wrong."
-            exit 1
-          }
-
-      - name: Set LLVM env (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          # LLVM_SYS_231_PREFIX — root prefix; llvm-sys invokes llvm-config from here.
-          Add-Content $env:GITHUB_ENV  "LLVM_SYS_231_PREFIX=C:\LLVM"
-
-          # LIBCLANG_PATH — directory that contains libclang.lib (NOT .dll).
-          # bindgen and llvm-sys search this directory for the import library.
-          Add-Content $env:GITHUB_ENV  "LIBCLANG_PATH=C:\LLVM\lib"
-
-          # Add bin\ to PATH so clang.exe / llvm-config.exe are reachable.
-          Add-Content $env:GITHUB_PATH "C:\LLVM\bin"
-
       # ── Rust toolchain ───────────────────────────────────────────────────────
       - name: Install Rust stable + target
         uses: dtolnay/rust-toolchain@stable
@@ -253,7 +94,7 @@ jobs:
 
       # ── Compile ──────────────────────────────────────────────────────────────
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
       # ── Quick smoke test (verify the binary is runnable) ─────────────────────
       - name: Smoke test binary (Unix)
