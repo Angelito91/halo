@@ -5,11 +5,73 @@ description: Requisitos, compilación desde fuente y verificación de la instala
 
 import { TabItem, Tabs } from '@astrojs/starlight/components';
 
-Halo se distribuye como un único binario llamado `halo`. Todavía no hay un
-paquete en crates.io, así que la vía principal es compilar desde el código
-fuente.
+Halo se distribuye como un único binario llamado `halo`. Puedes descargar un
+binario precompilado para tu plataforma o compilarlo desde el código fuente.
+Todavía no hay un paquete en crates.io.
 
-## Requisitos
+## Descargar un binario
+
+Cada release publica binarios nativos para estas plataformas:
+
+| Plataforma | Archivo |
+|---|---|
+| Linux x86_64 (estático) | `halo-x86_64-unknown-linux-musl.tar.gz` |
+| Linux ARM64 (estático) | `halo-aarch64-unknown-linux-musl.tar.gz` |
+| macOS Apple Silicon | `halo-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `halo-x86_64-apple-darwin.tar.gz` |
+| Windows x86_64 | `halo-x86_64-pc-windows-msvc.zip` |
+| Windows ARM64 | `halo-aarch64-pc-windows-msvc.zip` |
+
+Descárgalos desde la página de [Releases](https://github.com/Angelito91/halo/releases).
+
+<Tabs>
+	<TabItem label="Linux x86_64">
+		```bash
+		curl -LO https://github.com/Angelito91/halo/releases/download/v0.3.0/halo-x86_64-unknown-linux-musl.tar.gz
+		tar -xzf halo-x86_64-unknown-linux-musl.tar.gz
+		sudo install -m 755 halo-x86_64-unknown-linux-musl/halo /usr/local/bin/halo
+		```
+	</TabItem>
+
+	<TabItem label="macOS Apple Silicon">
+		```bash
+		curl -LO https://github.com/Angelito91/halo/releases/download/v0.3.0/halo-aarch64-apple-darwin.tar.gz
+		tar -xzf halo-aarch64-apple-darwin.tar.gz
+		sudo install -m 755 halo-aarch64-apple-darwin/halo /usr/local/bin/halo
+		```
+	</TabItem>
+
+	<TabItem label="Windows x86_64">
+		```powershell
+		Invoke-WebRequest `
+		  https://github.com/Angelito91/halo/releases/download/v0.3.0/halo-x86_64-pc-windows-msvc.zip `
+		  -OutFile halo.zip
+		Expand-Archive halo.zip -DestinationPath .
+		.\halo-x86_64-pc-windows-msvc\halo.exe version
+		```
+	</TabItem>
+</Tabs>
+
+### Verificar la descarga
+
+Cada release incluye un archivo `SHA256SUMS`:
+
+```bash
+sha256sum -c SHA256SUMS
+# macOS: shasum -a 256 -c SHA256SUMS
+```
+
+Los binarios también incluyen una attestation de build de GitHub. Si tienes
+[GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify halo-x86_64-unknown-linux-musl.tar.gz \
+  --repo Angelito91/halo
+```
+
+## Compilar desde fuente
+
+### Requisitos
 
 | Componente | Versión | ¿Para qué? |
 |---|---|---|
@@ -28,7 +90,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 En Windows, descarga el instalador de rustup desde [rustup.rs](https://rustup.rs/).
 
-## Compilar desde fuente
+### Compilación
 
 <Tabs>
 	<TabItem label="Linux / macOS">

@@ -1,0 +1,23 @@
+version: 2
+
+updates:
+  # Keep the GitHub Actions used by CI and release up to date.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Halo currently has no third-party crates, but this keeps working if one
+  # is added later.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      cargo:
+        patterns:
+          - "*"

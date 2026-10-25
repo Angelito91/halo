@@ -1,0 +1,26 @@
+# cargo-deny policy for Halo.
+#
+# Halo has no third-party dependencies today, but this keeps the policy
+# explicit for the day one is added. Run locally with:
+#
+#   cargo deny check
+#
+# See https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+# A yanked crate in a release build is treated as an error.
+yanked = "deny"
+
+[licenses]
+confidence-threshold = 0.9
+# Halo itself is MPL-2.0. Add licenses here only after reviewing them.
+allow = ["MPL-2.0"]
+
+[bans]
+multiple-versions = "warn"
+# Wildcard dependency requirements make builds non-reproducible.
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
