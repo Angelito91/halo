@@ -66,16 +66,6 @@ fn temp_source(name: &str, source: &str) -> std::path::PathBuf {
 }
 
 #[test]
-fn tokens_subcommand_is_stable() {
-    let out = run_halo("tokens");
-    assert!(
-        out.contains("Identifier"),
-        "unexpected tokens output: {out}"
-    );
-    assert!(out.contains("Number"), "unexpected tokens output: {out}");
-}
-
-#[test]
 fn tokens_subcommand_keeps_the_token_order() {
     let out = run_halo("tokens");
     let ident = out

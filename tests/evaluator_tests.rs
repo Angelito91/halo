@@ -127,22 +127,6 @@ r3 = check(0, 0)
 }
 
 #[test]
-#[ignore] // Causes stack overflow - recursion limit test should be done differently
-fn test_recursion_depth_limit() {
-    let code = "
-infinite(n) {
-    return infinite(n + 1)
-}
-result = infinite(0)
-";
-    let result = eval_code(code);
-    assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .contains("Maximum recursion depth exceeded"));
-}
-
-#[test]
 fn test_integer_overflow_protection() {
     let code = "
 big(n) {

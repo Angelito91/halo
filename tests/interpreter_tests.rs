@@ -406,8 +406,7 @@ fn test_division_by_zero() {
 
 #[test]
 fn test_empty_program() {
-    let code = "";
-    eval_code(code).ok();
+    assert_eq!(eval_code("").unwrap(), Value::Null);
 }
 
 #[test]
@@ -440,8 +439,9 @@ while x < 100 {
     }
     x = x + 1
 }
+x
 ";
-    eval_code(code).ok();
+    assert_eq!(eval_code(code).unwrap(), Value::Number(5));
 }
 
 // ============ Comment Tests ============

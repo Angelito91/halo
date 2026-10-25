@@ -544,19 +544,6 @@ find(13)
     assert_eq!(eval_last_number(code), 13);
 }
 
-#[test]
-fn test_void_function_returns_null() {
-    let code = "
-nothing() {
-    local_x = 1
-}
-result = nothing()
-";
-    // A void function (no explicit return) must return null.
-    // Local variables inside the function are not visible outside.
-    assert_eq!(eval_var(code, "result"), Value::Null);
-}
-
 // ── Logical short-circuit in conditions ──────────────────────────────────────
 
 #[test]

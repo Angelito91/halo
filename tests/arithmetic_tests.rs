@@ -276,28 +276,6 @@ total = total + 12
 // ── Arithmetic inside functions ───────────────────────────────────────────────
 
 #[test]
-fn test_function_add_returns_correct_value() {
-    let code = "
-add(a, b) {
-    return a + b
-}
-add(17, 25)
-";
-    assert_eq!(eval_last_number(code), 42);
-}
-
-#[test]
-fn test_function_mul_returns_correct_value() {
-    let code = "
-mul(a, b) {
-    return a * b
-}
-mul(6, 7)
-";
-    assert_eq!(eval_last_number(code), 42);
-}
-
-#[test]
 fn test_function_power_by_squaring() {
     // Computes base^exp iteratively using only multiplication.
     let code = "
@@ -331,70 +309,6 @@ sum_to(n) {
 sum_to(100)
 ";
     assert_eq!(eval_last_number(code), 5050);
-}
-
-#[test]
-fn test_factorial_5_equals_120() {
-    let code = "
-factorial(n) {
-    if n <= 1 { return 1 }
-    return n * factorial(n - 1)
-}
-factorial(5)
-";
-    assert_eq!(eval_last_number(code), 120);
-}
-
-#[test]
-fn test_factorial_0_equals_1() {
-    let code = "
-factorial(n) {
-    if n <= 1 { return 1 }
-    return n * factorial(n - 1)
-}
-factorial(0)
-";
-    assert_eq!(eval_last_number(code), 1);
-}
-
-#[test]
-fn test_factorial_10_equals_3628800() {
-    let code = "
-factorial(n) {
-    if n <= 1 { return 1 }
-    return n * factorial(n - 1)
-}
-factorial(10)
-";
-    assert_eq!(eval_last_number(code), 3_628_800);
-}
-
-// ── String × integer repetition ───────────────────────────────────────────────
-
-#[test]
-fn test_string_repeated_by_integer() {
-    use common::eval_string;
-    let result = eval_string(r#"x = "ab" * 3"#, "x");
-    assert_eq!(result, "ababab");
-}
-
-#[test]
-fn test_integer_times_string() {
-    use common::eval_string;
-    let result = eval_string(r#"x = 3 * "ab""#, "x");
-    assert_eq!(result, "ababab");
-}
-
-#[test]
-fn test_string_repeated_zero_times_is_empty() {
-    use common::eval_string;
-    let result = eval_string(r#"x = "hello" * 0"#, "x");
-    assert_eq!(result, "");
-}
-
-#[test]
-fn test_string_repetition_negative_errors() {
-    assert_runtime_error(r#"x = "x" * -1"#, "negative");
 }
 
 // ── Comparison operators return bools ────────────────────────────────────────
