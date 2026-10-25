@@ -13,9 +13,6 @@ use halo::interpreter::{Evaluator, Value};
 use halo::lexer::{Lexer, TokenKind};
 use halo::parser::Parser;
 
-pub mod cases;
-pub mod parity;
-
 // ── Core pipeline ─────────────────────────────────────────────────────────────
 
 /// Lex, parse, and evaluate a Halo source snippet.

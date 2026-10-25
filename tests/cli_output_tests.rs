@@ -45,6 +45,26 @@ fn run_halo(sub: &str) -> String {
     run_halo_on("x = 1 + 2\nprint(x)\n", sub).stdout
 }
 
+fn run_args(args: &[&str]) -> Output {
+    let out = Command::new(env!("CARGO_BIN_EXE_halo"))
+        .args(args)
+        .output()
+        .expect("spawn halo");
+    Output {
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        code: out.status.code(),
+    }
+}
+
+fn temp_source(name: &str, source: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join("halo_cli_output_tests");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join(name);
+    std::fs::write(&path, source).unwrap();
+    path
+}
+
 #[test]
 fn tokens_subcommand_is_stable() {
     let out = run_halo("tokens");
@@ -117,5 +137,44 @@ fn check_subcommand_fails_with_exit_code_1_on_a_syntax_error() {
     assert!(
         out.stderr.contains("1 error(s)"),
         "the error count must be reported on stderr: {out:?}"
+    );
+}
+
+#[test]
+fn bare_file_is_the_run_shorthand() {
+    let path = temp_source("shorthand.halo", "print(6 * 7)\n");
+    let out = run_args(&[path.to_str().unwrap()]);
+    assert_eq!(out.code, Some(0), "implicit run failed: {out:?}");
+    assert_eq!(out.stdout, "42\n");
+}
+
+#[test]
+fn help_lists_only_interpreter_commands() {
+    let out = run_args(&["help"]);
+    assert_eq!(out.code, Some(0), "halo help failed: {out:?}");
+    for command in ["run", "check", "tokens", "ast"] {
+        assert!(out.stdout.contains(command), "missing {command}: {out:?}");
+    }
+    assert!(
+        !out.stdout.contains("build") && !out.stdout.contains("llvm"),
+        "help must not advertise removed commands: {out:?}"
+    );
+}
+
+#[test]
+fn version_subcommand_is_available() {
+    let out = run_args(&["version"]);
+    assert_eq!(out.code, Some(0), "halo version failed: {out:?}");
+    assert!(out.stdout.contains("0.2.0"), "unexpected version: {out:?}");
+}
+
+#[test]
+fn removed_build_subcommand_fails_clearly() {
+    let path = temp_source("removed-build.halo", "print(1)\n");
+    let out = run_args(&["build", path.to_str().unwrap()]);
+    assert_eq!(out.code, Some(1), "build must not run: {out:?}");
+    assert!(
+        out.stderr.contains("was removed") && out.stderr.contains("interpreter-only"),
+        "build must explain the removal: {out:?}"
     );
 }

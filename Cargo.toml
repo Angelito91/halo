@@ -11,9 +11,6 @@ path = "src/lib.rs"
 name = "halo"
 path = "src/main.rs"
 
-[dependencies]
-inkwell = { git = "https://github.com/TheDan64/inkwell", features = ["llvm23-1"] }
-
 [profile.release]
 opt-level = "z"
 lto = true
