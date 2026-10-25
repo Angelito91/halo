@@ -172,46 +172,54 @@ impl Parser {
                 let pos = expr.pos();
                 let index = self.parse_index_or_slice()?;
                 self.consume(TokenKind::RightBracket, "Expected ']' after array index")?;
-                expr = Expression::Index {
-                    array: Box::new(expr),
-                    index,
-                    pos,
-                };
-            } else if self.advance_if(TokenKind::Dot) {
-                // Method call: object.method(...) or object.method
-                let method_pos = expr.pos();
 
-                if !self.check(TokenKind::Identifier) {
-                    self.error("Expected method name after dot");
-                    return None;
-                }
-
-                self.advance();
-                let method = self.previous().lexeme.clone();
-
-                let mut args = Vec::new();
-                if self.advance_if(TokenKind::LeftParen) {
-                    // Method with arguments: object.method(arg1, arg2)
-                    if !self.check(TokenKind::RightParen) {
-                        loop {
-                            args.push(self.parse_expression()?);
-                            if !self.advance_if(TokenKind::Comma) {
-                                break;
-                            }
+                if self.advance_if(TokenKind::Assign) {
+                    // `array[index] = value` is the only assignment form
+                    // allowed on an indexed expression.  Slices are read-only.
+                    let value = self.parse_expression()?;
+                    match index {
+                        IndexType::Single(index) => {
+                            expr = Expression::IndexAssign {
+                                array: Box::new(expr),
+                                index,
+                                value: Box::new(value),
+                                pos,
+                            };
+                        }
+                        IndexType::Slice { .. } => {
+                            self.error("Cannot assign to a slice; index a single element");
+                            return None;
                         }
                     }
-                    self.consume(TokenKind::RightParen, "Expected ')' after method arguments")?;
                 } else {
-                    // Method without arguments: object.method
-                    // This is valid - will be converted to method call with no additional args
+                    expr = Expression::Index {
+                        array: Box::new(expr),
+                        index,
+                        pos,
+                    };
+                }
+            } else if self.check(TokenKind::Dot) {
+                self.error("Method calls are not supported; use function syntax, e.g. upper(text)");
+                self.advance(); // consume the dot so parsing can continue
+                if self.check(TokenKind::Identifier) {
+                    self.advance();
                 }
 
-                expr = Expression::MethodCall {
-                    object: Box::new(expr),
-                    method,
-                    args,
-                    pos: method_pos,
-                };
+                // Consume a trailing `(...)` so the caller does not report a
+                // second, misleading error about an unexpected parenthesis.
+                if self.advance_if(TokenKind::LeftParen) {
+                    let mut depth = 1usize;
+                    while depth > 0 && !self.is_at_end() {
+                        if self.check(TokenKind::LeftParen) {
+                            depth += 1;
+                        } else if self.check(TokenKind::RightParen) {
+                            depth -= 1;
+                        }
+                        self.advance();
+                    }
+                }
+
+                return Some(expr);
             } else {
                 break;
             }

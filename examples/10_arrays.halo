@@ -3,8 +3,8 @@
 //
 // This example demonstrates array manipulation and operations.
 // Arrays are ordered collections that can hold any type of value.
-// Currently (Phase 1): Basic indexing, built-in functions, while-loop iteration
-// Future (Phase 2): For loops, slicing, dot notation methods
+// Halo uses built-in functions and explicit index assignment; there are no
+// dot-method calls.
 
 // ──────────────────────────────────────────────────────────────────────────
 // 1. CREATING ARRAYS
@@ -92,12 +92,13 @@ print("After push(arr, 5): " + str(arr))
 
 print("")
 
-// Pop: remove last element
+// Pop: return a new array without the last element
 arr = [10, 20, 30, 40, 50]
 print("Original: " + str(arr))
-last_elem = pop(arr)
-print("Popped element: " + str(last_elem))
-print("Note: pop() returns element, doesn't modify array in place")
+arr = pop(arr)
+print("After pop(arr): " + str(arr))
+print("last(arr): " + str(last(arr)))
+print("Note: pop() returns a new array; last() reads the last element")
 
 print("")
 
@@ -502,33 +503,27 @@ print("Copy: " + str(copy))
 print("")
 
 // ──────────────────────────────────────────────────────────────────────────
-// 16. FUTURE FEATURES (Phase 2+)
+// 16. INDEX ASSIGNMENT, SLICING AND FOR LOOPS
 // ──────────────────────────────────────────────────────────────────────────
 
-print("=== 16. FUTURE FEATURES (Phase 2+) ===")
+print("=== 16. INDEX ASSIGNMENT, SLICING AND FOR LOOPS ===")
 print("")
 
-print("When Phase 2 is implemented, you'll be able to write:")
+arr = [1, 2, 3, 4, 5]
+print("Original: " + str(arr))
+
+arr[0] = 100
+print("After arr[0] = 100: " + str(arr))
+
+print("arr[1:3]: " + str(arr[1:3]))
+print("arr[2:]: " + str(arr[2:]))
+print("arr[:2]: " + str(arr[:2]))
 print("")
-print("// For loops:")
-print("for item in arr {")
-print("    print(item)")
-print("}")
-print("")
-print("// Array slicing:")
-print("arr[1:3]          // [2, 3]")
-print("arr[2:]           // [3, 4, 5]")
-print("arr[:2]           // [1, 2]")
-print("")
-print("// Dot notation:")
-print("arr.push(6)")
-print("arr.pop()")
-print("arr.reverse()")
-print("arr.join(', ')")
-print("")
-print("// Index assignment:")
-print("arr[0] = 100")
-print("")
+
+print("For loop:")
+for item in arr {
+    print(item)
+}
 
 print("")
 
@@ -540,12 +535,15 @@ print("===========================================")
 print("You've mastered ARRAYS in Halo!")
 print("===========================================")
 print("")
-print("Phase 1 Features (Current):")
+print("Features:")
 print("✓ Array literals [1, 2, 3]")
 print("✓ Indexing arr[0]")
+print("✓ Index assignment arr[0] = value")
+print("✓ Slicing arr[1:3], arr[2:], arr[:2]")
 print("✓ len(arr) - get length")
-print("✓ push(arr, x) - add element")
-print("✓ pop(arr) - remove last")
+print("✓ push(arr, x) - return a new array with x")
+print("✓ pop(arr) - return a new array without its last element")
+print("✓ last(arr) - read the last element")
 print("✓ append(arr1, arr2) - combine")
 print("✓ first(arr) / last(arr) - endpoints")
 print("✓ reverse(arr) - reverse order")
@@ -553,20 +551,16 @@ print("✓ join(arr, sep) - concatenate")
 print("✓ contains(arr, x) - search")
 print("✓ index_of(arr, x) - find position")
 print("✓ sort(arr) - sort elements")
-print("✓ while loop iteration")
+print("✓ while and for loops")
 print("")
 print("Common Patterns:")
-print("✓ Iterate with while loop")
+print("✓ Iterate with while or for")
 print("✓ Calculate statistics (sum, avg, min, max)")
 print("✓ Search and filter elements")
 print("✓ Validate arrays")
 print("✓ Transform arrays")
 print("✓ Build arrays with loops")
 print("")
-print("Phase 2 Features (Coming Soon):")
-print("• For loops")
-print("• Array slicing [1:3]")
-print("• Dot notation arr.push()")
-print("• Index assignment arr[0] = 5")
+print("No dot-method syntax: use push(arr, x), pop(arr), and last(arr).")
 print("")
 print("Ready for more? Check out: 11_dictionaries.halo (future)")

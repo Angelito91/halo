@@ -8,7 +8,7 @@
 
 mod common;
 
-use common::eval_code;
+use common::{eval_code, eval_var};
 use halo::interpreter::value::Value;
 
 // ── push() tests ───────────────────────────────────────────────────────────
@@ -80,52 +80,35 @@ result = push(42, 1)
 // ── pop() tests ────────────────────────────────────────────────────────────
 
 #[test]
-fn test_pop_removes_last_element() {
+fn test_pop_returns_array_without_last_element() {
     let code = r#"
-get_result() {
-    arr = [1, 2, 3]
-    result = pop(arr)
-    return result
-}
-final = get_result()
+arr = [1, 2, 3]
+result = pop(arr)
 "#;
-    let result = eval_code(code).unwrap();
-    assert_eq!(result, Value::Null);
+    let result = eval_var(code, "result");
+    assert_eq!(
+        result,
+        Value::Array(vec![Value::Number(1), Value::Number(2)])
+    );
 }
 
 #[test]
-fn test_pop_returns_value() {
+fn test_pop_does_not_mutate_the_original_array() {
     let code = r#"
-get_result() {
-    arr = [10, 20, 30]
-    val = pop(arr)
-    if val == 30 {
-        return 1
-    }
-    return 0
-}
-final = get_result()
+arr = [1, 2, 3]
+result = pop(arr)
 "#;
-    let result = eval_code(code).unwrap();
-    assert_eq!(result, Value::Null);
+    let original = eval_var(code, "arr");
+    assert_eq!(
+        original,
+        Value::Array(vec![Value::Number(1), Value::Number(2), Value::Number(3)])
+    );
 }
 
 #[test]
-fn test_pop_empty_array_returns_null() {
-    let code = r#"
-get_result() {
-    arr = []
-    val = pop(arr)
-    result_type = type(val)
-    if result_type == "null" {
-        return 1
-    }
-    return 0
-}
-final = get_result()
-"#;
-    let result = eval_code(code).unwrap();
-    assert_eq!(result, Value::Null);
+fn test_pop_empty_array_returns_empty_array() {
+    let result = eval_var("result = pop([])", "result");
+    assert_eq!(result, Value::Array(Vec::new()));
 }
 
 #[test]

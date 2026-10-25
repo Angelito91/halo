@@ -1,9 +1,9 @@
 // Halo Programming Language
-// Example 09: String Methods & Manipulation
+// Example 09: String Functions & Manipulation
 //
 // This example demonstrates string manipulation techniques.
-// Phase 1: Uses built-in functions
-// Phase 2 (future): Will use dot notation (text.upper(), text.lower(), etc.)
+// Halo uses functions only: upper(text), lower(text), trim(text), etc.
+// There is no dot-method syntax.
 
 // ──────────────────────────────────────────────────────────────────────────
 // 1. BASIC STRING METHODS: Case Conversion
@@ -353,26 +353,19 @@ print("Slug: " + slug2)
 print("")
 
 // ──────────────────────────────────────────────────────────────────────────
-// 13. FUTURE SYNTAX (Phase 2): Dot Notation Examples
+// 13. COMPOSING FUNCTIONS
 // ──────────────────────────────────────────────────────────────────────────
 
-print("=== 13. FUTURE: Dot Notation (Phase 2) ===")
+print("=== 13. COMPOSING FUNCTIONS ===")
 print("")
-print("When Phase 2 is implemented, you'll be able to write:")
+print("Halo has no dot-method syntax. Compose functions instead:")
 print("")
 print("text = 'Hello World'")
-print("text.upper()           // Instead of: upper(text)")
-print("text.lower()           // Instead of: lower(text)")
-print("text.trim()            // Instead of: trim(text)")
-print("text.contains('World') // Instead of: contains(text, 'World')")
-print("text.replace('o', '0') // Instead of: replace(text, 'o', '0')")
-print("text.reverse()         // Instead of: reverse(text)")
-print("text.substr(0, 5)      // Instead of: substr(text, 0, 5)")
-print("text[0]                // Character indexing")
-print("text[6:11]             // String slicing")
+print("upper(text)")
+print("upper(trim(text))")
+print("replace(upper(trim(text)), 'HELLO', 'HI')")
 print("")
-print("This will be more ergonomic and easier to chain:")
-print("text.trim().upper().replace('HELLO', 'HI')")
+print("This keeps the API predictable: every operation is a function.")
 print("")
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -380,10 +373,10 @@ print("")
 // ──────────────────────────────────────────────────────────────────────────
 
 print("===========================================")
-print("String Methods in Halo")
+print("String Functions in Halo")
 print("===========================================")
 print("")
-print("Phase 1 (Current) - Built-in Functions:")
+print("Built-in Functions:")
 print("✓ upper(string) - Convert to uppercase")
 print("✓ lower(string) - Convert to lowercase")
 print("✓ trim(string) - Remove leading/trailing whitespace")
@@ -396,11 +389,7 @@ print("✓ reverse(string) - Reverse string")
 print("✓ index_of(string, substring) - Find position")
 print("✓ len(string) - Get length")
 print("")
-print("Phase 2 (Future) - Dot Notation:")
-print("• string.upper() - More ergonomic")
-print("• string[index] - Character access")
-print("• string[start:end] - String slicing")
-print("• Method chaining - text.trim().upper()")
+print("No dot-method syntax: use functions and compose them.")
 print("")
 print("Common Use Cases Demonstrated:")
 print("✓ Text normalization and cleaning")

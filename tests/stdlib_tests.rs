@@ -2,7 +2,7 @@
 //!
 //! The interpreter evaluates call arguments before dispatching to `stdlib`.
 //! For valid calls this is invisible; for malformed calls it means an
-//! argument error is reported before an arity or unknown-method error.
+//! argument error is reported before an arity error.
 
 mod common;
 
@@ -24,7 +24,7 @@ fn argument_errors_win_over_builtin_arity_errors() {
 }
 
 #[test]
-fn argument_errors_win_over_unknown_method_errors() {
+fn method_syntax_is_rejected_before_evaluation() {
     let err = eval_code("x = [1]\nx.nope(missing)").unwrap_err();
-    assert!(err.contains("Undefined variable"), "{err}");
+    assert!(err.contains("Method calls are not supported"), "{err}");
 }

@@ -174,12 +174,12 @@ devuelve `null`.
 nums = [1, 2, 3, 4]
 nums[0]                     // 1
 nums[1:3]                   // [2, 3]
-nums[2] = 99                // asignación por índice
+nums[2] = 99                // muta nums: [1, 2, 99, 4]
 len(nums)                   // 4
-push(nums, 5)               // [1, 2, 99, 4, 5]
-pop(nums)                   // 5
+nums = push(nums, 5)        // [1, 2, 99, 4, 5]
+nums = pop(nums)            // [1, 2, 99, 4]
+last(nums)                  // 4
 first([10, 20])             // 10
-last([10, 20])              // 20
 reverse([1, 2, 3])          // [3, 2, 1]
 sort([3, 1, 2])             // [1, 2, 3]
 join(["a", "b"], "-")       // "a-b"
@@ -188,13 +188,21 @@ contains([1, 2, 3], 2)      // true
 index_of([1, 2, 3], 2)      // 1
 ```
 
-También se acepta la forma con método:
+Las funciones de array son puras: `push`, `pop`, `reverse` y `sort`
+devuelven un array nuevo y no modifican el original. La única mutación de
+arrays es la asignación por índice:
 
 ```halo
-nums.push(5)
-nums.reverse()
-nums.contains(3)
+nums[2] = 99
 ```
+
+`pop(nums)` devuelve el array sin su último elemento; `last(nums)` lee el
+último elemento sin modificar el array. Halo no usa métodos con punto:
+`nums.push(5)` no es válido. La forma correcta es `nums = push(nums, 5)`.
+
+Los arrays se pasan por valor: mutar un parámetro dentro de una función no
+cambia el array del llamador. Si una función necesita modificar un array,
+debe devolver el array nuevo y el llamador reasignarlo.
 
 ### Strings
 
@@ -208,21 +216,20 @@ starts_with(s, "  Ho")   // true
 ends_with(s, "  ")       // true
 replace(s, "Mundo", "Halo")
 substr(s, 2, 4)          // "Hola"
-s.trim().upper()         // "HOLA MUNDO"
+upper(trim(s))           // "HOLA MUNDO"
 ```
 
-### Built-ins y métodos
+### Built-ins
 
 Funciones globales: `print`, `println`, `len`, `str`, `int`, `float`,
 `abs`, `type`, `range`, `push`, `pop`, `append`, `first`, `last`,
 `reverse`, `join`, `contains`, `index_of`, `sort`, `upper`, `lower`,
 `trim`, `starts_with`, `ends_with`, `replace`, `substr`.
 
-Métodos de string: `upper`, `lower`, `trim`, `reverse`, `starts_with`,
-`ends_with`, `contains`, `index_of`, `replace`, `substr`.
-
-Métodos de array: `push`, `pop`, `first`, `last`, `reverse`, `join`,
-`contains`, `index_of`, `sort`.
+No hay métodos con punto. Todas las operaciones se llaman como funciones,
+por ejemplo `upper(text)`, `len(array)` o `join(array, ",")`. Las funciones
+no modifican sus argumentos; para mutar un array se usa `array[i] = value`
+o se reasigna el resultado: `array = push(array, value)`.
 
 ### Errores
 
@@ -248,7 +255,7 @@ src/
 ├── lexer/             # texto → tokens
 ├── parser/            # tokens → AST
 ├── interpreter/       # entorno, valores y evaluador tree-walking
-└── stdlib/            # builtins y métodos sobre valores ya evaluados
+└── stdlib/            # builtins puros sobre valores ya evaluados
 ```
 
 El flujo de ejecución es:
@@ -257,12 +264,12 @@ El flujo de ejecución es:
 archivo → lexer → tokens → parser → AST → evaluador → stdout / error
 ```
 
-El evaluador solo recorre el AST. Los builtins y métodos viven en
-`src/stdlib` y reciben valores ya evaluados, sin conocer el AST ni el
-evaluador. Como los argumentos se evalúan antes del despacho, una llamada
-inválida puede reportar primero el error de un argumento (por ejemplo, una
-variable inexistente) y después la aridad o el método desconocido. El
-intérprete es síncrono, sin dependencias externas y sin código nativo.
+El evaluador solo recorre el AST. Los builtins viven en `src/stdlib` y
+reciben valores ya evaluados, sin conocer el AST ni el evaluador. Como los
+argumentos se evalúan antes del despacho, una llamada inválida puede
+reportar primero el error de un argumento (por ejemplo, una variable
+inexistente) y después la aridad. El intérprete es síncrono, sin
+dependencias externas y sin código nativo.
 
 ## Desarrollo
 

@@ -4,7 +4,7 @@
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 //
-// Array built-ins (split out of a single `methods.rs`).
+// Array built-in functions.
 
 use crate::interpreter::Value;
 
@@ -57,7 +57,7 @@ pub fn builtin_range(args: &[Value]) -> Result<Value, String> {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Array methods
+// Array functions
 // ──────────────────────────────────────────────────────────────────────────────
 
 /// `push(array, element)` - Appends an element to the array and returns the new array.
@@ -87,10 +87,16 @@ pub fn builtin_push(args: &[Value]) -> Result<Value, String> {
     push_value(array, element)
 }
 
-/// `pop(array)` - Removes and returns the last element of the array (null if empty).
+/// `pop(array)` - Returns a new array without its last element.
+///
+/// The original array is not modified. Use [`last_value`] to read the element
+/// that would be removed. Popping an empty array returns an empty array.
 pub fn pop_value(array: Value) -> Result<Value, String> {
     match array {
-        Value::Array(mut arr) => Ok(arr.pop().unwrap_or(Value::Null)),
+        Value::Array(mut arr) => {
+            arr.pop();
+            Ok(Value::Array(arr))
+        }
         other => Err(format!(
             "pop() expects an array, got '{}'",
             other.type_name()

@@ -4,7 +4,7 @@
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 //
-// String built-ins and their helpers (split out of a single `methods.rs`).
+// String built-in functions and their helpers.
 
 use crate::interpreter::Value;
 
@@ -39,7 +39,7 @@ fn extract_number(value: Value, method_name: &str, arg_pos: usize) -> Result<i64
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Value-level operations (shared by built-ins and method dispatch)
+// Value-level operations (shared by the built-in wrappers)
 // ──────────────────────────────────────────────────────────────────────────────
 
 /// `contains(array or string, value)` on already-evaluated values.

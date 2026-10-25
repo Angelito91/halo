@@ -72,7 +72,7 @@ pub fn call_builtin(name: &str, args: &[Value]) -> Result<Option<Value>, String>
         })?,
         "type" => builtin_single_arg(name, args, |v| Ok(Value::String(v.type_name().to_string())))?,
         "range" => super::arrays::builtin_range(args)?,
-        // Array methods that can also be called as functions.
+        // Array functions.
         "push" => super::arrays::builtin_push(args)?,
         "pop" => super::arrays::builtin_pop(args)?,
         "append" => super::arrays::builtin_append(args)?,
@@ -81,7 +81,7 @@ pub fn call_builtin(name: &str, args: &[Value]) -> Result<Option<Value>, String>
         "reverse" => super::arrays::builtin_reverse(args)?,
         "join" => super::arrays::builtin_join(args)?,
         "sort" => super::arrays::builtin_sort(args)?,
-        // String methods that can also be called as functions.
+        // String functions.
         "contains" => super::strings::builtin_contains(args)?,
         "index_of" => super::strings::builtin_index_of(args)?,
         "upper" => super::strings::builtin_upper(args)?,

@@ -10,7 +10,6 @@ use super::core::Evaluator;
 use crate::diagnostics::suggestions::find_suggestions_smart;
 use crate::interpreter::value::Value;
 use crate::parser::ast::{BinOp, Expression, IndexType};
-use crate::stdlib;
 
 impl Evaluator {
     /// Generate an error message for an undefined variable with suggestions
@@ -211,60 +210,141 @@ impl Evaluator {
                 }
             }
 
-            // -- Method call
-            Expression::MethodCall {
-                object,
-                method,
-                args,
-                ..
-            } => {
-                let obj_value = self.eval_expr(object)?;
-                let arg_values = self.eval_args(args)?;
-                stdlib::call_method(&obj_value, method, &arg_values)
-            }
-
             // -- Index assignment: arr[i] = value
             Expression::IndexAssign {
                 array,
                 index,
                 value,
                 ..
-            } => {
-                let arr_val = self.eval_expr(array)?;
-                let idx_val = self.eval_expr(index)?;
-                let new_val = self.eval_expr(value)?;
+            } => self.eval_index_assign(array, index, value),
+        }
+    }
 
-                match (arr_val, idx_val) {
-                    (Value::Array(mut arr), Value::Number(idx)) => {
-                        if idx < 0 {
-                            return Err(format!(
-                                "{} {}",
-                                crate::interpreter::errors::NEGATIVE_INDEX,
-                                idx
-                            ));
-                        }
-                        let idx_usize = idx as usize;
-                        if idx_usize >= arr.len() {
-                            return Err(format!(
-                                "Array index {} out of bounds (length {})",
-                                idx,
-                                arr.len()
-                            ));
-                        }
-                        arr[idx_usize] = new_val.clone();
-                        Ok(new_val)
-                    }
-                    (Value::Array(_), other) => Err(format!(
+    /// Evaluate `array[index] = value`, updating the variable that owns the
+    /// indexed array. Nested indexing (`matrix[i][j] = value`) is supported.
+    ///
+    /// The left-hand side must be a variable or a chain of single-element
+    /// indexes. Slices, literals and call results are not assignable.
+    fn eval_index_assign(
+        &mut self,
+        array: &Expression,
+        index: &Expression,
+        value: &Expression,
+    ) -> Result<Value, String> {
+        let mut path = Vec::new();
+        let root = self.collect_index_path(array, index, &mut path)?;
+
+        let mut indices = Vec::with_capacity(path.len());
+        for index_expr in path {
+            match self.eval_expr(index_expr)? {
+                Value::Number(n) => indices.push(n),
+                other => {
+                    return Err(format!(
                         "Array index must be a number, got '{}'",
                         other.type_name()
-                    )),
-                    (other, _) => Err(format!(
-                        "Cannot index a value of type '{}'",
-                        other.type_name()
-                    )),
+                    ))
                 }
             }
         }
+
+        let new_value = self.eval_expr(value)?;
+        self.assign_index_path(&root, &indices, new_value.clone())?;
+        Ok(new_value)
+    }
+
+    /// Walk an assignment target and collect the root variable plus the
+    /// index expressions in left-to-right order.
+    fn collect_index_path<'a>(
+        &self,
+        array: &'a Expression,
+        index: &'a Expression,
+        path: &mut Vec<&'a Expression>,
+    ) -> Result<String, String> {
+        match array {
+            Expression::Var(name, _) => {
+                path.push(index);
+                Ok(name.clone())
+            }
+            Expression::Index {
+                array: parent,
+                index: parent_index,
+                ..
+            } => {
+                let root = match parent_index {
+                    IndexType::Single(parent_index) => {
+                        self.collect_index_path(parent, parent_index, path)?
+                    }
+                    IndexType::Slice { .. } => {
+                        return Err(
+                            "Cannot assign through a slice; index a single element".to_string()
+                        )
+                    }
+                };
+                path.push(index);
+                Ok(root)
+            }
+            _ => Err(
+                "Cannot assign to this expression; expected a variable or an indexed array"
+                    .to_string(),
+            ),
+        }
+    }
+
+    /// Apply a previously evaluated index path to the root binding.
+    fn assign_index_path(
+        &mut self,
+        root: &str,
+        indices: &[i64],
+        value: Value,
+    ) -> Result<(), String> {
+        if self.env.get_ref(root).is_none() {
+            return Err(self.undefined_variable_error(root));
+        }
+
+        let mut current = self
+            .env
+            .get_mut(root)
+            .expect("variable existence checked above");
+
+        for (depth, &index) in indices.iter().enumerate() {
+            if index < 0 {
+                return Err(format!(
+                    "{} {}",
+                    crate::interpreter::errors::NEGATIVE_INDEX,
+                    index
+                ));
+            }
+
+            let index_usize = index as usize;
+            let is_last = depth + 1 == indices.len();
+
+            let array = match current {
+                Value::Array(array) => array,
+                other => {
+                    return Err(format!(
+                        "Cannot index a value of type '{}'",
+                        other.type_name()
+                    ))
+                }
+            };
+
+            if index_usize >= array.len() {
+                return Err(format!(
+                    "Array index {} out of bounds (length {})",
+                    index,
+                    array.len()
+                ));
+            }
+
+            if is_last {
+                array[index_usize] = value;
+                return Ok(());
+            }
+
+            current = &mut array[index_usize];
+        }
+
+        unreachable!("index paths always contain at least one index")
     }
 
     /// Evaluate a binary expression, handling short-circuit operators first.

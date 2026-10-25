@@ -112,12 +112,6 @@ pub enum Expression {
         index: IndexType,
         pos: Position,
     },
-    MethodCall {
-        object: Box<Expression>,
-        method: String,
-        args: Vec<Expression>,
-        pos: Position,
-    },
     IndexAssign {
         array: Box<Expression>,
         index: Box<Expression>,
@@ -175,21 +169,6 @@ impl fmt::Display for Expression {
                     write!(f, "]")
                 }
             },
-            Expression::MethodCall {
-                object,
-                method,
-                args,
-                ..
-            } => {
-                write!(f, "{}.{}(", object, method)?;
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", arg)?;
-                }
-                write!(f, ")")
-            }
             Expression::IndexAssign {
                 array,
                 index,
@@ -214,7 +193,6 @@ impl Expression {
             Expression::Call { pos, .. } => *pos,
             Expression::ArrayLiteral { pos, .. } => *pos,
             Expression::Index { pos, .. } => *pos,
-            Expression::MethodCall { pos, .. } => *pos,
             Expression::IndexAssign { pos, .. } => *pos,
         }
     }
