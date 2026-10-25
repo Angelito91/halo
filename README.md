@@ -23,8 +23,8 @@ El intérprete conserva todas las funciones del lenguaje: funciones,
 recursión, arrays, strings, `for`, `while`, errores con posición y
 mensajes de diagnóstico.
 
-Si necesitas consultar el backend anterior, está preservado en la rama
-`archive/llvm-backend` y en el tag `llvm-backend-final`.
+Si necesitas consultar el backend anterior, permanece en el historial de Git;
+no forma parte de la versión actual.
 
 ## Instalación
 

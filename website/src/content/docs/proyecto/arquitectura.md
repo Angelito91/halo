@@ -251,8 +251,8 @@ nombre parecido.
 
 Hasta la versión 0.2.0 el proyecto incluía un backend LLVM que generaba
 binarios nativos. Se eliminó en 0.3.0 para simplificar el código y centrar el
-proyecto en el intérprete. El backend anterior está preservado en el tag
-`llvm-backend-final`; no forma parte de la versión actual.
+proyecto en el intérprete. El backend anterior permanece en el historial de
+Git; no forma parte de la versión actual.
 
 ## Limitaciones conocidas
 
