@@ -10,7 +10,7 @@ use inkwell::passes::PassBuilderOptions;
 use inkwell::targets::{CodeModel, InitializationConfig, RelocMode, Target, TargetMachine};
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, FunctionValue, GlobalValue};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::compiler::builder::IRBuilder;
 use crate::compiler::types::TypeMapper;
@@ -35,6 +35,8 @@ pub struct CodeGenerator<'ctx> {
     pub fn_return_types: HashMap<String, &'static str>,
     /// Module-level global variables (name → GlobalValue).
     pub globals: HashMap<String, GlobalValue<'ctx>>,
+    /// Global variables whose source-level type is `bool`.
+    pub bool_globals: HashSet<String>,
     /// Cached format-string globals for printf calls.
     pub string_globals: HashMap<String, GlobalValue<'ctx>>,
     /// Stack of (loop_cond_bb, loop_exit_bb) for break/continue support.
@@ -43,7 +45,7 @@ pub struct CodeGenerator<'ctx> {
 
 impl<'ctx> CodeGenerator<'ctx> {
     pub fn new(context: &'ctx Context, module: &'ctx Module<'ctx>) -> Self {
-        let builder = IRBuilder::new(context, module);
+        let builder = IRBuilder::new(context);
         let type_mapper = TypeMapper::new(context);
 
         CodeGenerator {
@@ -54,6 +56,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             functions: HashMap::new(),
             fn_return_types: HashMap::new(),
             globals: HashMap::new(),
+            bool_globals: HashSet::new(),
             string_globals: HashMap::new(),
             loop_stack: Vec::new(),
         }
@@ -62,6 +65,11 @@ impl<'ctx> CodeGenerator<'ctx> {
     // =========================================================================
     // Public API
     // =========================================================================
+
+    /// Whether `name` refers to a variable with source-level boolean type.
+    pub(crate) fn is_bool_var(&self, name: &str) -> bool {
+        self.builder.is_bool_local(name) || self.bool_globals.contains(name)
+    }
 
     /// Compile the entire program to LLVM IR.
     ///
@@ -147,6 +155,12 @@ impl<'ctx> CodeGenerator<'ctx> {
             self.generate_main(&top_level_stmts)?;
         }
 
+        // Reject malformed IR at the source instead of letting clang produce a
+        // confusing error (or, worse, emitting a broken binary).
+        self.module
+            .verify()
+            .map_err(|e| format!("Invalid LLVM IR: {e}"))?;
+
         Ok(())
     }
 
@@ -172,6 +186,12 @@ impl<'ctx> CodeGenerator<'ctx> {
             )
             .ok_or("Failed to create TargetMachine")?;
 
+        // Keep the module's data layout consistent with the target machine.
+        // This is required for correct optimisation and removes a source of
+        // target-dependent IR differences.
+        self.module
+            .set_data_layout(&machine.get_target_data().get_data_layout());
+
         // Build the pass pipeline string, mirroring clang -O<level>.
         let pipeline = match level {
             0 => return Ok(()), // nothing to do
@@ -191,18 +211,6 @@ impl<'ctx> CodeGenerator<'ctx> {
             .map_err(|e| format!("Optimisation pass failed: {}", e))?;
 
         Ok(())
-    }
-
-
-
-    /// Print LLVM IR to stdout (useful for debugging).
-    pub fn print_ir(&self) {
-        println!("{}", self.module.print_to_string().to_string());
-    }
-
-    /// Access the underlying LLVM module.
-    pub fn get_module(&self) -> &'ctx Module<'ctx> {
-        self.module
     }
 
     // =========================================================================
@@ -239,8 +247,19 @@ impl<'ctx> CodeGenerator<'ctx> {
                 if iv.get_type() == it {
                     return Ok(iv.into());
                 }
+                if iv.get_type().get_bit_width() == 1 && it.get_bit_width() > 1 {
+                    return self
+                        .builder
+                        .build_int_z_extend(iv, it, "zext")
+                        .map(|v| v.into())
+                        .map_err(|_| {
+                            format!(
+                                "Failed to zero-extend bool to slot type i{}",
+                                it.get_bit_width()
+                            )
+                        });
+                }
                 self.builder
-                    .builder
                     .build_int_s_extend_or_bit_cast(iv, it, "coerce")
                     .map(|v| v.into())
                     .map_err(|_| "Failed to coerce int to slot type".to_string())
@@ -263,7 +282,6 @@ impl<'ctx> CodeGenerator<'ctx> {
     ) -> Result<inkwell::values::IntValue<'ctx>, String> {
         if val.is_float_value() {
             self.builder
-                .builder
                 .build_float_compare(
                     inkwell::FloatPredicate::ONE,
                     val.into_float_value(),
@@ -277,7 +295,6 @@ impl<'ctx> CodeGenerator<'ctx> {
                 return Ok(iv);
             }
             self.builder
-                .builder
                 .build_int_compare(
                     inkwell::IntPredicate::NE,
                     iv,

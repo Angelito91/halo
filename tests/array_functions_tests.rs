@@ -6,28 +6,10 @@
 
 //! Tests for array manipulation built-in functions
 
-use halo::interpreter::evaluator::Evaluator;
-use halo::interpreter::value::Value;
-use halo::lexer::{Lexer, TokenKind};
-use halo::parser::Parser;
+mod common;
 
-/// Helper function to tokenise, parse, and evaluate a snippet of Halo source code.
-fn eval_code(code: &str) -> Result<Value, String> {
-    let mut lexer = Lexer::new(code.to_string());
-    let mut tokens = Vec::new();
-    loop {
-        let tok = lexer.next_token();
-        let is_eof = tok.kind == TokenKind::Eof;
-        tokens.push(tok);
-        if is_eof {
-            break;
-        }
-    }
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse().map_err(|errs| errs.join("; "))?;
-    let mut evaluator = Evaluator::new();
-    evaluator.eval_program(&program)
-}
+use common::eval_code;
+use halo::interpreter::value::Value;
 
 // ── push() tests ───────────────────────────────────────────────────────────
 
@@ -863,7 +845,9 @@ append([1, 2], 3)
 "#;
     let result = eval_code(code);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("expects second argument to be an array"));
+    assert!(result
+        .unwrap_err()
+        .contains("expects second argument to be an array"));
 }
 
 #[test]
@@ -873,5 +857,7 @@ append("not an array", [1])
 "#;
     let result = eval_code(code);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("expects first argument to be an array"));
+    assert!(result
+        .unwrap_err()
+        .contains("expects first argument to be an array"));
 }

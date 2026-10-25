@@ -30,7 +30,9 @@ fn tokenize(source: &str) -> Vec<halo::lexer::Token> {
 
 /// Parse `source` and return `Ok(program)` or `Err(errors)`.
 fn parse(source: &str) -> Result<halo::parser::ast::Program, Vec<String>> {
-    Parser::new(tokenize(source)).parse()
+    Parser::new(tokenize(source))
+        .parse()
+        .map_err(|errs| errs.into_iter().map(|err| err.to_string()).collect())
 }
 
 /// Parse `source` and unwrap, panicking with a clear message on failure.

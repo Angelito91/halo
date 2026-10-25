@@ -18,4 +18,4 @@ pub use diagnostics::colors;
 pub use interpreter::Evaluator;
 pub use lexer::Lexer;
 pub use parser::Parser;
-pub use utils::{find_suggestions, find_suggestions_adaptive, find_suggestions_smart, Suggestion};
+pub use utils::{find_suggestions, find_suggestions_smart, Suggestion};

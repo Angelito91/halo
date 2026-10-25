@@ -64,7 +64,9 @@ pub fn emit_trim<'ctx>(
     let next_or_st = b!(gen)
         .build_select(is_sp, next, st, "inc.or.same")
         .map_err(|_| "select")?;
-    b!(gen).build_store(start_ptr, next_or_st).map_err(|_| "store")?;
+    b!(gen)
+        .build_store(start_ptr, next_or_st)
+        .map_err(|_| "store")?;
     b!(gen)
         .build_conditional_branch(is_sp, sc, sx)
         .map_err(|_| "branch")?;
@@ -111,7 +113,9 @@ pub fn emit_trim<'ctx>(
     let eidx_or_ed = b!(gen)
         .build_select(e_is_sp, eidx, ed, "eidx.or.same")
         .map_err(|_| "select")?;
-    b!(gen).build_store(end_ptr, eidx_or_ed).map_err(|_| "store")?;
+    b!(gen)
+        .build_store(end_ptr, eidx_or_ed)
+        .map_err(|_| "store")?;
     b!(gen)
         .build_conditional_branch(e_is_sp, ec, ex)
         .map_err(|_| "branch")?;
@@ -143,4 +147,3 @@ pub fn emit_trim<'ctx>(
         .map_err(|_| "null")?;
     Ok(result.into())
 }
-

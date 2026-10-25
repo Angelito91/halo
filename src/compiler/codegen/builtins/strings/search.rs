@@ -16,7 +16,6 @@ pub fn emit_starts_with<'ctx>(
     }
     let s = expect_string(gen, &args[0], "starts_with", 0)?;
     let prefix = expect_string(gen, &args[1], "starts_with", 1)?;
-    let i64_ty = gen.type_mapper.i64_type();
     let i32_ty = gen.type_mapper.i32_type();
 
     let prefix_len = call_strlen(gen, prefix)?;
@@ -35,10 +34,7 @@ pub fn emit_starts_with<'ctx>(
     let eq = b!(gen)
         .build_int_compare(IntPredicate::EQ, result, i32_ty.const_zero(), "sw.eq")
         .map_err(|_| "cmp")?;
-    Ok(b!(gen)
-        .build_int_z_extend(eq, i64_ty, "sw.ext")
-        .map_err(|_| "zext")?
-        .into())
+    Ok(eq.into())
 }
 
 pub fn emit_ends_with<'ctx>(
@@ -50,9 +46,9 @@ pub fn emit_ends_with<'ctx>(
     }
     let s = expect_string(gen, &args[0], "ends_with", 0)?;
     let suffix = expect_string(gen, &args[1], "ends_with", 1)?;
-    let i64_ty = gen.type_mapper.i64_type();
+    let i1_ty = gen.type_mapper.i1_type();
     let i32_ty = gen.type_mapper.i32_type();
-    let zero = i64_ty.const_zero();
+    let zero = i1_ty.const_zero();
 
     let s_len = call_strlen(gen, s)?;
     let suffix_len = call_strlen(gen, suffix)?;
@@ -60,7 +56,7 @@ pub fn emit_ends_with<'ctx>(
         .get_insert_block()
         .and_then(|bb| bb.get_parent())
         .ok_or("no fn")?;
-    let rp = Emitter::emit_entry_alloca(&gen.builder, cf, "ew.r", i64_ty.into());
+    let rp = Emitter::emit_entry_alloca(&gen.builder, cf, "ew.r", i1_ty.into());
 
     let toolong = b!(gen)
         .build_int_compare(IntPredicate::SGT, suffix_len, s_len, "ew.tl")
@@ -94,22 +90,13 @@ pub fn emit_ends_with<'ctx>(
     let eq = b!(gen)
         .build_int_compare(IntPredicate::EQ, cr, i32_ty.const_zero(), "ew.eq")
         .map_err(|_| "cmp")?;
-    b!(gen)
-        .build_store(
-            rp,
-            b!(gen)
-                .build_int_z_extend(eq, i64_ty, "ew.ext")
-                .map_err(|_| "zext")?,
-        )
-        .map_err(|_| "store")?;
+    b!(gen).build_store(rp, eq).map_err(|_| "store")?;
     b!(gen)
         .build_unconditional_branch(eb)
         .map_err(|_| "branch")?;
 
     b!(gen).position_at_end(eb);
-    let rv = b!(gen)
-        .build_load(i64_ty, rp, "ew.rv")
-        .map_err(|_| "load")?;
+    let rv = b!(gen).build_load(i1_ty, rp, "ew.rv").map_err(|_| "load")?;
     Ok(rv)
 }
 
@@ -138,10 +125,7 @@ pub fn emit_contains<'ctx>(
     let found = b!(gen)
         .build_int_compare(IntPredicate::NE, rp_int, i64_ty.const_zero(), "found")
         .map_err(|_| "cmp")?;
-    Ok(b!(gen)
-        .build_int_z_extend(found, i64_ty, "ext")
-        .map_err(|_| "zext")?
-        .into())
+    Ok(found.into())
 }
 
 pub fn emit_index_of<'ctx>(
@@ -208,4 +192,3 @@ pub fn emit_index_of<'ctx>(
         .map_err(|_| "load")?;
     Ok(rv)
 }
-

@@ -4,9 +4,9 @@
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
+use super::Parser;
 use crate::lexer::TokenKind;
 use crate::parser::ast::{Block, ElseIfBranch, Statement};
-use super::Parser;
 
 impl Parser {
     // Block and statement rules

@@ -63,19 +63,10 @@ pub fn builtin_range(evaluator: &mut Evaluator, args: &[Expression]) -> Result<V
 // ──────────────────────────────────────────────────────────────────────────────
 
 /// `push(array, element)` - Appends an element to the array and returns the new array.
-pub fn builtin_push(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 2 {
-        return Err(format!(
-            "push() expects exactly 2 arguments, got {}",
-            args.len()
-        ));
-    }
-    let arr_val = evaluator.eval_expr(&args[0])?;
-    let elem = evaluator.eval_expr(&args[1])?;
-
-    match arr_val {
+pub fn push_value(array: Value, element: Value) -> Result<Value, String> {
+    match array {
         Value::Array(mut arr) => {
-            arr.push(elem);
+            arr.push(element);
             Ok(Value::Array(arr))
         }
         other => Err(format!(
@@ -85,21 +76,23 @@ pub fn builtin_push(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Va
     }
 }
 
-/// `pop(array)` - Removes and returns the last element of the array (null if empty).
-pub fn builtin_pop(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 1 {
+/// Builtin form of [`push_value`].
+pub fn builtin_push(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+    if args.len() != 2 {
         return Err(format!(
-            "pop() expects exactly 1 argument, got {}",
+            "push() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let arr_val = evaluator.eval_expr(&args[0])?;
+    let array = evaluator.eval_expr(&args[0])?;
+    let element = evaluator.eval_expr(&args[1])?;
+    push_value(array, element)
+}
 
-    match arr_val {
-        Value::Array(mut arr) => {
-            let result = arr.pop().unwrap_or(Value::Null);
-            Ok(result)
-        }
+/// `pop(array)` - Removes and returns the last element of the array (null if empty).
+pub fn pop_value(array: Value) -> Result<Value, String> {
+    match array {
+        Value::Array(mut arr) => Ok(arr.pop().unwrap_or(Value::Null)),
         other => Err(format!(
             "pop() expects an array, got '{}'",
             other.type_name()
@@ -107,21 +100,23 @@ pub fn builtin_pop(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Val
     }
 }
 
-/// `append(array, array)` - Combines two arrays and returns a new array.
-pub fn builtin_append(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 2 {
+/// Builtin form of [`pop_value`].
+pub fn builtin_pop(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+    if args.len() != 1 {
         return Err(format!(
-            "append() expects exactly 2 arguments, got {}",
+            "pop() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    let arr1_val = evaluator.eval_expr(&args[0])?;
-    let arr2_val = evaluator.eval_expr(&args[1])?;
+    pop_value(evaluator.eval_expr(&args[0])?)
+}
 
-    match (arr1_val, arr2_val) {
-        (Value::Array(mut arr1), Value::Array(arr2)) => {
-            arr1.extend(arr2);
-            Ok(Value::Array(arr1))
+/// `append(array, array)` - Combines two arrays and returns a new array.
+pub fn append_value(left: Value, right: Value) -> Result<Value, String> {
+    match (left, right) {
+        (Value::Array(mut left), Value::Array(right)) => {
+            left.extend(right);
+            Ok(Value::Array(left))
         }
         (Value::Array(_), other) => Err(format!(
             "append() expects second argument to be an array, got '{}'",
@@ -134,17 +129,22 @@ pub fn builtin_append(evaluator: &mut Evaluator, args: &[Expression]) -> Result<
     }
 }
 
-/// `first(array)` - Returns the first element of the array (null if empty).
-pub fn builtin_first(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 1 {
+/// Builtin form of [`append_value`].
+pub fn builtin_append(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+    if args.len() != 2 {
         return Err(format!(
-            "first() expects exactly 1 argument, got {}",
+            "append() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let arr_val = evaluator.eval_expr(&args[0])?;
+    let left = evaluator.eval_expr(&args[0])?;
+    let right = evaluator.eval_expr(&args[1])?;
+    append_value(left, right)
+}
 
-    match arr_val {
+/// `first(array)` - Returns the first element of the array (null if empty).
+pub fn first_value(array: Value) -> Result<Value, String> {
+    match array {
         Value::Array(arr) => Ok(arr.first().cloned().unwrap_or(Value::Null)),
         other => Err(format!(
             "first() expects an array, got '{}'",
@@ -153,17 +153,20 @@ pub fn builtin_first(evaluator: &mut Evaluator, args: &[Expression]) -> Result<V
     }
 }
 
-/// `last(array)` - Returns the last element of the array (null if empty).
-pub fn builtin_last(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+/// Builtin form of [`first_value`].
+pub fn builtin_first(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
-            "last() expects exactly 1 argument, got {}",
+            "first() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    let arr_val = evaluator.eval_expr(&args[0])?;
+    first_value(evaluator.eval_expr(&args[0])?)
+}
 
-    match arr_val {
+/// `last(array)` - Returns the last element of the array (null if empty).
+pub fn last_value(array: Value) -> Result<Value, String> {
+    match array {
         Value::Array(arr) => Ok(arr.last().cloned().unwrap_or(Value::Null)),
         other => Err(format!(
             "last() expects an array, got '{}'",
@@ -172,25 +175,25 @@ pub fn builtin_last(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Va
     }
 }
 
-/// `reverse(array or string)` - Returns a new array with elements in reverse order, or reversed string.
-pub fn builtin_reverse(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+/// Builtin form of [`last_value`].
+pub fn builtin_last(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
     if args.len() != 1 {
         return Err(format!(
-            "reverse() expects exactly 1 argument, got {}",
+            "last() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    let val = evaluator.eval_expr(&args[0])?;
+    last_value(evaluator.eval_expr(&args[0])?)
+}
 
-    match val {
+/// `reverse(array or string)` - Returns a new array with elements in reverse order, or reversed string.
+pub fn reverse_value(value: Value) -> Result<Value, String> {
+    match value {
         Value::Array(mut arr) => {
             arr.reverse();
             Ok(Value::Array(arr))
         }
-        Value::String(s) => {
-            let reversed: String = s.chars().rev().collect();
-            Ok(Value::String(reversed))
-        }
+        Value::String(s) => Ok(Value::String(s.chars().rev().collect())),
         other => Err(format!(
             "reverse() expects an array or string, got '{}'",
             other.type_name()
@@ -198,18 +201,20 @@ pub fn builtin_reverse(evaluator: &mut Evaluator, args: &[Expression]) -> Result
     }
 }
 
-/// `join(array, separator)` - Converts array elements to a string joined by separator.
-pub fn builtin_join(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 2 {
+/// Builtin form of [`reverse_value`].
+pub fn builtin_reverse(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+    if args.len() != 1 {
         return Err(format!(
-            "join() expects exactly 2 arguments, got {}",
+            "reverse() expects exactly 1 argument, got {}",
             args.len()
         ));
     }
-    let arr_val = evaluator.eval_expr(&args[0])?;
-    let sep_val = evaluator.eval_expr(&args[1])?;
+    reverse_value(evaluator.eval_expr(&args[0])?)
+}
 
-    let sep = match sep_val {
+/// `join(array, separator)` - Converts array elements to a string joined by separator.
+pub fn join_value(array: Value, separator: Value) -> Result<Value, String> {
+    let separator = match separator {
         Value::String(s) => s,
         other => {
             return Err(format!(
@@ -219,10 +224,10 @@ pub fn builtin_join(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Va
         }
     };
 
-    match arr_val {
+    match array {
         Value::Array(arr) => {
             let strings: Vec<String> = arr.iter().map(|v| v.to_string_value()).collect();
-            Ok(Value::String(strings.join(&sep)))
+            Ok(Value::String(strings.join(&separator)))
         }
         other => Err(format!(
             "join() expects first argument to be an array, got '{}'",
@@ -231,17 +236,22 @@ pub fn builtin_join(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Va
     }
 }
 
-/// `sort(array)` - Returns a new array with elements sorted.
-pub fn builtin_sort(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    if args.len() != 1 {
+/// Builtin form of [`join_value`].
+pub fn builtin_join(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+    if args.len() != 2 {
         return Err(format!(
-            "sort() expects exactly 1 argument, got {}",
+            "join() expects exactly 2 arguments, got {}",
             args.len()
         ));
     }
-    let arr_val = evaluator.eval_expr(&args[0])?;
+    let array = evaluator.eval_expr(&args[0])?;
+    let separator = evaluator.eval_expr(&args[1])?;
+    join_value(array, separator)
+}
 
-    match arr_val {
+/// `sort(array)` - Returns a new array with elements sorted.
+pub fn sort_value(array: Value) -> Result<Value, String> {
+    match array {
         Value::Array(mut arr) => {
             // Determine the element type: numbers, floats, or strings.
             let has_string = arr.iter().any(|e| matches!(e, Value::String(_)));
@@ -292,4 +302,15 @@ pub fn builtin_sort(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Va
             other.type_name()
         )),
     }
+}
+
+/// Builtin form of [`sort_value`].
+pub fn builtin_sort(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+    if args.len() != 1 {
+        return Err(format!(
+            "sort() expects exactly 1 argument, got {}",
+            args.len()
+        ));
+    }
+    sort_value(evaluator.eval_expr(&args[0])?)
 }

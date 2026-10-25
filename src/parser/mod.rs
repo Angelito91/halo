@@ -9,6 +9,5 @@ mod core;
 mod declarations;
 mod expressions;
 mod statements;
-pub mod visitor;
 
-pub use core::Parser;
+pub use core::{ParseError, Parser};

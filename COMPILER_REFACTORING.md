@@ -4,6 +4,14 @@
 > La estructura del compilador ya está partida como se describe en
 > «Estructura real (post-R0)»; el resto del documento se conserva como
 > registro de la decisión.
+>
+> **Cierre P1 (2026-10-23):** el módulo fija el target triple del host y el
+> data layout del `TargetMachine`; el parser expone una única API
+> `Parser::parse() -> Result<Program, Vec<ParseError>>`; `IRBuilder` mantiene
+> privado su `Builder` de inkwell; y el backend compilado imprime booleanos,
+> formatea floats y convierte `str`/`int`/`float` en runtime con la misma
+> semántica que el intérprete. Los arrays siguen en P3 y están declarados en
+> `tests/common/cases.rs`.
 
 ## 📋 Problema (estado anterior al refactor)
 
@@ -46,7 +54,6 @@ src/
 │   ├── declarations.rs         # Nivel superior
 │   ├── statements.rs
 │   ├── expressions.rs
-│   ├── visitor.rs
 │   └── mod.rs
 ├── interpreter/
 │   ├── value.rs
@@ -65,22 +72,19 @@ src/
 │   ├── types.rs                # TypeMapper (Halo → LLVM)
 │   └── codegen/
 │       ├── mod.rs
-│       ├── generator.rs        # CodeGenerator (orquestación) — 292 líneas
+│       ├── generator.rs        # CodeGenerator (orquestación) — 290 líneas
 │       ├── module.rs           # libc y helpers de módulo (282)
 │       ├── functions.rs        # funciones de usuario (183)
-│       ├── emitter.rs          # salida (LLVM IR / objeto / binario)
+│       ├── emitter.rs          # salida de IR y enlace
 │       ├── statements/{mod,expr_stmt,var_decl,while_loop,if_stmt,
 │       │              for_loop,return_stmt,break_stmt,continue_stmt}.rs
 │       ├── expressions/{mod,literals,arrays,binary_ops,unary_ops,
 │       │               variables,function_call,method_call}.rs
 │       ├── builtins/{mod,io,math,conversions}.rs
-│       ├── builtins/strings/{mod,helpers,trim,replace,substr,search,case}.rs
-│       └── runtime/mod.rs
-├── diagnostics/                # Antes: error_codes.rs monolítico (480 líneas)
-│   ├── mod.rs
-│   ├── colors.rs
-│   ├── style_checker.rs
-│   └── error_codes/{mod,mapping,descriptions,category}.rs
+│       └── builtins/strings/{mod,helpers,trim,replace,substr,search,case}.rs
+├── diagnostics/
+│   ├── mod.rs                  # Diagnostic, localización y estadísticas
+│   └── colors.rs
 ├── cli/                        # Antes: commands.rs monolítico (544 líneas)
 │   ├── mod.rs
 │   ├── args.rs
@@ -106,11 +110,11 @@ responsabilidades con menos indirección (`module.rs`/`functions.rs` en vez de
 
 | Aspecto | Antes | Después |
 |---------|-------|---------|
-| **generator.rs** | monolítico (~1600 líneas) | 292 líneas (orquestación) + `module.rs` + `functions.rs` |
+| **generator.rs** | monolítico (~1600 líneas) | 290 líneas (orquestación) + `module.rs` + `functions.rs` |
 | **Expresiones** | En generator.rs | `expressions/*.rs` (865 líneas) |
 | **Statements** | En generator.rs | `statements/*.rs` (637 líneas) |
 | **Built-ins** | En generator.rs | `builtins/*.rs` + `builtins/strings/*` (1507 líneas) |
-| **Runtime support** | Disperso | `runtime/mod.rs` |
+| **Runtime support** | Disperso | Retirado: no tenía consumidores; arrays siguen en P3 |
 | **Testing** | Difícil | Fácil (módulos pequeños) |
 
 ---
@@ -227,7 +231,12 @@ pub fn emit_builtin(
 
 ---
 
-### **4. Runtime Support (NEW)**
+### **4. Runtime Support (histórico)**
+
+> El módulo `codegen/runtime/` se eliminó en la limpieza posterior: estaba
+> vacío y no tenía consumidores. La sección se conserva como registro de la
+> propuesta original; si arrays entra en el compilado (P3), se decidirá entonces
+> si conviene reintroducirlo.
 
 Para arrays necesitamos funciones helper:
 

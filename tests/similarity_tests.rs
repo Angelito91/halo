@@ -7,8 +7,7 @@
 //! Tests for string similarity and suggestion finding algorithms
 
 use halo::utils::similarity::{
-    find_suggestions, find_suggestions_adaptive, find_suggestions_smart, levenshtein_distance,
-    Suggestion,
+    find_suggestions, find_suggestions_smart, levenshtein_distance, Suggestion,
 };
 
 #[test]
@@ -77,14 +76,6 @@ fn test_find_suggestions_smart() {
 
     assert!(!suggestions.is_empty());
     assert_eq!(suggestions[0].text, "add");
-}
-
-#[test]
-fn test_find_suggestions_adaptive() {
-    let candidates = vec!["factorial", "function", "fibonacci", "filter"];
-    let suggestions = find_suggestions_adaptive("ficatorial", &candidates, 2);
-
-    assert!(!suggestions.is_empty());
 }
 
 #[test]

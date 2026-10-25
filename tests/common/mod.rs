@@ -13,6 +13,7 @@ use halo::interpreter::{Evaluator, Value};
 use halo::lexer::{Lexer, TokenKind};
 use halo::parser::Parser;
 
+pub mod cases;
 pub mod parity;
 
 // ── Core pipeline ─────────────────────────────────────────────────────────────
@@ -33,9 +34,12 @@ pub fn eval_code(code: &str) -> Result<Value, String> {
         }
     }
 
-    let program = Parser::new(tokens)
-        .parse()
-        .map_err(|errs| errs.join("; "))?;
+    let program = Parser::new(tokens).parse().map_err(|errs| {
+        errs.iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("; ")
+    })?;
 
     Evaluator::new().eval_program(&program)
 }
@@ -227,7 +231,11 @@ pub fn assert_parse_error(code: &str, needle: &str) {
     }
     match Parser::new(tokens).parse() {
         Err(errs) => {
-            let joined = errs.join("; ");
+            let joined = errs
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("; ");
             assert!(
                 joined.contains(needle),
                 "expected parse error containing {needle:?}, got: {joined:?}\n  code: {code}"

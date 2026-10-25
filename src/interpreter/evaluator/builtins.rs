@@ -16,7 +16,7 @@ pub fn try_eval_builtin(
     args: &[Expression],
 ) -> Result<Option<Value>, String> {
     let result = match name {
-        "print" => builtin_print(evaluator, args)?,
+        "print" | "println" => builtin_print(evaluator, args)?,
         "len" => builtin_single_arg(evaluator, name, args, |v| match v {
             Value::String(s) => Ok(Value::Number(s.len() as i64)),
             Value::Array(arr) => Ok(Value::Number(arr.len() as i64)),
@@ -67,12 +67,15 @@ pub fn try_eval_builtin(
     Ok(Some(result))
 }
 
-/// `print(v1, v2, …)` — prints each argument on its own line.
+/// `print(v1, v2, …)` / `println(v1, v2, …)` — print all arguments on one
+/// line, separated by spaces, followed by a newline. This matches the
+/// compiled backend's output exactly.
 fn builtin_print(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
+    let mut rendered = Vec::with_capacity(args.len());
     for arg in args {
-        let val = evaluator.eval_expr(arg)?;
-        println!("{val}");
+        rendered.push(evaluator.eval_expr(arg)?.to_string_value());
     }
+    println!("{}", rendered.join(" "));
     Ok(Value::Null)
 }
 

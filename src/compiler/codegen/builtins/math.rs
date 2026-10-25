@@ -28,7 +28,6 @@ pub fn emit_abs<'ctx>(
             .ok_or("Failed to get/create llvm.fabs.f64")?;
         let call_site = gen
             .builder
-            .builder
             .build_call(abs_f, &[fv.into()], "abs.f64")
             .map_err(|_| "Failed to call llvm.fabs.f64")?;
         return match call_site.try_as_basic_value() {
@@ -45,16 +44,13 @@ pub fn emit_abs<'ctx>(
     let zero = iv.get_type().const_zero();
     let neg = gen
         .builder
-        .builder
         .build_int_sub(zero, iv, "neg")
         .map_err(|_| "Failed to negate for abs")?;
     let cond = gen
         .builder
-        .builder
         .build_int_compare(inkwell::IntPredicate::SLT, iv, zero, "abs.cond")
         .map_err(|_| "Failed to compare for abs")?;
     gen.builder
-        .builder
         .build_select(cond, neg, iv, "abs.result")
         .map_err(|_| "Failed to build select for abs".to_string())
 }

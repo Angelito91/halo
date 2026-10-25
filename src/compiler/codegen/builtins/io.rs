@@ -28,6 +28,15 @@ pub fn emit_print<'ctx>(
             Emitter::emit_printf_str(gen, " ")?;
         }
         let val = expressions::emit_expression(gen, arg_expr)?;
+        // Source-level booleans are stored as i64. Recover the boolean
+        // semantics so `print(b)` renders true/false instead of 1/0.
+        if let Expression::Var(name, _) = arg_expr {
+            if gen.is_bool_var(name) {
+                let cond = gen.coerce_to_bool(val)?;
+                Emitter::emit_printf_for_value(gen, cond.into())?;
+                continue;
+            }
+        }
         Emitter::emit_printf_for_value(gen, val)?;
     }
 

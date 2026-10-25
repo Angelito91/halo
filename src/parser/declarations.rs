@@ -4,9 +4,9 @@
 // License: MPL 2.0
 // SPDX-License-Identifier: MPL-2.0
 
+use super::Parser;
 use crate::lexer::TokenKind;
 use crate::parser::ast::TopLevel;
-use super::Parser;
 
 impl Parser {
     pub(crate) fn parse_toplevel(&mut self) -> Option<TopLevel> {

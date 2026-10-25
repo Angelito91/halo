@@ -40,19 +40,19 @@ pub fn emit_for_loop<'ctx>(
     // outer binding of the same name (which may hold another type, e.g. a
     // float). The previous mapping is restored once the loop is done.
     let outer_slot = gen.builder.get_slot(var);
+    let outer_is_bool = gen.builder.is_bool_local(var);
     let var_slot = Emitter::emit_entry_alloca(&gen.builder, function, var, i64_type.into());
     gen.builder
         .set_alloca(var.to_string(), var_slot, i64_type.into());
+    gen.builder.unmark_bool(var);
 
     // The upper bound is evaluated once, before the first iteration.
     let end_slot = Emitter::emit_entry_alloca(&gen.builder, function, "for.end", i64_type.into());
 
     gen.builder
-        .builder
         .build_store(var_slot, start_val)
         .map_err(|_| "Failed to initialise the for loop variable")?;
     gen.builder
-        .builder
         .build_store(end_slot, end_val)
         .map_err(|_| "Failed to store the for loop bound")?;
 
@@ -62,36 +62,31 @@ pub fn emit_for_loop<'ctx>(
     let exit_bb = gen.context.append_basic_block(function, "for.exit");
 
     gen.builder
-        .builder
         .build_unconditional_branch(cond_bb)
         .map_err(|_| "Failed to branch to for.cond")?;
 
     // ── condition: i < end ──
-    gen.builder.builder.position_at_end(cond_bb);
+    gen.builder.position_at_end(cond_bb);
     let current = gen
-        .builder
         .builder
         .build_load(i64_type, var_slot, "for.i")
         .map_err(|_| "Failed to load the for loop variable")?
         .into_int_value();
     let end = gen
         .builder
-        .builder
         .build_load(i64_type, end_slot, "for.end.v")
         .map_err(|_| "Failed to load the for loop bound")?
         .into_int_value();
     let cond = gen
         .builder
-        .builder
         .build_int_compare(inkwell::IntPredicate::SLT, current, end, "for.cond.v")
         .map_err(|_| "Failed to compare the for loop bounds")?;
     gen.builder
-        .builder
         .build_conditional_branch(cond, body_bb, exit_bb)
         .map_err(|_| "Failed to build the for conditional branch")?;
 
     // ── body ──
-    gen.builder.builder.position_at_end(body_bb);
+    gen.builder.position_at_end(body_bb);
     // `continue` must run the increment step before re-checking the bound.
     gen.loop_stack.push((incr_bb, exit_bb));
     let body_terminated = gen.generate_block(body, function)?;
@@ -100,46 +95,45 @@ pub fn emit_for_loop<'ctx>(
     if !body_terminated
         && gen
             .builder
-            .builder
             .get_insert_block()
             .and_then(|b| b.get_terminator())
             .is_none()
     {
         gen.builder
-            .builder
             .build_unconditional_branch(incr_bb)
             .map_err(|_| "Failed to branch to for.incr")?;
     }
 
     // ── increment: i = i + 1 ──
-    gen.builder.builder.position_at_end(incr_bb);
+    gen.builder.position_at_end(incr_bb);
     let current = gen
-        .builder
         .builder
         .build_load(i64_type, var_slot, "for.i.inc")
         .map_err(|_| "Failed to load the for loop variable")?
         .into_int_value();
     let next = gen
         .builder
-        .builder
         .build_int_add(current, i64_type.const_int(1, false), "for.i.next")
         .map_err(|_| "Failed to increment the for loop variable")?;
     gen.builder
-        .builder
         .build_store(var_slot, next)
         .map_err(|_| "Failed to store the for loop variable")?;
     gen.builder
-        .builder
         .build_unconditional_branch(cond_bb)
         .map_err(|_| "Failed to branch back to for.cond")?;
 
-    gen.builder.builder.position_at_end(exit_bb);
+    gen.builder.position_at_end(exit_bb);
 
     // The loop variable only exists inside the loop: restore whatever the
     // name meant before, so code after the loop sees the outer binding.
     match outer_slot {
         Some(slot) => gen.builder.set_alloca(var.to_string(), slot.ptr, slot.ty),
         None => gen.builder.remove_slot(var),
+    }
+    if outer_slot.is_some() && outer_is_bool {
+        gen.builder.mark_bool(var);
+    } else {
+        gen.builder.unmark_bool(var);
     }
 
     Ok(false)

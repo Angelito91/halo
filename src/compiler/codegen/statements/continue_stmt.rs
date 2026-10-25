@@ -14,7 +14,6 @@ pub fn emit_continue<'ctx>(gen: &mut CodeGenerator<'ctx>) -> Result<bool, String
         .map(|(cond, _)| *cond)
         .ok_or_else(|| "`continue` used outside of a loop".to_string())?;
     gen.builder
-        .builder
         .build_unconditional_branch(cond_bb)
         .map_err(|_| "Failed to build continue branch")?;
     Ok(true)

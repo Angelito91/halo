@@ -17,8 +17,6 @@ mod strings;
 pub use arrays::*;
 pub use strings::*;
 
-use strings::build_string_call_args;
-
 /// Try to evaluate a method call on an object.
 pub fn try_eval_method_call(
     evaluator: &mut Evaluator,
@@ -28,32 +26,32 @@ pub fn try_eval_method_call(
 ) -> Result<Value, String> {
     match (object, method) {
         // String methods
-        (Value::String(_), "upper") => {
+        (Value::String(s), "upper") => {
             if !args.is_empty() {
                 return Err(format!(
                     "String method upper() expects 0 arguments, got {}",
                     args.len()
                 ));
             }
-            builtin_upper(evaluator, &build_string_call_args(object, args))
+            upper_value(Value::String(s.clone()))
         }
-        (Value::String(_), "lower") => {
+        (Value::String(s), "lower") => {
             if !args.is_empty() {
                 return Err(format!(
                     "String method lower() expects 0 arguments, got {}",
                     args.len()
                 ));
             }
-            builtin_lower(evaluator, &build_string_call_args(object, args))
+            lower_value(Value::String(s.clone()))
         }
-        (Value::String(_), "trim") => {
+        (Value::String(s), "trim") => {
             if !args.is_empty() {
                 return Err(format!(
                     "String method trim() expects 0 arguments, got {}",
                     args.len()
                 ));
             }
-            builtin_trim(evaluator, &build_string_call_args(object, args))
+            trim_value(Value::String(s.clone()))
         }
         (Value::String(_), "reverse") => {
             if !args.is_empty() {
@@ -62,7 +60,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            builtin_reverse(evaluator, &build_string_call_args(object, args))
+            reverse_value(object.clone())
         }
         (Value::String(_), "starts_with") => {
             if args.len() != 1 {
@@ -71,7 +69,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            builtin_starts_with(evaluator, &build_string_call_args(object, args))
+            starts_with_value(object.clone(), evaluator.eval_expr(&args[0])?)
         }
         (Value::String(_), "ends_with") => {
             if args.len() != 1 {
@@ -80,7 +78,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            builtin_ends_with(evaluator, &build_string_call_args(object, args))
+            ends_with_value(object.clone(), evaluator.eval_expr(&args[0])?)
         }
         (Value::String(_), "contains") => {
             if args.len() != 1 {
@@ -89,7 +87,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            builtin_contains(evaluator, &build_string_call_args(object, args))
+            contains_value(object.clone(), evaluator.eval_expr(&args[0])?)
         }
         (Value::String(_), "index_of") => {
             if args.len() != 1 {
@@ -98,7 +96,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            builtin_index_of(evaluator, &build_string_call_args(object, args))
+            index_of_value(object.clone(), evaluator.eval_expr(&args[0])?)
         }
         (Value::String(_), "replace") => {
             if args.len() != 2 {
@@ -107,7 +105,9 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            builtin_replace(evaluator, &build_string_call_args(object, args))
+            let old = evaluator.eval_expr(&args[0])?;
+            let new = evaluator.eval_expr(&args[1])?;
+            replace_value(object.clone(), old, new)
         }
         (Value::String(_), "substr") => {
             if args.len() != 2 {
@@ -116,7 +116,9 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            builtin_substr(evaluator, &build_string_call_args(object, args))
+            let start = evaluator.eval_expr(&args[0])?;
+            let length = evaluator.eval_expr(&args[1])?;
+            substr_value(object.clone(), start, length)
         }
 
         // Array methods
@@ -127,12 +129,8 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let array_expr = evaluator.value_to_expression(object);
-            let mut call_args = vec![array_expr];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_push(evaluator, &call_args)
+            let element = evaluator.eval_expr(&args[0])?;
+            push_value(object.clone(), element)
         }
         (Value::Array(_), "pop") => {
             if !args.is_empty() {
@@ -141,8 +139,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let array_expr = evaluator.value_to_expression(object);
-            builtin_pop(evaluator, &[array_expr])
+            pop_value(object.clone())
         }
         (Value::Array(_), "first") => {
             if !args.is_empty() {
@@ -151,8 +148,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let array_expr = evaluator.value_to_expression(object);
-            builtin_first(evaluator, &[array_expr])
+            first_value(object.clone())
         }
         (Value::Array(_), "last") => {
             if !args.is_empty() {
@@ -161,8 +157,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let array_expr = evaluator.value_to_expression(object);
-            builtin_last(evaluator, &[array_expr])
+            last_value(object.clone())
         }
         (Value::Array(_), "reverse") => {
             if !args.is_empty() {
@@ -171,8 +166,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let array_expr = evaluator.value_to_expression(object);
-            builtin_reverse(evaluator, &[array_expr])
+            reverse_value(object.clone())
         }
         (Value::Array(_), "join") => {
             if args.len() != 1 {
@@ -181,12 +175,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let array_expr = evaluator.value_to_expression(object);
-            let mut call_args = vec![array_expr];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_join(evaluator, &call_args)
+            join_value(object.clone(), evaluator.eval_expr(&args[0])?)
         }
         (Value::Array(_), "contains") => {
             if args.len() != 1 {
@@ -195,12 +184,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let array_expr = evaluator.value_to_expression(object);
-            let mut call_args = vec![array_expr];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_contains(evaluator, &call_args)
+            contains_value(object.clone(), evaluator.eval_expr(&args[0])?)
         }
         (Value::Array(_), "index_of") => {
             if args.len() != 1 {
@@ -209,12 +193,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let array_expr = evaluator.value_to_expression(object);
-            let mut call_args = vec![array_expr];
-            for arg in args {
-                call_args.push(arg.clone());
-            }
-            builtin_index_of(evaluator, &call_args)
+            index_of_value(object.clone(), evaluator.eval_expr(&args[0])?)
         }
         (Value::Array(_), "sort") => {
             if !args.is_empty() {
@@ -223,8 +202,7 @@ pub fn try_eval_method_call(
                     args.len()
                 ));
             }
-            let array_expr = evaluator.value_to_expression(object);
-            builtin_sort(evaluator, &[array_expr])
+            sort_value(object.clone())
         }
 
         // Unknown method

@@ -7,7 +7,7 @@
 mod common;
 
 use common::{
-    assert_runtime_error, eval_bool, eval_float, eval_last_number, eval_number, eval_var,
+    assert_runtime_error, eval_bool, eval_code, eval_float, eval_last_number, eval_number, eval_var,
 };
 use halo::interpreter::Value;
 
@@ -221,6 +221,15 @@ fn test_float_division_by_zero_errors() {
 #[test]
 fn test_modulo_by_zero_errors() {
     assert_runtime_error("x = 10 % 0", "Division by zero");
+}
+
+#[test]
+fn test_runtime_errors_include_source_position() {
+    let err = eval_code("x = 5 / 0").unwrap_err();
+    assert!(
+        err.contains("--> line 1"),
+        "runtime error should carry a source position, got: {err:?}"
+    );
 }
 
 // ── Overflow protection ───────────────────────────────────────────────────────

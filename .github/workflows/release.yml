@@ -73,15 +73,15 @@ jobs:
           # ── Linux x86_64 ──────────────────────────────────────────────────────
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-24.04
-            llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
-            llvm_prefix: /usr/lib/llvm-21
+            llvm_pkg: llvm-23 llvm-23-dev libpolly-23-dev libclang-common-23-dev clang-23
+            llvm_prefix: /usr/lib/llvm-23
             archive_ext: tar.gz
 
           # ── Linux aarch64 — native ARM runner ────────────────────────────────
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
-            llvm_pkg: llvm-21 llvm-21-dev libpolly-21-dev libclang-common-21-dev clang-21
-            llvm_prefix: /usr/lib/llvm-21
+            llvm_pkg: llvm-23 llvm-23-dev libpolly-23-dev libclang-common-23-dev clang-23
+            llvm_prefix: /usr/lib/llvm-23
             archive_ext: tar.gz
 
           # ── macOS aarch64 (Apple Silicon, native) ─────────────────────────────
@@ -107,34 +107,34 @@ jobs:
         uses: actions/checkout@v4
 
       # ── LLVM setup — Linux ───────────────────────────────────────────────────
-      - name: Install LLVM 21 (Linux)
+      - name: Install LLVM 23 (Linux)
         if: runner.os == 'Linux'
         run: |
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
             | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" \
-            | sudo tee /etc/apt/sources.list.d/llvm-21.list
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-23 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-23.list
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends ${{ matrix.llvm_pkg }}
 
       - name: Set LLVM env (Linux)
         if: runner.os == 'Linux'
         run: |
-          echo "LLVM_SYS_211_PREFIX=${{ matrix.llvm_prefix }}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${{ matrix.llvm_prefix }}" >> "$GITHUB_ENV"
           echo "${{ matrix.llvm_prefix }}/bin"                 >> "$GITHUB_PATH"
 
       # ── LLVM setup — macOS ───────────────────────────────────────────────────
-      - name: Install LLVM 21 (macOS)
+      - name: Install LLVM 23 (macOS)
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install llvm@21
+          brew install llvm@23
 
       - name: Set LLVM env (macOS)
         if: runner.os == 'macOS'
         run: |
-          LLVM_PREFIX="$(brew --prefix llvm@21)"
-          echo "LLVM_SYS_211_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          LLVM_PREFIX="$(brew --prefix llvm@23)"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
           echo "${LLVM_PREFIX}/bin"                 >> "$GITHUB_PATH"
           echo "LDFLAGS=-L${LLVM_PREFIX}/lib"       >> "$GITHUB_ENV"
           echo "CPPFLAGS=-I${LLVM_PREFIX}/include"  >> "$GITHUB_ENV"
@@ -155,18 +155,18 @@ jobs:
       #   clang+llvm-<ver>-x86_64-pc-windows-msvc.tar.xz
       #
       # Environment variables required by llvm-sys / inkwell on Windows:
-      #   LLVM_SYS_211_PREFIX  — root of the unpacked archive (contains bin/
+      #   LLVM_SYS_231_PREFIX  — root of the unpacked archive (contains bin/
       #                          include/ lib/); llvm-sys runs
       #                          `llvm-config --prefix` as a sanity-check
       #   LIBCLANG_PATH        — directory that contains libclang.lib;
       #                          this is <prefix>\lib, NOT <prefix>\bin
       #                          (bindgen / llvm-sys look for the .lib here)
-      - name: Resolve latest LLVM 21 version (Windows)
+      - name: Resolve latest LLVM 23 version (Windows)
         if: runner.os == 'Windows'
         id: llvm-version
         shell: pwsh
         run: |
-          # Query the GitHub API for llvmorg-21.* releases.
+          # Query the GitHub API for llvmorg-23.* releases.
           # We send an Accept header for the v3 API and honour GitHub's
           # recommendation to pass a User-Agent string.
           $headers  = @{ "Accept" = "application/vnd.github+json"; "X-GitHub-Api-Version" = "2022-11-28" }
@@ -174,20 +174,20 @@ jobs:
             -Uri     "https://api.github.com/repos/llvm/llvm-project/releases?per_page=30" `
             -Headers $headers
 
-          $latest21 = $releases |
-            Where-Object { $_.tag_name -match '^llvmorg-21\.\d+\.\d+$' } |
+          $latest23 = $releases |
+            Where-Object { $_.tag_name -match '^llvmorg-23\.\d+\.\d+$' } |
             Select-Object -First 1
 
-          if (-not $latest21) {
-            Write-Error "No stable LLVM 21 release found via GitHub API."
+          if (-not $latest23) {
+            Write-Error "No stable LLVM 23 release found via GitHub API."
             exit 1
           }
 
-          $version = $latest21.tag_name -replace '^llvmorg-', ''
+          $version = $latest23.tag_name -replace '^llvmorg-', ''
           Write-Host "Resolved LLVM version: $version"
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: Download LLVM 21 dev archive (Windows)
+      - name: Download LLVM 23 dev archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -229,8 +229,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # LLVM_SYS_211_PREFIX — root prefix; llvm-sys invokes llvm-config from here.
-          Add-Content $env:GITHUB_ENV  "LLVM_SYS_211_PREFIX=C:\LLVM"
+          # LLVM_SYS_231_PREFIX — root prefix; llvm-sys invokes llvm-config from here.
+          Add-Content $env:GITHUB_ENV  "LLVM_SYS_231_PREFIX=C:\LLVM"
 
           # LIBCLANG_PATH — directory that contains libclang.lib (NOT .dll).
           # bindgen and llvm-sys search this directory for the import library.

@@ -8,8 +8,21 @@
 
 use super::core::{Evaluator, LoopSignal};
 use crate::interpreter::value::Value;
-use crate::parser::ast::{Block, Program, Statement, TopLevel};
+use crate::parser::ast::{Block, Position, Program, Statement, TopLevel};
 use std::rc::Rc;
+
+/// Append a source position to a runtime error exactly once.
+///
+/// Nested blocks annotate the innermost failing statement first; outer
+/// statements then leave the message untouched.
+pub(crate) fn annotate_error(message: String, pos: Position) -> String {
+    const MARKER: &str = "\n  --> line ";
+    if message.contains(MARKER) {
+        message
+    } else {
+        format!("{}{}{}, column {}", message, MARKER, pos.line, pos.column)
+    }
+}
 
 // ── Safety limits ─────────────────────────────────────────────────────────────
 
@@ -53,7 +66,8 @@ impl Evaluator {
                     let value = init
                         .as_ref()
                         .map(|expr| self.eval_expr(expr))
-                        .transpose()?
+                        .transpose()
+                        .map_err(|err| annotate_error(err, item.pos()))?
                         .unwrap_or(Value::Null);
                     // "__expr" is a synthetic name the parser gives to bare
                     // top-level expressions (e.g. `x`, `f()`, `1 + 2`).
@@ -93,6 +107,11 @@ impl Evaluator {
     }
 
     pub(crate) fn eval_stmt(&mut self, stmt: &Statement) -> Result<Value, String> {
+        self.eval_stmt_inner(stmt)
+            .map_err(|err| annotate_error(err, stmt.pos()))
+    }
+
+    fn eval_stmt_inner(&mut self, stmt: &Statement) -> Result<Value, String> {
         match stmt {
             Statement::Expr(expr) => self.eval_expr(expr),
 

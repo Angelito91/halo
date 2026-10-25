@@ -5,7 +5,7 @@ use crate::parser::ast::Expression;
 
 macro_rules! b {
     ($gen:expr) => {
-        &$gen.builder.builder
+        &$gen.builder
     };
 }
 pub(crate) use b;

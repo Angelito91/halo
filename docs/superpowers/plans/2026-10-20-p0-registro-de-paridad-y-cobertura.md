@@ -56,7 +56,7 @@ Riesgos que el spec implica y que ninguna prueba de tarea cubre por sí sola:
 - Modify: `tests/common/parity.rs`, `tests/common/mod.rs`, `tests/parity_freeze_tests.rs`
 
 **Interfaces:**
-- Consumes: `halo::lang::catalog::{Builtin, Method, Support}` (solo en Task 4).
+- Consumes: `halo::lang::catalog::{Builtin, Method, Support}` (solo en Task 5).
 - Produces:
   - `common::parity::Phase` — enum `P1 | P2 | P3`, con `Display`.
   - `common::parity::KnownDivergence { id: &'static str, reason: &'static str, phase: Phase }`.
@@ -144,7 +144,7 @@ fn harness_reports_parity_for_an_agreeing_case() {
 }
 ```
 
-…y una línea por cada id de `CASES` (los 34 ids actuales, luego los nuevos de Task 2 y Task 3).
+…y una línea por cada id de `CASES` (los 34 ids actuales, luego los nuevos de Task 3 y Task 4).
 
 Run: `cargo test --test parity_freeze_tests 2>&1 | head -20`
 Expected: FALLA — `unresolved import common::cases` / `no function or associated item named assert_case`.
@@ -539,7 +539,433 @@ exist without a case that exercises it."
 
 ---
 
-### Task 2: Ampliar el corpus — operadores, literales, control de flujo y funciones (P0.1)
+### Task 2: Blindar el arnés y cerrar los hallazgos de la revisión (P0.0b)
+
+> Esta tarea existe por la revisión final de R0 (2026-10-20), que no encontró
+> fallos en el producto pero sí en la **maquinaria de evidencia**: una caché
+> que puede servir binarios obsoletos, y tablas que no se autocomprueban. P0 se
+> apoya justo en esa maquinaria, así que se arregla antes de ampliar el corpus.
+
+**Files:**
+- Modify: `tests/common/parity.rs` (huella del compilador en la clave de caché)
+- Modify: `tests/lang_catalog_tests.rs` (sonda derivada del catálogo)
+- Modify: `tests/cli_output_tests.rs` (orden de tokens y exit codes)
+- Modify: `src/lang/format.rs`, `src/lang/errors.rs` (alinear con el intérprete + tests)
+- Modify: `src/compiler/mod.rs` (doc comment obsoleto)
+- Modify: `COMPILER_REFACTORING.md`, `REFACTORING_SUMMARY.md` (cifras obsoletas)
+
+**Interfaces:**
+- Consumes: nada de tareas anteriores.
+- Produces:
+  - `common::parity::compiler_fingerprint() -> u64` — huella del ejecutable de test (mtime + tamaño).
+  - `common::parity::cache_dir_for(fingerprint: u64) -> PathBuf` — directorio de caché acotado por la huella.
+  - `common::parity::cache_dir() -> PathBuf` — `cache_dir_for(compiler_fingerprint())`.
+  - `halo::lang::format::format_float` alineado con `Value::Float(..).to_string_value()`.
+
+- [ ] **Step 1: La caché de binarios, acotada por la huella del compilador**
+
+Hoy la clave de la caché es **solo el hash del fuente**: si cambia el
+generador de código, `run_compiled` reutiliza el binario producido por el
+código viejo y la red "pasa" sin haber medido nada.
+
+`tests/common/parity.rs`:
+
+```rust
+/// Huella del ejecutable de test (mtime + tamaño).
+///
+/// El binario compilado por `run_compiled` lo produce el codegen **enlazado
+/// en este binario de test**, no el binario `halo`. Cuando el codegen
+/// cambia, este ejecutable se reconstruye, cambia su mtime y la huella
+/// cambia: la caché se invalida sola y el caso se vuelve a compilar de verdad.
+pub fn compiler_fingerprint() -> u64 {
+    let mut h = DefaultHasher::new();
+    match std::env::current_exe().ok().and_then(|p| std::fs::metadata(&p).ok()) {
+        Some(meta) => {
+            let mtime = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(0);
+            mtime.hash(&mut h);
+            meta.len().hash(&mut h);
+        }
+        None => 0u64.hash(&mut h),
+    }
+    h.finish()
+}
+
+/// Directorio de caché para una huella dada. Dos huellas distintas nunca
+/// comparten directorio.
+pub fn cache_dir_for(fingerprint: u64) -> PathBuf {
+    std::env::temp_dir()
+        .join("halo_parity_cache")
+        .join(format!("{fingerprint:016x}"))
+}
+
+/// Directorio de caché de esta ejecución.
+pub fn cache_dir() -> PathBuf {
+    cache_dir_for(compiler_fingerprint())
+}
+```
+
+Y borrar el `cache_dir()` antiguo (el que no tenía la huella).
+
+Run: `cargo test --test parity_freeze_tests 2>&1 | tail -3`
+Expected: PASS (38 tests), y el binario se recompila porque la caché ahora
+está en un directorio nuevo.
+
+- [ ] **Step 2: Probar que la huella acota la caché**
+
+Añadir a `tests/parity_freeze_tests.rs`:
+
+```rust
+#[test]
+fn the_cache_is_scoped_by_the_compiler_fingerprint() {
+    // Dos huellas distintas no pueden compartir caché: si compartieran, un
+    // codegen nuevo serviría el binario del viejo.
+    assert_ne!(
+        parity::cache_dir_for(1),
+        parity::cache_dir_for(2),
+        "distinct fingerprints must not share a cache directory"
+    );
+    assert_eq!(parity::cache_dir_for(7), parity::cache_dir_for(7));
+}
+
+#[test]
+fn the_compiler_fingerprint_is_stable_within_a_run() {
+    assert_eq!(
+        parity::compiler_fingerprint(),
+        parity::compiler_fingerprint(),
+        "the fingerprint must not change during a run"
+    );
+    assert_ne!(
+        parity::compiler_fingerprint(),
+        0,
+        "the fingerprint must be computed"
+    );
+}
+```
+
+Run: `cargo test --test parity_freeze_tests 2>&1 | tail -3`
+Expected: PASS (40 tests).
+
+- [ ] **Step 3: La sonda del catálogo, derivada del catálogo**
+
+`tests/lang_catalog_tests.rs` solo sondea 9 de 26 built-ins y 0 de 16
+métodos: una entrada del catálogo puede estar equivocada sin que nadie lo note.
+
+Sustituir `catalog_matches_observed_behavior` por una versión dirigida por el
+catálogo, con una sonda por entrada:
+
+```rust
+/// Snippet mínimo que ejercita un built-in.
+fn builtin_probe(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "print" => "print(1)",
+        "println" => "println(\"x\")",
+        "len" => "print(len(\"ab\"))",
+        "str" => "print(str(1))",
+        "int" => "print(int(1.9))",
+        "float" => "print(float(1))",
+        "abs" => "print(abs(-1))",
+        "type" => "print(type(1))",
+        "range" => "print(len(range(2)))",
+        "push" => "a = [1]\na.push(2)\nprint(len(a))",
+        "pop" => "a = [1]\na.pop()\nprint(len(a))",
+        "append" => "a = [1]\na.append(2)\nprint(len(a))",
+        "first" => "a = [1]\nprint(a.first())",
+        "last" => "a = [1]\nprint(a.last())",
+        "reverse" => "a = [1]\na.reverse()\nprint(a[0])",
+        "join" => "a = [\"x\"]\nprint(a.join(\"-\"))",
+        "sort" => "a = [1]\na.sort()\nprint(a[0])",
+        "contains" => "print(\"ab\".contains(\"a\"))",
+        "index_of" => "print(\"ab\".index_of(\"b\"))",
+        "upper" => "print(\"a\".upper())",
+        "lower" => "print(\"A\".lower())",
+        "trim" => "print(\" a \".trim())",
+        "starts_with" => "print(\"ab\".starts_with(\"a\"))",
+        "ends_with" => "print(\"ab\".ends_with(\"b\"))",
+        "replace" => "print(\"ab\".replace(\"a\", \"c\"))",
+        "substr" => "print(\"abc\".substr(0, 2))",
+        _ => return None,
+    })
+}
+
+/// Snippet mínimo que ejercita un método (con su receptor).
+fn method_probe(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "push" => "a = [1]\na.push(2)",
+        "pop" => "a = [1]\na.pop()",
+        "first" => "a = [1]\nprint(a.first())",
+        "last" => "a = [1]\nprint(a.last())",
+        "join" => "a = [\"x\"]\nprint(a.join(\"-\"))",
+        "sort" => "a = [1]\na.sort()",
+        "reverse" => "a = [1]\na.reverse()",
+        "contains" => "a = [1]\nprint(a.contains(1))",
+        "index_of" => "a = [1]\nprint(a.index_of(1))",
+        "upper" => "print(\"a\".upper())",
+        "lower" => "print(\"A\".lower())",
+        "trim" => "print(\" a \".trim())",
+        "starts_with" => "print(\"ab\".starts_with(\"a\"))",
+        "ends_with" => "print(\"ab\".ends_with(\"b\"))",
+        "replace" => "print(\"ab\".replace(\"a\", \"c\"))",
+        "substr" => "print(\"abc\".substr(0, 2))",
+        _ => return None,
+    })
+}
+
+#[test]
+fn every_catalog_entry_has_a_probe() {
+    for b in BUILTINS {
+        assert!(
+            builtin_probe(b.name).is_some(),
+            "builtin '{}' has no probe in the catalog test",
+            b.name
+        );
+    }
+    for m in METHODS {
+        assert!(
+            method_probe(m.name).is_some(),
+            "method '{}' has no probe in the catalog test",
+            m.name
+        );
+    }
+}
+
+#[test]
+fn catalog_matches_observed_behavior() {
+    if !parity::clang_available() { return; }
+    for b in BUILTINS {
+        let code = builtin_probe(b.name).unwrap();
+        let interpreter_ok = !parity::run_interpreter(code).is_error();
+        let compiled_ok = parity::run_compiled(code).map(|r| !r.is_error()).unwrap_or(false);
+        match b.support {
+            Support::Both => assert!(interpreter_ok && compiled_ok, "{}: declared Both", b.name),
+            Support::InterpreterOnly => assert!(interpreter_ok && !compiled_ok, "{}: declared InterpreterOnly", b.name),
+            Support::CompilerOnly => assert!(!interpreter_ok && compiled_ok, "{}: declared CompilerOnly", b.name),
+        }
+    }
+    for m in METHODS {
+        let code = method_probe(m.name).unwrap();
+        let interpreter_ok = !parity::run_interpreter(code).is_error();
+        let compiled_ok = parity::run_compiled(code).map(|r| !r.is_error()).unwrap_or(false);
+        match m.support {
+            Support::Both => assert!(interpreter_ok && compiled_ok, "method {}: declared Both", m.name),
+            Support::InterpreterOnly => assert!(interpreter_ok && !compiled_ok, "method {}: declared InterpreterOnly", m.name),
+            Support::CompilerOnly => assert!(!interpreter_ok && compiled_ok, "method {}: declared CompilerOnly", m.name),
+        }
+    }
+}
+```
+
+Run: `cargo test --test lang_catalog_tests 2>&1 | tail -20`
+Expected: PASS, o FAIL con el nombre del built-in/método cuya matriz de
+soporte no coincide con lo observado. **Si falla, la matriz del catálogo es
+incorrecta y hay que corregir `src/lang/catalog.rs`**, no el test.
+
+- [ ] **Step 4: Fijar el orden de tokens y los exit codes de la CLI**
+
+`tests/cli_output_tests.rs` solo comprueba `contains`, así que un reordenamiento
+de tokens pasaría; y descarta stderr y exit code, así que un `check` que
+fallara no lo detectaría.
+
+Sustituir `run_halo` por una versión que devuelva stdout, stderr y exit code, y
+añadir el fixture de error de sintaxis:
+
+```rust
+struct Output {
+    stdout: String,
+    stderr: String,
+    code: Option<i32>,
+}
+
+fn run_halo_on(source: &str, sub: &str) -> Output {
+    let dir = std::env::temp_dir().join("halo_cli_output_tests");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("prog.halo");
+    std::fs::write(&src, source).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_halo"))
+        .arg(sub)
+        .arg(&src)
+        .output()
+        .expect("spawn halo");
+    Output {
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        code: out.status.code(),
+    }
+}
+
+fn run_halo(sub: &str) -> String {
+    run_halo_on("x = 1 + 2\nprint(x)\n", sub).stdout
+}
+```
+
+Y el test del orden de tokens:
+
+```rust
+#[test]
+fn tokens_subcommand_keeps_the_token_order() {
+    let out = run_halo("tokens");
+    let ident = out.find("Identifier").unwrap_or_else(|| panic!("no Identifier in {out}"));
+    let number = out.find("Number").unwrap_or_else(|| panic!("no Number in {out}"));
+    let plus = out.find('+').unwrap_or_else(|| panic!("no '+' in {out}"));
+    // `x = 1 + 2`: el identificador va antes que el número, y el `+` entre
+    // ambos. Un reordenamiento del lexer o del parser rompe este orden.
+    assert!(ident < number, "identifier must come before the number: {out}");
+    assert!(number < plus, "the number must come before '+': {out}");
+}
+
+#[test]
+fn check_subcommand_fails_with_exit_code_1_on_a_syntax_error() {
+    let out = run_halo_on("x = = 2\n", "check");
+    assert_eq!(out.code, Some(1), "a parse error must exit with 1: {out:?}");
+    assert!(!out.stdout.contains("OK"), "a broken program must not report OK: {out:?}");
+}
+```
+
+Run: `cargo test --test cli_output_tests 2>&1 | tail -5`
+Expected: PASS (6 tests).
+
+- [ ] **Step 5: Alinear `src/lang/format.rs` con el intérprete y darle tests**
+
+`format_float` usa `Display` + `.0`, pero el intérprete usa `{:.1}` cuando el
+float es entero: para `1e300` o `NaN` los dos discrepan, y `format.rs` no lo
+dice.
+
+`src/lang/format.rs`:
+
+```rust
+/// How the interpreter prints a float: `{:.1}` when the value is integral
+/// (`5.0` → `5.0`), plain `Display` otherwise (`0.25` → `0.25`).
+///
+/// This mirrors `Value::Float(f).to_string_value()` exactly; the differential
+/// test below pins the two together.
+pub fn format_float(f: f64) -> String {
+    if f.fract() == 0.0 {
+        format!("{:.1}", f)
+    } else {
+        f.to_string()
+    }
+}
+```
+
+Y un test diferencial en el mismo archivo:
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interpreter::Value;
+
+    #[test]
+    fn format_float_matches_the_interpreter() {
+        for f in [5.0, 0.25, -3.14, 1e300, f64::INFINITY, f64::NAN] {
+            assert_eq!(
+                format_float(f),
+                Value::Float(f).to_string_value(),
+                "float formatting diverged for {f}"
+            );
+        }
+    }
+
+    #[test]
+    fn format_number_matches_the_interpreter() {
+        for n in [0i64, 42, -7, i64::MAX, i64::MIN] {
+            assert_eq!(
+                format_number(n),
+                Value::Number(n).to_string_value(),
+                "number formatting diverged for {n}"
+            );
+        }
+    }
+
+    #[test]
+    fn format_bool_and_null_match_the_interpreter() {
+        assert_eq!(format_bool(true), Value::Bool(true).to_string_value());
+        assert_eq!(format_bool(false), Value::Bool(false).to_string_value());
+        assert_eq!(format_null(), Value::Null.to_string_value());
+    }
+}
+```
+
+Run: `cargo test --lib 2>&1 | tail -5`
+Expected: PASS.
+
+- [ ] **Step 6: Los mensajes de error de `src/lang/errors.rs`, fijados**
+
+`src/lang/errors.rs` declara constantes que ningún backend consume todavía.
+Fijarlas contra el intérprete:
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interpreter::Value;
+
+    #[test]
+    fn the_error_messages_match_the_interpreter() {
+        assert_eq!(DIVISION_BY_ZERO, "Division by zero");
+        assert_eq!(
+            INTEGER_OVERFLOW,
+            Value::Number(i64::MAX).checked_add(1).unwrap_err()
+        );
+        assert!(UNDEFINED_VARIABLE.contains("Undefined variable"));
+        assert!(UNDEFINED_FUNCTION.contains("Undefined function"));
+        assert!(NEGATIVE_INDEX.contains("Array index cannot be negative"));
+    }
+}
+```
+
+Run: `cargo test --lib 2>&1 | tail -5`
+Expected: PASS. Si `INTEGER_OVERFLOW` no coincide con el mensaje real del
+intérprete, corregir la constante (es el intérprete la referencia).
+
+- [ ] **Step 7: Docs y comentarios obsoletos**
+
+- `src/compiler/mod.rs:89` — el doc comment de `optimise` menciona
+  `emit_object`, que ya no existe. Dejar: *"Call this after
+  `codegen().compile(...)` and before `emit_llvm`."*
+- `COMPILER_REFACTORING.md` — `generator.rs` dice 292 líneas; son 290. Y
+  `emitter.rs` se describe como "salida (LLVM IR / objeto / binario)", pero ya
+  no emite objetos ni binarios. Corregir ambas cosas.
+- `REFACTORING_SUMMARY.md` — dice "829 tests"; son 828.
+
+- [ ] **Step 8: Verificar y commitear**
+
+Run: `cargo test 2>&1 | grep -E "^test result" | awk '{p+=$4; f+=$6} END {print p, f}'`
+Expected: `832 0` (828 + 2 de la huella + 1 de sondas + 1 de CLI).
+
+Run: `cargo clippy --all-targets 2>&1 | grep -cE "^(warning|error)"`
+Expected: `0`.
+
+Run: `cargo build 2>&1 | grep -cE "^(warning|error)"`
+Expected: `0`.
+
+```bash
+git add -A
+git commit -m "test: harden the parity harness and pin the catalog against observed behavior
+
+Addresses the findings of the R0 final review:
+
+- The parity cache is keyed by the source hash alone, so a changed code
+  generator could be served binaries produced by the old one. The cache
+  directory is now scoped by a fingerprint of the test executable, so a
+  rebuild invalidates it automatically.
+- The catalog test probed 9 of 26 builtins and 0 of 16 methods; it is now
+  driven by the catalog itself and fails on any entry without a probe.
+- The CLI tests only checked for substrings and discarded the exit code;
+  token order and the exit code of a syntax error are now pinned.
+- src/lang/format.rs diverged from the interpreter on large and non-finite
+  floats and had no tests; it is now aligned and pinned differentially.
+- Stale doc comments and counts in COMPILER_REFACTORING, REFACTORING_SUMMARY
+  and src/compiler/mod.rs."
+```
+
+---
+
+### Task 3: Ampliar el corpus — operadores, literales, control de flujo y funciones (P0.1)
 
 **Files:**
 - Modify: `tests/common/cases.rs`, `tests/parity_freeze_tests.rs`
@@ -653,13 +1079,13 @@ divergence with its reason and closing phase."
 
 ---
 
-### Task 3: Ampliar el corpus — built-ins, métodos, arrays, errores y formato (P0.2)
+### Task 4: Ampliar el corpus — built-ins, métodos, arrays, errores y formato (P0.2)
 
 **Files:**
 - Modify: `tests/common/cases.rs`, `tests/parity_freeze_tests.rs`
 
 **Interfaces:**
-- Consumes: `common::cases::CASES` (Task 2).
+- Consumes: `common::cases::CASES` (Task 1).
 - Produces: 32 casos nuevos.
 
 - [ ] **Step 1: Añadir los 32 casos a `CASES`**
@@ -720,7 +1146,7 @@ Una línea por id nuevo en `tests/parity_freeze_tests.rs`.
 Run: `cargo test --test parity_freeze_tests 2>&1 | grep -E "^test .* FAILED" | head -40`
 Expected: los casos que difieren de verdad fallan.
 
-Registrar cada una en `CASES` con motivo y fase (tabla de fases del Task 2,
+Registrar cada una en `CASES` con motivo y fase (tabla de fases del Task 3,
 Step 3). **No se modifica el snippet.**
 
 Run: `cargo test --test parity_freeze_tests 2>&1 | tail -5`
@@ -742,7 +1168,7 @@ divergence with its reason and closing phase."
 
 ---
 
-### Task 4: Cobertura derivada del catálogo (P0.3)
+### Task 5: Cobertura derivada del catálogo (P0.3)
 
 **Files:**
 - Create: `tests/parity_coverage_tests.rs`
@@ -857,7 +1283,7 @@ the catalog, so a new builtin without a case breaks the suite."
 
 ---
 
-### Task 5: Verificación final de P0 (P0.4)
+### Task 6: Verificación final de P0 (P0.4)
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-10-20-p0-registro-de-paridad-y-cobertura.md` (checkboxes)
@@ -889,7 +1315,7 @@ Run: `git diff --stat 0f91d25..HEAD -- src/compiler src/interpreter src/parser s
 Expected: **vacío**. P0 no toca los backends.
 
 Run: `git diff --stat 0f91d25..HEAD -- src/lang`
-Expected: solo si Task 4 necesitó ajustar el catálogo (y entonces debe ser
+Expected: solo si Task 5 necesitó ajustar el catálogo (y entonces debe ser
 justificado en el mensaje de commit).
 
 - [ ] **Step 3: Actualizar la documentación**

@@ -1,26 +1,77 @@
 // Pins the text that parser-dependent CLI subcommands print, so that
 // refactors of the parser cannot silently change token or item order.
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::process::Command;
 
-fn run_halo(sub: &str) -> String {
+/// What a CLI invocation produced.
+#[derive(Debug)]
+struct Output {
+    stdout: String,
+    stderr: String,
+    code: Option<i32>,
+}
+
+/// Unique file name per (source, subcommand).
+///
+/// The tests run in parallel and a shared file name would let one test
+/// overwrite another's source between the write and the spawn.
+fn unique_name(source: &str, sub: &str) -> String {
+    let mut h = DefaultHasher::new();
+    source.hash(&mut h);
+    sub.hash(&mut h);
+    format!("prog-{:016x}.halo", h.finish())
+}
+
+fn run_halo_on(source: &str, sub: &str) -> Output {
     let dir = std::env::temp_dir().join("halo_cli_output_tests");
     std::fs::create_dir_all(&dir).unwrap();
-    let src = dir.join("prog.halo");
-    std::fs::write(&src, "x = 1 + 2\nprint(x)\n").unwrap();
+    let src = dir.join(unique_name(source, sub));
+    std::fs::write(&src, source).unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_halo"))
         .arg(sub)
         .arg(&src)
         .output()
         .expect("spawn halo");
-    String::from_utf8_lossy(&out.stdout).into_owned()
+    Output {
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        code: out.status.code(),
+    }
+}
+
+fn run_halo(sub: &str) -> String {
+    run_halo_on("x = 1 + 2\nprint(x)\n", sub).stdout
 }
 
 #[test]
 fn tokens_subcommand_is_stable() {
     let out = run_halo("tokens");
-    assert!(out.contains("Identifier"), "unexpected tokens output: {out}");
+    assert!(
+        out.contains("Identifier"),
+        "unexpected tokens output: {out}"
+    );
     assert!(out.contains("Number"), "unexpected tokens output: {out}");
+}
+
+#[test]
+fn tokens_subcommand_keeps_the_token_order() {
+    let out = run_halo("tokens");
+    let ident = out
+        .find("Identifier")
+        .unwrap_or_else(|| panic!("no Identifier in {out}"));
+    let number = out
+        .find("Number")
+        .unwrap_or_else(|| panic!("no Number in {out}"));
+    let plus = out.find('+').unwrap_or_else(|| panic!("no '+' in {out}"));
+    // `x = 1 + 2`: the identifier comes before the number, and the `+` after
+    // it. A lexer or parser split that reorders tokens breaks this.
+    assert!(
+        ident < number,
+        "identifier must come before the number: {out}"
+    );
+    assert!(number < plus, "the number must come before '+': {out}");
 }
 
 #[test]
@@ -52,5 +103,19 @@ fn check_subcommand_is_stable() {
     assert!(
         out.contains("top-level item(s)"),
         "unexpected check output: {out}"
+    );
+}
+
+#[test]
+fn check_subcommand_fails_with_exit_code_1_on_a_syntax_error() {
+    let out = run_halo_on("x = = 2\n", "check");
+    assert_eq!(out.code, Some(1), "a parse error must exit with 1: {out:?}");
+    assert!(
+        !out.stdout.contains("OK"),
+        "a broken program must not report OK: {out:?}"
+    );
+    assert!(
+        out.stderr.contains("1 error(s)"),
+        "the error count must be reported on stderr: {out:?}"
     );
 }

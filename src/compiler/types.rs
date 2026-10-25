@@ -63,6 +63,7 @@ impl<'ctx> TypeMapper<'ctx> {
                 ptr_ty.fn_type(&params, false)
             }
             "f64" => self.f64_type().fn_type(&params, false),
+            "bool" => self.i1_type().fn_type(&params, false),
             _ => i64_type.fn_type(&params, false),
         }
     }
@@ -75,23 +76,6 @@ impl<'ctx> TypeMapper<'ctx> {
     }
 
     // ===== Value-level helpers =====
-
-    /// Return a zero constant of the same type as `val`.
-    /// Useful for generating default-initialised allocas.
-    ///
-    /// Exercised only by the unit tests in this file, but kept as part of the
-    /// mapper API.
-    pub fn zero_of(&self, ty: BasicTypeEnum<'ctx>) -> BasicValueEnum<'ctx> {
-        match ty {
-            BasicTypeEnum::IntType(i) => i.const_zero().into(),
-            BasicTypeEnum::FloatType(f) => f.const_zero().into(),
-            BasicTypeEnum::PointerType(p) => p.const_zero().into(),
-            BasicTypeEnum::ArrayType(a) => a.const_zero().into(),
-            BasicTypeEnum::StructType(s) => s.const_zero().into(),
-            BasicTypeEnum::VectorType(v) => v.const_zero().into(),
-            BasicTypeEnum::ScalableVectorType(v) => v.const_zero().into(),
-        }
-    }
 
     /// Return the storage `BasicTypeEnum` that should be used when allocating
     /// a variable that holds `val`.  Floats stay as `f64`; pointer values
@@ -160,21 +144,5 @@ mod tests {
         let mapper = TypeMapper::new(&context);
         let val: BasicValueEnum = mapper.f64_type().const_float(1.0).into();
         assert_eq!(mapper.storage_type_of(val), mapper.f64_type().into());
-    }
-
-    #[test]
-    fn test_zero_of_int() {
-        let context = Context::create();
-        let mapper = TypeMapper::new(&context);
-        let zero = mapper.zero_of(mapper.i64_type().into());
-        assert!(zero.is_int_value());
-    }
-
-    #[test]
-    fn test_zero_of_float() {
-        let context = Context::create();
-        let mapper = TypeMapper::new(&context);
-        let zero = mapper.zero_of(mapper.f64_type().into());
-        assert!(zero.is_float_value());
     }
 }

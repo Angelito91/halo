@@ -6,7 +6,7 @@
 ## 1. Visión
 
 Halo es un lenguaje educativo en Rust (intérprete tree-walking + backend LLVM vía
-inkwell/llvm-sys 211 = LLVM 21) que evoluciona en dos etapas:
+inkwell/llvm-sys 231 = LLVM 23) que evoluciona en dos etapas:
 
 1. **Terminar el roadmap v0.3/v0.4 original** (lenguaje genérico).
 2. **Redirigir hacia scripting de sistema**: la moderna alternativa a bash —
@@ -80,4 +80,4 @@ El REPL queda para después de que la stdlib sea rica.
 - Cada fase termina con tests pasando y commit antes de empezar la siguiente.
 - No romper la sintaxis existente salvo lo diseñado (interpolación a partir
   de la 6.1, comentarios multi-línea en su fase).
-- LLVM 21 (inkwell feature `llvm21-1`); no actualizar llvm-sys sin decisión explícita.
+- LLVM 23 (inkwell feature `llvm23-1`, llvm-sys 231); no actualizar llvm-sys sin decisión explícita.

@@ -23,6 +23,8 @@ pub fn emit_var_decl<'ctx>(
     };
 
     let storage_ty = gen.type_mapper.storage_type_of(init_val);
+    let is_bool =
+        init_val.is_int_value() && init_val.into_int_value().get_type().get_bit_width() == 1;
 
     // Reuse the existing alloca slot if this variable was already
     // declared in the current function scope.  Creating a second
@@ -38,10 +40,15 @@ pub fn emit_var_decl<'ctx>(
         a
     };
 
+    if is_bool {
+        gen.builder.mark_bool(name);
+    } else {
+        gen.builder.unmark_bool(name);
+    }
+
     let to_store = gen.coerce_to_storage(init_val, storage_ty)?;
 
     gen.builder
-        .builder
         .build_store(alloca, to_store)
         .map_err(|_| format!("Failed to store into '{}'", name))?;
 

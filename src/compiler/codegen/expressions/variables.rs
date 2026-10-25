@@ -20,7 +20,6 @@ pub fn emit_var_ref<'ctx>(
     // Try local alloca first
     if let Some(slot) = builder.get_slot(name) {
         return builder
-            .builder
             .build_load(slot.ty, slot.ptr, name)
             .map_err(|_| format!("Failed to load '{}'", name));
     }
@@ -32,7 +31,6 @@ pub fn emit_var_ref<'ctx>(
             .try_into()
             .map_err(|_| format!("Global '{}' has a non-basic type", name))?;
         return builder
-            .builder
             .build_load(ty, gv.as_pointer_value(), name)
             .map_err(|_| format!("Failed to load global '{}'", name));
     }
@@ -47,14 +45,19 @@ pub fn emit_var_assign<'ctx>(
     value_expr: &Expression,
 ) -> Result<BasicValueEnum<'ctx>, String> {
     let val = super::emit_expression(gen, value_expr)?;
+    let is_bool = val.is_int_value() && val.into_int_value().get_type().get_bit_width() == 1;
 
     if let Some(slot) = gen.builder.get_slot(name) {
         // Coerce the new value to the slot's existing storage type
         let to_store = gen.coerce_to_storage(val, slot.ty)?;
         gen.builder
-            .builder
             .build_store(slot.ptr, to_store)
             .map_err(|_| format!("Failed to store into '{}'", name))?;
+        if is_bool {
+            gen.builder.mark_bool(name);
+        } else {
+            gen.builder.unmark_bool(name);
+        }
         return Ok(to_store);
     }
 
@@ -66,9 +69,13 @@ pub fn emit_var_assign<'ctx>(
             .map_err(|_| format!("Global '{}' has a non-basic type", name))?;
         let to_store = gen.coerce_to_storage(val, slot_ty)?;
         gen.builder
-            .builder
             .build_store(gv.as_pointer_value(), to_store)
             .map_err(|_| format!("Failed to store into global '{}'", name))?;
+        if is_bool {
+            gen.bool_globals.insert(name.to_string());
+        } else {
+            gen.bool_globals.remove(name);
+        }
         return Ok(to_store);
     }
 

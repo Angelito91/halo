@@ -22,14 +22,12 @@ pub fn emit_unary<'ctx>(
             if val.is_float_value() {
                 let neg = gen
                     .builder
-                    .builder
                     .build_float_neg(val.into_float_value(), "fneg")
                     .map_err(|_| "Failed to negate float")?;
                 Ok(neg.into())
             } else {
                 let iv = Emitter::widen_to_i64(gen, val)?;
                 let neg = gen
-                    .builder
                     .builder
                     .build_int_neg(iv, "ineg")
                     .map_err(|_| "Failed to negate integer")?;
@@ -39,7 +37,6 @@ pub fn emit_unary<'ctx>(
         "!" => {
             let iv = gen.coerce_to_bool(val)?;
             let not = gen
-                .builder
                 .builder
                 .build_not(iv, "not")
                 .map_err(|_| "Failed to apply NOT")?;

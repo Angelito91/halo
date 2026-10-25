@@ -8,6 +8,4 @@ pub mod constants;
 pub mod similarity;
 
 pub use constants::*;
-pub use similarity::{
-    find_suggestions, find_suggestions_adaptive, find_suggestions_smart, Suggestion,
-};
+pub use similarity::{find_suggestions, find_suggestions_smart, Suggestion};

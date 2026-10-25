@@ -64,20 +64,21 @@ Halo nace como un proyecto de aprendizaje práctico para desmitificar el proceso
 | **Recursión mutua** | `is_even` / `is_odd` y similares funcionan |
 | **Límite de recursión** | Guard contra stack overflow (500 niveles en producción) |
 | **Límite de iteraciones** | Guard contra bucles infinitos (1 000 000 iteraciones) |
-| **Funciones built-in** | `print`, `len`, `str`, `int`, `float`, `abs`, `type`, `range` + arrays (`push`, `pop`, `append`, `first`, `last`, `reverse`, `index_of`) |
+| **Funciones built-in** | `print`, `println`, `len`, `str`, `int`, `float`, `abs`, `type`, `range` + arrays (`push`, `pop`, `append`, `first`, `last`, `reverse`, `index_of`) |
+| **Errores con posición** | Los errores de runtime del intérprete incluyen línea y columna |
 | **Protección de overflow** | Aritmética entera con checked operations |
 | **Intérprete tree-walking** | Ejecución directa del AST |
 | **Compilación nativa** | AST → LLVM IR → binario nativo vía clang o llc+cc |
 | **Optimización LLVM** | Niveles O0–O3 configurables |
 | **Lexer** | Escaneo lineal O(n), flotantes, strings con comillas simples/dobles y escapes |
 | **Parser** | Recursivo descendente, expresiones top-level directas |
-| **Suite de tests** | 828 tests de integración y unitarios |
+| **Suite de tests** | 783 tests de integración y unitarios |
 
 ### 🚧 En Progreso
 
 | Característica | Prioridad |
 |---|---|
-| Mensajes de error con número de línea y columna | Alta |
+| Arrays en modo compilado (`range` como valor, indexación y métodos) | Media |
 | Iteración con `for` sobre arrays (intérprete completo; compilado solo `range()`) | Media |
 
 ### 📅 Planificado
@@ -166,6 +167,7 @@ print(factorial(10))   // 3628800
 | Función | Descripción | Ejemplo |
 |---------|-------------|---------|
 | `print(x)` | Imprime un valor en stdout | `print("hola")` |
+| `println(x)` | Igual que `print`, con salto de línea final | `println("hola")` |
 | `len(x)` | Longitud de string, array o dígitos de un número | `len([1,2,3])` → `3` |
 | `str(x)` | Convierte cualquier valor a string | `str(3.14)` → `"3.14"` |
 | `int(x)` | Convierte a entero (trunca floats) | `int(3.9)` → `3` |
@@ -174,7 +176,7 @@ print(factorial(10))   // 3628800
 | `type(x)` | Nombre del tipo como string | `type(true)` → `"bool"` |
 | `range(n)` / `range(a, b)` | Array de enteros `[0..n-1]` o `[a..b-1]` | `range(3)` → `[0, 1, 2]` |
 
-Todos los built-ins aceptan exactamente **1 argumento** (salvo `print` y `range`, que acepta 1 o 2). Pasar un número distinto produce un error de runtime.
+`print` y `println` aceptan cualquier número de argumentos y los separan con un espacio en una sola línea. El resto de built-ins aceptan exactamente **1 argumento** (salvo `range`, que acepta 1 o 2). Pasar un número distinto produce un error de runtime.
 
 ---
 
@@ -184,7 +186,7 @@ Todos los built-ins aceptan exactamente **1 argumento** (salvo `print` y `range`
 
 - **Rust 1.70+** — [Instalar Rust](https://www.rust-lang.org/tools/install)
 - **Cargo** — incluido con Rust
-- **LLVM 21 + Clang** — *solo* necesarios para compilar a binario nativo (`halo build`)
+- **LLVM 23 + Clang** — *solo* necesarios para compilar a binario nativo (`halo build`)
 
 ### Compilar desde fuente
 
@@ -497,7 +499,6 @@ halo/
 │   │   ├── declarations.rs   # Nivel superior (funciones, variables globales)
 │   │   ├── statements.rs     # Bloques, if/while/for/return, declaraciones
 │   │   ├── expressions.rs    # Expresiones y precedencia
-│   │   ├── visitor.rs        # Patrón Visitor
 │   │   └── mod.rs
 │   ├── interpreter/
 │   │   ├── value.rs          # Enum Value (Number, Float, Bool, String, Null, Array)
@@ -520,16 +521,13 @@ halo/
 │   │   │   ├── statements/   # if, while, for, return, var-decl…
 │   │   │   ├── expressions/  # literales, binarias, llamadas, arrays…
 │   │   │   ├── builtins/     # print/str/int/abs… y strings/
-│   │   │   ├── runtime/      # Soporte de runtime en IR
 │   │   │   └── mod.rs
 │   │   ├── builder.rs        # IRBuilder y gestión de allocas
 │   │   ├── types.rs          # TypeMapper: tipos Halo → tipos LLVM
 │   │   └── mod.rs            # Compilation, OptLevel
 │   ├── diagnostics/
 │   │   ├── colors.rs         # Colores ANSI
-│   │   ├── error_codes/      # mod + mapping + descriptions + category
-│   │   ├── style_checker.rs  # Avisos de estilo
-│   │   └── mod.rs
+│   │   └── mod.rs            # Diagnostic, localización y estadísticas
 │   ├── cli/
 │   │   ├── args.rs           # Parseo de argumentos
 │   │   ├── run.rs build.rs check.rs tokens.rs ast.rs llvm.rs
@@ -545,26 +543,23 @@ halo/
 ├── tests/
 │   ├── common/
 │   │   ├── mod.rs            # Helpers compartidos (eval_*, assert_*)
+│   │   ├── cases.rs          # Corpus único de paridad + divergencias
 │   │   └── parity.rs         # Arnés diferencial intérprete vs compilado
 │   ├── arithmetic_tests.rs   # Aritmética, floats, overflow, comparaciones
 │   ├── array_functions_tests.rs     # Built-ins y métodos de arrays
 │   ├── cli_args_tests.rs     # Parseo de argumentos y toolchains
 │   ├── cli_output_tests.rs   # Salida de los subcomandos (tokens/ast/run/check)
-│   ├── compiler_output_tests.rs     # IR y binario generados
 │   ├── control_flow_tests.rs # if/else-if/else, while, for, range, break, continue, return
 │   ├── environment_tests.rs  # Scopes, shadowing, frames
-│   ├── error_codes_tests.rs  # Catálogo de códigos de error
-│   ├── evaluator_tests.rs    # Evaluador: expresiones y sentencias
 │   ├── function_tests.rs     # Definición, llamada, recursión, scope, aridad
-│   ├── interpreter_tests.rs  # Tests end-to-end del intérprete
 │   ├── lang_catalog_tests.rs # Coherencia del catálogo con ambos backends
 │   ├── lexer_tests.rs        # Tokenización
+│   ├── parity_coverage_tests.rs     # Cobertura del catálogo por el corpus
 │   ├── parity_freeze_tests.rs       # Corpus congelado intérprete/compilador
 │   ├── parser_tests.rs       # Análisis sintáctico y errores de parse
 │   ├── scope_and_variable_tests.rs  # Scoping, shadowing, variables globales
 │   ├── similarity_tests.rs   # Sugerencias de similitud
 │   ├── string_and_types_tests.rs    # Strings, built-ins, conversiones
-│   ├── style_checker_tests.rs       # Avisos de estilo
 │   └── value_tests.rs        # Semántica del enum Value
 │
 ├── examples/
@@ -694,10 +689,11 @@ cargo test --test scope_and_variable_tests
 cargo test --test string_and_types_tests
 cargo test --test lexer_tests
 cargo test --test parser_tests
-cargo test --test interpreter_tests
 
-# Paridad intérprete ↔ compilador (corpus congelado + CLI)
+# Paridad intérprete ↔ compilador (corpus congelado + cobertura + CLI)
 cargo test --test parity_freeze_tests
+cargo test --test parity_coverage_tests
+cargo test --test lang_catalog_tests
 cargo test --test cli_output_tests
 
 # Un test específico por nombre
@@ -756,7 +752,7 @@ cargo tarpaulin --out Html
 - [x] CLI unificada con subcomandos `run`, `build`, `check`, `tokens`, `ast`, `llvm`
 - [x] Toolchain doble: `clang` y `llc+cc`
 - [x] Niveles de optimización O0–O3
-- [x] Suite de +500 tests de integración
+- [x] Suite de +700 tests de integración
 
 ### ✅ v0.3.0 — Estructuras de Datos
 

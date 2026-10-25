@@ -38,7 +38,6 @@ pub fn emit_function_call<'ctx>(
             let i64_ty = gen.type_mapper.i64_type();
             let ptr_int = gen
                 .builder
-                .builder
                 .build_ptr_to_int(val.into_pointer_value(), i64_ty, "arg.ptr2int")
                 .map_err(|_| "Failed to convert string arg to int")?;
             call_args.push(ptr_int.into());
@@ -49,7 +48,6 @@ pub fn emit_function_call<'ctx>(
     }
 
     let call_site = gen
-        .builder
         .builder
         .build_call(function, &call_args, "call")
         .map_err(|_| format!("Failed to call '{}'", name))?;

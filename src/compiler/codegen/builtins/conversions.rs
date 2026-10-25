@@ -9,14 +9,15 @@
 use crate::compiler::codegen::emitter::Emitter;
 use crate::compiler::codegen::expressions;
 use crate::compiler::codegen::generator::CodeGenerator;
+use crate::lang::format;
 use crate::parser::ast::Expression;
 use inkwell::values::BasicValueEnum;
 
 /// `str(value)` — convert the value to its string representation.
 ///
 /// Supports:
-/// - integers (constants only, otherwise returns a runtime integer)
-/// - floats  (constant values are formatted at compile-time)
+/// - integers and floats (constants are formatted at compile time; variables
+///   use the libc runtime helpers)
 /// - bools   (returns "true" or "false")
 /// - strings (pass-through)
 pub fn emit_str<'ctx>(
@@ -31,40 +32,60 @@ pub fn emit_str<'ctx>(
     }
     let val = expressions::emit_expression(gen, &args[0])?;
 
+    // Booleans may be i1 (literals/comparisons/returns) or i64 when loaded
+    // from a variable slot. In both cases render `true`/`false`.
+    let bool_value = if val.is_int_value() && val.into_int_value().get_type().get_bit_width() == 1 {
+        Some(val.into_int_value())
+    } else if let Expression::Var(name, _) = &args[0] {
+        if gen.is_bool_var(name) {
+            Some(gen.coerce_to_bool(val)?)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    if let Some(cond) = bool_value {
+        return Ok(Emitter::bool_string(gen, cond)?.into());
+    }
+
     if val.is_pointer_value() {
         // Already a string — pass through.
         return Ok(val);
     }
 
-    // Try to format the value at compile-time.
     if val.is_int_value() {
         let iv = val.into_int_value();
         if iv.is_const() {
-            let v = iv.get_zero_extended_constant().unwrap_or(0);
-            return Ok(
-                Emitter::get_or_create_string(gen, &v.to_string(), "str.lit.int")
-                    .as_pointer_value()
-                    .into(),
-            );
+            // Use sign extension so negative literals keep their sign instead
+            // of being rendered as huge unsigned values.
+            let v = iv.get_sign_extended_constant().unwrap_or(0);
+            return Ok(Emitter::get_or_create_string(
+                gen,
+                &format::format_number(v),
+                "str.lit.int",
+            )
+            .as_pointer_value()
+            .into());
         }
+        return Ok(Emitter::format_int(gen, iv)?.into());
     }
 
     if val.is_float_value() {
         let fv = val.into_float_value();
         if let Some((c, _lossless)) = fv.get_constant() {
-            // Use a 6-digit representation.
-            let s = format!("{:.6}", c);
-            let trimmed = s.trim_end_matches('0').trim_end_matches('.').to_string();
-            return Ok(
-                Emitter::get_or_create_string(gen, &trimmed, "str.lit.float")
-                    .as_pointer_value()
-                    .into(),
-            );
+            return Ok(Emitter::get_or_create_string(
+                gen,
+                &format::format_float(c),
+                "str.lit.float",
+            )
+            .as_pointer_value()
+            .into());
         }
+        return Ok(Emitter::format_float(gen, fv)?.into());
     }
 
-    // Fallback: we don't have sprintf at hand, so we cannot produce a real
-    // string at runtime. Return a placeholder so the program still links.
+    // Fallback: arrays/null are not represented in native compilation yet.
     Ok(Emitter::get_or_create_string(gen, "?", "str.lit.unknown")
         .as_pointer_value()
         .into())
@@ -86,15 +107,30 @@ pub fn emit_int<'ctx>(
         let fv = val.into_float_value();
         return gen
             .builder
-            .builder
             .build_float_to_signed_int(fv, gen.type_mapper.i64_type(), "f2i")
             .map(|v| v.into())
             .map_err(|_| "Failed to convert float to int".to_string());
     }
     if val.is_pointer_value() {
-        return Err(
-            "int() conversion from strings is not yet supported in native compilation".to_string(),
-        );
+        let strtoll = gen
+            .module
+            .get_function("strtoll")
+            .ok_or("strtoll not declared")?;
+        let null = gen.type_mapper.ptr_type().const_null();
+        let parsed = match gen
+            .builder
+            .build_call(
+                strtoll,
+                &[val.into_pointer_value().into(), null.into()],
+                "strtoll",
+            )
+            .map_err(|_| "Failed to call strtoll")?
+            .try_as_basic_value()
+        {
+            inkwell::values::ValueKind::Basic(v) => v.into_int_value(),
+            _ => return Err("strtoll returned an instruction".to_string()),
+        };
+        return Ok(parsed.into());
     }
     Ok(Emitter::widen_to_i64(gen, val)?.into())
 }
@@ -112,10 +148,25 @@ pub fn emit_float<'ctx>(
     }
     let val = expressions::emit_expression(gen, &args[0])?;
     if val.is_pointer_value() {
-        return Err(
-            "float() conversion from strings is not yet supported in native compilation"
-                .to_string(),
-        );
+        let strtod = gen
+            .module
+            .get_function("strtod")
+            .ok_or("strtod not declared")?;
+        let null = gen.type_mapper.ptr_type().const_null();
+        let parsed = match gen
+            .builder
+            .build_call(
+                strtod,
+                &[val.into_pointer_value().into(), null.into()],
+                "strtod",
+            )
+            .map_err(|_| "Failed to call strtod")?
+            .try_as_basic_value()
+        {
+            inkwell::values::ValueKind::Basic(v) => v.into_float_value(),
+            _ => return Err("strtod returned an instruction".to_string()),
+        };
+        return Ok(parsed.into());
     }
     Ok(Emitter::promote_to_f64(gen, val)?.into())
 }
@@ -164,7 +215,7 @@ pub fn emit_len<'ctx>(
     }
     let val = expressions::emit_expression(gen, &args[0])?;
     if val.is_pointer_value() {
-        let b = &gen.builder.builder;
+        let b = &gen.builder;
         let strlen_fn = gen
             .module
             .get_function("strlen")
@@ -185,7 +236,7 @@ pub fn emit_len<'ctx>(
     if val.is_int_value() {
         let iv = val.into_int_value();
         if iv.is_const() {
-            let v = iv.get_zero_extended_constant().unwrap_or(0);
+            let v = iv.get_sign_extended_constant().unwrap_or(0);
             return Ok(gen
                 .type_mapper
                 .i64_type()

@@ -25,7 +25,6 @@ fn as_pointer<'ctx>(
     let ptr_ty = gen.type_mapper.ptr_type();
     let iv = Emitter::widen_to_i64(gen, val)?;
     gen.builder
-        .builder
         .build_int_to_ptr(iv, ptr_ty, name)
         .map_err(|_| format!("as_pointer: int_to_ptr failed for {}", name))
 }
@@ -39,6 +38,27 @@ pub fn emit_binop<'ctx>(
 ) -> Result<BasicValueEnum<'ctx>, String> {
     let lv = super::emit_expression(gen, left_expr)?;
     let rv = super::emit_expression(gen, right_expr)?;
+
+    // Equality between values of different runtime categories is always
+    // false in the interpreter (e.g. `1 == "1"` and `true == 1`). The
+    // compiled backend would otherwise reuse strcmp/intcmp on mismatched
+    // representations.
+    if matches!(op, BinOp::Eq | BinOp::Neq) {
+        let mixed_pointer = (lv.is_pointer_value() || rv.is_pointer_value())
+            && !(lv.is_pointer_value() && rv.is_pointer_value());
+        let mixed_bool = lv.is_int_value()
+            && rv.is_int_value()
+            && (lv.into_int_value().get_type().get_bit_width() == 1)
+                != (rv.into_int_value().get_type().get_bit_width() == 1);
+        if mixed_pointer || mixed_bool {
+            let result = matches!(op, BinOp::Neq);
+            return Ok(gen
+                .type_mapper
+                .i1_type()
+                .const_int(result as u64, false)
+                .into());
+        }
+    }
 
     // String operations: `+` (concatenation), `*` (repetition),
     // and `==` / `!=` (comparison via strcmp).
@@ -69,8 +89,8 @@ fn emit_string_concat<'ctx>(
     left: BasicValueEnum<'ctx>,
     right: BasicValueEnum<'ctx>,
 ) -> Result<BasicValueEnum<'ctx>, String> {
-    let left_ptr = as_pointer(gen, left, "strcat.left")?;
-    let right_ptr = as_pointer(gen, right, "strcat.right")?;
+    let left_ptr = Emitter::value_to_string(gen, left)?;
+    let right_ptr = Emitter::value_to_string(gen, right)?;
 
     let strlen_fn = gen
         .module
@@ -89,7 +109,7 @@ fn emit_string_concat<'ctx>(
         .get_function("strcat")
         .ok_or("strcat not declared")?;
 
-    let b = &gen.builder.builder;
+    let b = &gen.builder;
     let i64_type = gen.type_mapper.i64_type();
     let i8_ptr = gen
         .type_mapper
@@ -173,7 +193,7 @@ fn emit_string_repeat<'ctx>(
         .get_function("strcat")
         .ok_or("strcat not declared")?;
 
-    let b = &gen.builder.builder;
+    let b = &gen.builder;
     let i64_type = gen.type_mapper.i64_type();
     let i8_ptr = gen
         .type_mapper
@@ -292,8 +312,7 @@ fn emit_string_compare<'ctx>(
         })
         .ok_or("strcmp not declared")?;
 
-    let b = &gen.builder.builder;
-    let i64_type = gen.type_mapper.i64_type();
+    let b = &gen.builder;
     let i32_type = gen.type_mapper.i32_type();
 
     let cs = b
@@ -308,9 +327,7 @@ fn emit_string_compare<'ctx>(
     let cmp = b
         .build_int_compare(pred, result, zero, "strcmp.pred")
         .map_err(|_| "strcmp comparison failed")?;
-    Ok(b.build_int_z_extend(cmp, i64_type, "strcmp.ext")
-        .map_err(|_| "strcmp extend failed")?
-        .into())
+    Ok(cmp.into())
 }
 
 /// Emit integer binary operations
@@ -323,7 +340,20 @@ fn emit_int_binop<'ctx>(
     // Widen both operands to i64 so bit-widths always match.
     let lv = Emitter::widen_to_i64(gen, left)?;
     let rv = Emitter::widen_to_i64(gen, right)?;
-    let b = &gen.builder.builder;
+
+    // Logical operators yield an i1 so `print` can render true/false.
+    if matches!(op, BinOp::And | BinOp::Or) {
+        let lb = gen.coerce_to_bool(lv.into())?;
+        let rb = gen.coerce_to_bool(rv.into())?;
+        let result = match op {
+            BinOp::And => gen.builder.build_and(lb, rb, "and"),
+            _ => gen.builder.build_or(lb, rb, "or"),
+        }
+        .map_err(|_| "logical op")?;
+        return Ok(result.into());
+    }
+
+    let b = &gen.builder;
 
     match op {
         BinOp::Add => Ok(b.build_int_add(lv, rv, "add").map_err(|_| "add")?.into()),
@@ -376,7 +406,7 @@ fn emit_float_binop<'ctx>(
     // Promote both operands to f64.
     let lv = Emitter::promote_to_f64(gen, left)?;
     let rv = Emitter::promote_to_f64(gen, right)?;
-    let b = &gen.builder.builder;
+    let b = &gen.builder;
 
     match op {
         BinOp::Add => Ok(b

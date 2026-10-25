@@ -6,13 +6,13 @@
 
 use inkwell::builder::Builder;
 use inkwell::context::Context;
-use inkwell::module::Module;
 use inkwell::types::BasicTypeEnum;
-use inkwell::values::{FunctionValue, PointerValue};
-use std::collections::HashMap;
+use inkwell::values::PointerValue;
+use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 
 /// A variable slot: the alloca pointer plus the LLVM type it holds.
-/// LLVM 21 uses opaque pointers, so we store the type explicitly.
+/// LLVM 23 uses opaque pointers, so we store the type explicitly.
 #[derive(Clone, Copy)]
 pub struct VarSlot<'ctx> {
     pub ptr: PointerValue<'ctx>,
@@ -20,28 +20,39 @@ pub struct VarSlot<'ctx> {
 }
 
 pub struct IRBuilder<'ctx> {
-    pub builder: Builder<'ctx>,
+    builder: Builder<'ctx>,
     /// Maps variable names to their alloca'd stack slots.
     allocas: HashMap<String, VarSlot<'ctx>>,
-    current_function: Option<FunctionValue<'ctx>>,
+    /// Names of local variables whose source-level type is `bool`.
+    ///
+    /// Booleans are stored as i64 for uniform arithmetic, so this metadata is
+    /// needed to print and stringify them as `true`/`false` instead of 1/0.
+    bool_locals: HashSet<String>,
+}
+
+impl<'ctx> Deref for IRBuilder<'ctx> {
+    type Target = Builder<'ctx>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.builder
+    }
 }
 
 impl<'ctx> IRBuilder<'ctx> {
     /// Create a new IRBuilder bound to the given context.
-    pub fn new(context: &'ctx Context, _module: &'ctx Module<'ctx>) -> Self {
+    pub fn new(context: &'ctx Context) -> Self {
         IRBuilder {
             builder: context.create_builder(),
             allocas: HashMap::new(),
-            current_function: None,
+            bool_locals: HashSet::new(),
         }
     }
 
     /// Reset scope when entering a new function.
-    pub fn set_function(&mut self, function: FunctionValue<'ctx>) {
-        self.current_function = Some(function);
+    pub fn reset_scope(&mut self) {
         self.allocas.clear();
+        self.bool_locals.clear();
     }
-
 
     /// Register an alloca slot for a named variable.
     /// `ty` is the type of the value stored in the slot (the pointee type).
@@ -61,7 +72,21 @@ impl<'ctx> IRBuilder<'ctx> {
     /// it meant before (or to nothing at all).
     pub fn remove_slot(&mut self, name: &str) {
         self.allocas.remove(name);
+        self.bool_locals.remove(name);
     }
 
+    /// Record that `name` holds a source-level boolean.
+    pub fn mark_bool(&mut self, name: &str) {
+        self.bool_locals.insert(name.to_string());
+    }
 
+    /// Record that `name` no longer holds a source-level boolean.
+    pub fn unmark_bool(&mut self, name: &str) {
+        self.bool_locals.remove(name);
+    }
+
+    /// Whether `name` is a local variable with boolean source semantics.
+    pub fn is_bool_local(&self, name: &str) -> bool {
+        self.bool_locals.contains(name)
+    }
 }

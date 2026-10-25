@@ -12,6 +12,7 @@ pub use codegen::CodeGenerator;
 
 use inkwell::context::Context;
 use inkwell::module::Module;
+use inkwell::targets::TargetMachine;
 
 /// Optimisation level passed to LLVM passes and clang.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -46,9 +47,11 @@ impl OptLevel {
 // ─────────────────────────────────────────────────────────────────────────────
 // Compilation
 //
-// Owns the LLVM Context and Module for the lifetime of a single compilation.
-// This avoids the need for Box::leak in callers: create a Compilation, borrow
-// a CodeGenerator from it, compile, then let the Compilation drop cleanly.
+// Owns the LLVM Context, Module and CodeGenerator for the lifetime of a single
+// compilation. The context and module live in boxes so their addresses stay
+// stable when `Compilation` is moved; that is what makes the internal
+// `'static` borrows sound. The generator is the first field so it is dropped
+// before the module and the context it borrows from.
 //
 // Usage:
 //
@@ -58,10 +61,11 @@ impl OptLevel {
 //
 // ─────────────────────────────────────────────────────────────────────────────
 pub struct Compilation {
-    /// SAFETY: `module` borrows from `context`, so it must be dropped first.
-    /// Field declaration order guarantees this in Rust (fields are dropped
-    /// in declaration order, reversed).
-    module: Option<Module<'static>>,
+    generator: CodeGenerator<'static>,
+    module: Box<Module<'static>>,
+    // Declared last: dropped after the generator and the module. The field is
+    // never read directly; it owns the context the generator borrows from.
+    #[allow(dead_code)]
     context: Box<Context>,
 }
 
@@ -69,44 +73,48 @@ impl Compilation {
     /// Create a new compilation unit with the given module name.
     pub fn new(module_name: &str) -> Self {
         let context = Box::new(Context::create());
+        // SAFETY: `context` is boxed, so its address is stable even after the
+        // `Box` is moved into `Compilation`. The context outlives every value
+        // that borrows from it (drop order: generator, module, context).
         let ctx_ref: &'static Context = unsafe { &*(&*context as *const Context) };
-        let module = ctx_ref.create_module(module_name);
+
+        let module = Box::new(ctx_ref.create_module(module_name));
+        // Pin the module to the host triple. Without this, LLVM emits its own
+        // default triple and clang warns while linking because it has to
+        // override it with the host triple.
+        module.set_triple(&TargetMachine::get_default_triple());
+        // SAFETY: `module` is boxed for the same reason as the context. It is
+        // declared before the context, so it is dropped before the context.
+        let mod_ref: &'static Module<'static> = unsafe { &*(&*module as *const Module<'static>) };
+
+        let generator = CodeGenerator::new(ctx_ref, mod_ref);
+
         Compilation {
-            module: Some(module),
+            generator,
+            module,
             context,
         }
     }
 
-    /// Borrow a `CodeGenerator` tied to this compilation's context and module.
-    pub fn codegen(&mut self) -> CodeGenerator<'static> {
-        let ctx_ref: &'static Context = unsafe { &*(&*self.context as *const Context) };
-        let mod_ref: &'static Module<'static> =
-            unsafe { &*(self.module.as_ref().unwrap() as *const Module<'static>) };
-        CodeGenerator::new(ctx_ref, mod_ref)
+    /// Borrow the `CodeGenerator` tied to this compilation's context and module.
+    ///
+    /// The returned reference borrows `self`, so it cannot outlive the
+    /// `Compilation` even though the generator itself carries a `'static`
+    /// lifetime internally.
+    pub fn codegen(&mut self) -> &mut CodeGenerator<'static> {
+        &mut self.generator
     }
 
     /// Run LLVM optimisation passes on the module at the given level.
-    /// Call this after `codegen().compile(...)` and before `emit_llvm` / `emit_object`.
+    /// Call this after `codegen().compile(...)` and before `emit_llvm`.
     pub fn optimise(&mut self, level: OptLevel) -> Result<(), String> {
-        self.codegen().optimise(level.as_u32())
+        self.generator.optimise(level.as_u32())
     }
 
     /// Write the compiled LLVM IR to a `.ll` file.
     pub fn emit_llvm(&self, filename: &str) -> Result<(), String> {
         self.module
-            .as_ref()
-            .unwrap()
             .print_to_file(filename)
-            .map_err(|e| format!("Failed to write LLVM IR: {}", e))
-    }
-
-
-}
-
-impl Drop for Compilation {
-    fn drop(&mut self) {
-        // Drop the module explicitly before the context is freed.
-        drop(self.module.take());
-        // `self.context` is dropped automatically after this.
+            .map_err(|e| format!("Failed to write LLVM IR: {e}"))
     }
 }

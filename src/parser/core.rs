@@ -6,6 +6,25 @@
 
 use crate::lexer::{Token, TokenKind};
 use crate::parser::ast::Program;
+use std::fmt;
+
+/// A syntax error with the source position where it was detected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseError {
+    pub line: u32,
+    pub column: u32,
+    pub message: String,
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Error at {}:{}: {}",
+            self.line, self.column, self.message
+        )
+    }
+}
 
 /// Recursive-descent parser that converts a flat token stream into a typed
 /// [`Program`] AST.
@@ -23,7 +42,7 @@ pub struct Parser {
     /// Index of the token that will be returned by the next call to [`peek`].
     pub(crate) cursor: usize,
     /// Syntax errors accumulated during parsing.
-    pub(crate) errors: Vec<String>,
+    pub(crate) errors: Vec<ParseError>,
 }
 
 impl Parser {
@@ -39,8 +58,8 @@ impl Parser {
     /// Parse the full token stream into a [`Program`].
     ///
     /// Returns `Ok(program)` when no syntax errors were encountered, or
-    /// `Err(errors)` with a list of human-readable messages otherwise.
-    pub fn parse(&mut self) -> Result<Program, Vec<String>> {
+    /// `Err(errors)` with the structured syntax errors otherwise.
+    pub fn parse(&mut self) -> Result<Program, Vec<ParseError>> {
         let program = self.parse_program();
         if self.errors.is_empty() {
             Ok(program)
@@ -122,9 +141,10 @@ impl Parser {
 
     pub(crate) fn error(&mut self, message: &str) {
         let tok = self.peek();
-        self.errors.push(format!(
-            "Error at {}:{}: {}",
-            tok.position.line, tok.position.column, message
-        ));
+        self.errors.push(ParseError {
+            line: tok.position.line,
+            column: tok.position.column,
+            message: message.to_string(),
+        });
     }
 }

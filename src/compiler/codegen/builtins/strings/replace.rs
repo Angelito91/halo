@@ -41,7 +41,7 @@ pub fn emit_replace<'ctx>(
         .map_err(|_| "cmp")?;
     let nb = gen.context.append_basic_block(cf, "rep.nb");
     let cb = gen.context.append_basic_block(cf, "rep.cb");
-    let ac = gen.context.append_basic_block(cf, "rep.ac");
+    let done = gen.context.append_basic_block(cf, "rep.done");
     b!(gen)
         .build_conditional_branch(old_empty, nb, cb)
         .map_err(|_| "branch")?;
@@ -58,7 +58,7 @@ pub fn emit_replace<'ctx>(
         .map_err(|_| "strcpy")?;
     b!(gen).build_store(rs, dup).map_err(|_| "store")?;
     b!(gen)
-        .build_unconditional_branch(ac)
+        .build_unconditional_branch(done)
         .map_err(|_| "branch")?;
 
     b!(gen).position_at_end(cb);
@@ -134,7 +134,6 @@ pub fn emit_replace<'ctx>(
     let bc = gen.context.append_basic_block(cf, "rep.bc");
     let bf = gen.context.append_basic_block(cf, "rep.bf");
     let bcopy = gen.context.append_basic_block(cf, "rep.bcopy");
-    let bdone = gen.context.append_basic_block(cf, "rep.bdone");
     b!(gen)
         .build_unconditional_branch(bc)
         .map_err(|_| "branch")?;
@@ -231,10 +230,10 @@ pub fn emit_replace<'ctx>(
         .build_store(fn2, i8_ty.const_zero())
         .map_err(|_| "null")?;
     b!(gen)
-        .build_unconditional_branch(bdone)
+        .build_unconditional_branch(done)
         .map_err(|_| "branch")?;
 
-    b!(gen).position_at_end(bdone);
+    b!(gen).position_at_end(done);
     let fr = b!(gen)
         .build_load(ptr_ty, rs, "rep.fr")
         .map_err(|_| "load")?;

@@ -11,8 +11,8 @@ use crate::lexer::{Lexer, TokenKind};
 use crate::parser::Parser;
 use crate::utils::{BANNER, VERSION};
 use std::fs;
-use std::process;
 use std::path::Path;
+use std::process;
 
 pub fn print_version() {
     println!("{BANNER} v{VERSION}");
@@ -136,32 +136,13 @@ pub fn parse_tokens(
 ) -> Result<crate::parser::ast::Program, Vec<Diagnostic>> {
     match Parser::new(tokens).parse() {
         Ok(program) => Ok(program),
-        Err(error_strings) => {
-            let diagnostics = error_strings
-                .iter()
-                .map(|err| {
-                    if let Some(at_idx) = err.find("at ") {
-                        let rest = &err[at_idx + 3..];
-                        let parts: Vec<&str> = rest.split(':').collect();
-
-                        if parts.len() >= 3 {
-                            if let (Ok(line_num), Ok(col_num)) = (
-                                parts[0].trim().parse::<u32>(),
-                                parts[1].trim().parse::<u32>(),
-                            ) {
-                                let location =
-                                    location_from_source(file, source, line_num, col_num, 1);
-                                let message = parts[2..].join(":").trim().to_string();
-                                return Diagnostic::error(message).with_location(location);
-                            }
-                        }
-                    }
-
-                    Diagnostic::error(err)
-                })
-                .collect();
-            Err(diagnostics)
-        }
+        Err(errors) => Err(errors
+            .into_iter()
+            .map(|error| {
+                let location = location_from_source(file, source, error.line, error.column, 1);
+                Diagnostic::error(error.message).with_location(location)
+            })
+            .collect()),
     }
 }
 

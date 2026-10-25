@@ -13,11 +13,6 @@ use crate::parser::ast::Expression;
 use crate::utils::find_suggestions_smart;
 
 impl Evaluator {
-    /// Get the current call stack as a vector of function names
-    pub fn get_call_stack(&self) -> Vec<String> {
-        self.call_stack.clone()
-    }
-
     /// Format call stack as a readable string for error reporting
     pub fn format_call_stack(&self) -> String {
         if self.call_stack.is_empty() {
@@ -37,7 +32,7 @@ impl Evaluator {
 
         let suggestions = find_suggestions_smart(name, &candidates, 3);
 
-        let mut message = format!("Undefined function: '{name}'");
+        let mut message = format!("{} '{name}'", crate::lang::errors::UNDEFINED_FUNCTION);
         if !suggestions.is_empty() {
             message.push_str("\n\n  Did you mean:");
             for (i, suggestion) in suggestions.iter().enumerate() {

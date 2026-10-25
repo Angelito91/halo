@@ -1,215 +1,79 @@
-# Refactorización: Reducción de Duplicación en String Methods
+# Refactorización del intérprete: métodos value-level
 
-## 📊 Resumen Ejecutivo
+## Estado actual
 
-Se ha refactorizado exitosamente `src/interpreter/evaluator/methods.rs` para reducir la duplicación de código en los métodos string. La refactorización mantiene la funcionalidad idéntica mientras mejora significativamente la mantenibilidad y reduce aproximadamente **~250 líneas de código duplicado**.
+El intérprete ya no convierte valores (`Value`) de vuelta a expresiones
+(`Expression`) para reutilizar built-ins. Los métodos de string y array
+comparten funciones **value-level** en:
 
-> **Nota (R0):** ese archivo ya no existe como tal. Ahora es el directorio
-> `src/interpreter/evaluator/methods/` (`mod.rs`, `strings.rs`, `arrays.rs`);
-> los helpers descritos aquí viven en `methods/strings.rs`.
+- `src/interpreter/evaluator/methods/strings.rs`
+- `src/interpreter/evaluator/methods/arrays.rs`
+- `src/interpreter/evaluator/methods/mod.rs` (dispatcher)
 
-## ✅ Logros
+Cada built-in evalúa sus argumentos y delega en la operación value-level:
 
-- ✓ Código compila sin errores
-- ✓ Todos los tests pasan
-- ✓ Reducción significativa de duplicación (~250 líneas)
-- ✓ Mejor mantenibilidad y claridad
-- ✓ Cambios no rompieron funcionalidad existente
-
-## 🔧 Cambios Realizados
-
-### 1. **Funciones Helper Generales**
-
-Se crearon 4 funciones helper reutilizables:
-
-#### a) `extract_string(value, method_name, arg_pos)`
-Extrae un valor String con manejo de errores uniforme:
-```rust
-fn extract_string(value: Value, method_name: &str, arg_pos: usize) -> Result<String, String>
-```
-
-#### b) `extract_number(value, method_name, arg_pos)`
-Extrae un valor Number con manejo de errores uniforme:
-```rust
-fn extract_number(value: Value, method_name: &str, arg_pos: usize) -> Result<i64, String>
-```
-
-#### c) `apply_string_transformer(evaluator, args, method_name, expected_args, transformer)`
-Para métodos que transforman strings (upper, lower, trim):
-```rust
-fn apply_string_transformer<F>(
-    evaluator: &mut Evaluator,
-    args: &[Expression],
-    method_name: &str,
-    expected_args: usize,
-    transformer: F,
-) -> Result<Value, String>
-where
-    F: Fn(&str) -> String,
-```
-
-#### d) `apply_string_predicate(evaluator, args, method_name, predicate)`
-Para métodos que retornan booleanos (starts_with, ends_with):
-```rust
-fn apply_string_predicate<F>(
-    evaluator: &mut Evaluator,
-    args: &[Expression],
-    method_name: &str,
-    predicate: F,
-) -> Result<Value, String>
-where
-    F: Fn(&str, &str) -> bool,
-```
-
-#### e) `apply_multi_string_transformer(evaluator, args, method_name, expected_args, transformer)`
-Para métodos con múltiples argumentos strings (replace):
-```rust
-fn apply_multi_string_transformer<F>(
-    evaluator: &mut Evaluator,
-    args: &[Expression],
-    method_name: &str,
-    expected_args: usize,
-    transformer: F,
-) -> Result<Value, String>
-where
-    F: Fn(&[String]) -> String,
-```
-
-#### f) `build_string_call_args(object, args)`
-Simplifica la construcción de argumentos en `try_eval_method_call`:
-```rust
-fn build_string_call_args(object: &Value, args: &[Expression]) -> Vec<Expression>
-```
-
-### 2. **Métodos Refactorizados**
-
-#### Antes (Ejemplo: `builtin_upper`)
 ```rust
 pub fn builtin_upper(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
     if args.len() != 1 {
-        return Err(format!(
-            "upper() expects exactly 1 argument, got {}",
-            args.len()
-        ));
+        return Err(format!("upper() expects exactly 1 argument, got {}", args.len()));
     }
-    let val = evaluator.eval_expr(&args[0])?;
-
-    match val {
-        Value::String(s) => Ok(Value::String(s.to_uppercase())),
-        other => Err(format!(
-            "upper() expects a string, got '{}'",
-            other.type_name()
-        )),
-    }
+    upper_value(evaluator.eval_expr(&args[0])?)
 }
 ```
-**~18 líneas**
 
-#### Después
+El dispatcher de métodos hace lo mismo sin fabricar un AST sintético:
+
 ```rust
-pub fn builtin_upper(evaluator: &mut Evaluator, args: &[Expression]) -> Result<Value, String> {
-    apply_string_transformer(evaluator, args, "upper", 1, |s| s.to_uppercase())
-}
-```
-**1 línea**
-
-### 3. **Métodos Simplificados**
-
-| Método | Antes | Después | Reducción |
-|--------|-------|---------|-----------|
-| `builtin_upper` | 18 líneas | 1 línea | -17 líneas |
-| `builtin_lower` | 18 líneas | 1 línea | -17 líneas |
-| `builtin_trim` | 18 líneas | 1 línea | -17 líneas |
-| `builtin_starts_with` | 40 líneas | 3 líneas | -37 líneas |
-| `builtin_ends_with` | 40 líneas | 3 líneas | -37 líneas |
-| `builtin_replace` | 47 líneas | 3 líneas | -44 líneas |
-| `builtin_substr` | 68 líneas | 35 líneas | -33 líneas |
-
-### 4. **Simplificación en `try_eval_method_call`**
-
-Cada método string en `try_eval_method_call` se simplificó usando `build_string_call_args`:
-
-#### Antes (Ejemplo)
-```rust
-(Value::String(_), "upper") => {
-    if !args.is_empty() {
-        return Err(format!(
-            "String method upper() expects 0 arguments, got {}",
-            args.len()
-        ));
-    }
-    let mut call_args = vec![Expression::StringLiteral(
-        object.to_string_value(),
-        crate::parser::ast::Position { line: 0, column: 0 },
-    )];
-    for arg in args {
-        call_args.push(arg.clone());
-    }
-    builtin_upper(evaluator, &call_args)
+(Value::String(s), "upper") => {
+    if !args.is_empty() { /* error de aridad */ }
+    upper_value(Value::String(s.clone()))
 }
 ```
 
-#### Después
-```rust
-(Value::String(_), "upper") => {
-    if !args.is_empty() {
-        return Err(format!(
-            "String method upper() expects 0 arguments, got {}",
-            args.len()
-        ));
-    }
-    builtin_upper(evaluator, &build_string_call_args(object, args))
-}
-```
+Se eliminaron `value_to_expression` y `build_string_call_args`. Esto también
+eliminó el `Expression::StringLiteral` con `Position { line: 0, column: 0 }`
+que se usaba como puente.
 
-## 📈 Impacto
+## Cambios relacionados
 
-- **Líneas eliminadas**: ~250 líneas de código duplicado
-- **Líneas agregadas**: ~100 líneas (funciones helper reutilizables)
-- **Neto**: ~150 líneas de reducción neta
-- **Mejora de mantenibilidad**: Cambios futuros en validación solo requieren actualizar helpers
-- **Consistencia**: Mensajes de error ahora uniformes en todos los métodos
+- `IRBuilder` encapsula su `Builder` de inkwell: el campo es privado y el
+  wrapper implementa `Deref<Target = Builder>` para emitir instrucciones.
+- `Compilation` fija el **target triple** del host al crear el módulo y
+  `CodeGenerator::optimise` fija el **data layout** del `TargetMachine`.
+- `Parser::parse()` devuelve `Result<Program, Vec<ParseError>>`; ya no existe
+  `parse_diagnostics`.
+- El backend compilado trackea variables booleanas (`bool_locals` /
+  `bool_globals`) para imprimir y convertir `true`/`false` en vez de `1`/`0`.
+- `print` y `println` tienen la misma semántica en ambos backends: todos los
+  argumentos en una línea, separados por espacios, con un newline final.
+- Los errores de runtime del intérprete se anotan con línea y columna de la
+  sentencia que falló.
 
-## 🧪 Verificación
+## Paridad intérprete ↔ compilado
 
-Estado en el momento del cambio:
+El corpus vive en `tests/common/cases.rs` y el arnés en
+`tests/common/parity.rs`. Estado actual:
+
+- **111 casos** de paridad.
+- **30 divergencias declaradas**: arrays/`range` como valor (P3), errores de
+  runtime detectados en compilación (P2) y el retorno vacío (P1).
+- Las divergencias P1 de formato (`bool`, floats, `str` runtime, `int(string)`,
+  `float(string)`, `print` multiargumento, predicados de string) están
+  cerradas.
+
+## Verificación
+
+Estado del árbol: **783 tests definidos**. El agente no ejecutó la suite
+completa; la validación estática usada fue:
 
 ```bash
-$ cargo check
-✓ Compila sin errores
-
-$ cargo test --lib
-✓ Los tests unitarios pasaban
-
-$ cargo build
-✓ Build exitoso sin errores
+cargo check --all-targets --offline --jobs 1
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features --jobs 1 -- -D warnings
 ```
 
-Tras el refactor R0 la verificación es la suite completa:
+Para ejecutar la suite completa:
 
 ```bash
-$ cargo test
-✓ 829 tests, 0 fallos
+nice -n 19 cargo test --jobs 1 -- --test-threads=1
 ```
-
-## 🎯 Beneficios
-
-1. **DRY (Don't Repeat Yourself)**: Se eliminó la duplicación de patrones comunes
-2. **Mantenibilidad**: Cambios en validación de argumentos se hacen una sola vez
-3. **Consistencia**: Mensajes de error ahora uniformes
-4. **Extensibilidad**: Agregar nuevos métodos string es más simple
-5. **Legibilidad**: El código de cada método es más conciso y fácil de entender
-6. **Testabilidad**: Los helpers pueden ser testeados independientemente (si es necesario)
-
-## 📝 Notas Técnicas
-
-- Se mantuvieron todos los nombres públicos de funciones
-- La funcionalidad es idéntica
-- Los tipos y signatures se mantienen iguales
-- No hay cambios en el comportamiento
-
-## 🔮 Futuras Mejoras Posibles
-
-1. Crear helpers similares para métodos de Array
-2. Agregar un sistema de registro de métodos más centralizado
-3. Automatizar la generación de mensajes de error

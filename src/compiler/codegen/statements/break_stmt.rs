@@ -14,7 +14,6 @@ pub fn emit_break<'ctx>(gen: &mut CodeGenerator<'ctx>) -> Result<bool, String> {
         .map(|(_, exit)| *exit)
         .ok_or_else(|| "`break` used outside of a loop".to_string())?;
     gen.builder
-        .builder
         .build_unconditional_branch(exit_bb)
         .map_err(|_| "Failed to build break branch")?;
     Ok(true)

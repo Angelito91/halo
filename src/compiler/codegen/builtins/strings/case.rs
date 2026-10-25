@@ -146,7 +146,6 @@ pub fn emit_lower<'ctx>(
     Ok(result.into())
 }
 
-
 pub fn emit_reverse<'ctx>(
     gen: &mut CodeGenerator<'ctx>,
     args: &[Expression],
@@ -207,4 +206,3 @@ pub fn emit_reverse<'ctx>(
     store_u8(gen, result, len, i8_ty.const_zero())?;
     Ok(result.into())
 }
-

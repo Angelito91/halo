@@ -5,12 +5,14 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::cli::args::Args;
-use crate::cli::helpers::{file_stem, parse_tokens, read_source, tokenize};
+use crate::cli::helpers::{
+    file_stem, link_with_clang, link_with_llc, parse_tokens, read_source, tokenize,
+};
 use crate::compiler::Compilation;
 use crate::diagnostics::CompilationStats;
+use crate::parser::ast::TopLevel;
 use std::fs;
 use std::process;
-use crate::cli::helpers::{link_with_clang, link_with_llc};
 
 pub fn cmd_build(args: &Args) -> i32 {
     let source = match read_source(&args.file) {
@@ -54,14 +56,13 @@ pub fn cmd_build(args: &Args) -> i32 {
     };
 
     let item_count = program.items.len();
-    let ast_node_count = program.items.len();
     let mut function_count = 0;
     let mut variable_count = 0;
 
     for item in &program.items {
         match item {
-            crate::parser::ast::TopLevel::Function { .. } => function_count += 1,
-            crate::parser::ast::TopLevel::GlobalVar { .. } => variable_count += 1,
+            TopLevel::Function { .. } => function_count += 1,
+            TopLevel::GlobalVar { .. } => variable_count += 1,
             _ => {}
         }
     }
@@ -125,7 +126,7 @@ pub fn cmd_build(args: &Args) -> i32 {
 
         let stats = CompilationStats {
             tokens: token_count,
-            ast_nodes: ast_node_count,
+            top_level_items: item_count,
             functions: function_count,
             variables: variable_count,
             lines_of_code: source.lines().count(),

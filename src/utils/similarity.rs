@@ -169,28 +169,3 @@ pub fn find_suggestions_smart(
 
     find_suggestions(typo, candidates, max_suggestions, max_distance)
 }
-
-/// Find similar identifiers with adaptive threshold
-///
-/// The threshold allows up to 30% of the string length as distance,
-/// with a minimum of 1.
-///
-/// # Arguments
-/// * `typo` - The misspelled identifier
-/// * `candidates` - List of valid identifiers to compare against
-/// * `max_suggestions` - Maximum number of suggestions to return
-///
-/// # Returns
-/// Vector of suggestions sorted by distance (closest first)
-pub fn find_suggestions_adaptive(
-    typo: &str,
-    candidates: &[&str],
-    max_suggestions: usize,
-) -> Vec<Suggestion> {
-    let typo_len = typo.len() as f64;
-
-    // Adaptive threshold: allow up to 30% of the length as distance
-    let max_distance = std::cmp::max(1, (typo_len * 0.3).ceil() as usize);
-
-    find_suggestions(typo, candidates, max_suggestions, max_distance)
-}

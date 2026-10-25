@@ -14,11 +14,3 @@ pub const VERSION: &str = "0.2.0";
 
 /// The banner text displayed in CLI output.
 pub const BANNER: &str = "🌟 Halo Programming Language";
-
-
-
-
-
-
-
-

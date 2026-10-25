@@ -46,10 +46,7 @@ pub fn emit_substr<'ctx>(
     let bl = b!(gen)
         .build_int_compare(IntPredicate::SLT, length, zero, "ss.ln")
         .map_err(|_| "cmp")?;
-    let ba = b!(gen).build_int_add(bad, bl, "ss.ba").map_err(|_| "add")?;
-    let bad_bool = b!(gen)
-        .build_int_compare(IntPredicate::NE, ba, zero, "ss.bb")
-        .map_err(|_| "cmp")?;
+    let bad_bool = b!(gen).build_or(bad, bl, "ss.bb").map_err(|_| "or")?;
 
     let errb = gen.context.append_basic_block(cf, "ss.err");
     let okb = gen.context.append_basic_block(cf, "ss.ok");
@@ -121,4 +118,3 @@ pub fn emit_substr<'ctx>(
         .map_err(|_| "load")?;
     Ok(rv)
 }
-

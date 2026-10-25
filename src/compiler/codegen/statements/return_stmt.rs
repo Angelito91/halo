@@ -24,7 +24,8 @@ pub fn emit_return<'ctx>(
                         // convert via inttoptr (hack for ptr-as-i64 params)
                         let ptr_ty = gen.type_mapper.ptr_type();
                         let iv = Emitter::widen_to_i64(gen, v)?;
-                        gen.builder.builder.build_int_to_ptr(iv, ptr_ty, "ret.ptr")
+                        gen.builder
+                            .build_int_to_ptr(iv, ptr_ty, "ret.ptr")
                             .map_err(|_| "return: int_to_ptr failed".to_string())?
                             .into()
                     }
@@ -36,16 +37,19 @@ pub fn emit_return<'ctx>(
                         Emitter::promote_to_f64(gen, v)?.into()
                     }
                 }
-                _ => {
-                    Emitter::widen_to_i64(gen, v)?.into()
-                }
+                "bool" => gen.coerce_to_bool(v)?.into(),
+                _ => Emitter::widen_to_i64(gen, v)?.into(),
             }
         }
-        None => gen.type_mapper.i64_type().const_int(0, false).into(),
+        None => match gen.fn_return_types.get(fn_name).copied().unwrap_or("i64") {
+            "string" => gen.type_mapper.ptr_type().const_null().into(),
+            "f64" => gen.type_mapper.f64_type().const_zero().into(),
+            "bool" => gen.type_mapper.i1_type().const_zero().into(),
+            _ => gen.type_mapper.i64_type().const_int(0, false).into(),
+        },
     };
 
     gen.builder
-        .builder
         .build_return(Some(&ret_val))
         .map_err(|_| "Failed to build return")?;
     Ok(true)

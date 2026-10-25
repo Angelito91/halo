@@ -1,12 +1,12 @@
 // The Halo Programming Language — module/function emission for CodeGenerator.
 
-use inkwell::module::Linkage;
-use inkwell::AddressSpace;
-use inkwell::types::BasicTypeEnum;
-use inkwell::values::{BasicValueEnum, FunctionValue};
-use crate::parser::ast::{Block, Expression, Statement};
 use super::emitter::Emitter;
 use super::generator::CodeGenerator;
+use crate::parser::ast::{Block, Expression, Statement};
+use inkwell::module::Linkage;
+use inkwell::types::BasicTypeEnum;
+use inkwell::values::{BasicValueEnum, FunctionValue};
+use inkwell::AddressSpace;
 
 impl<'ctx> CodeGenerator<'ctx> {
     // =========================================================================
@@ -21,10 +21,10 @@ impl<'ctx> CodeGenerator<'ctx> {
         let main_type = i32_ty.fn_type(&[], false);
         let main_fn = self.module.add_function("main", main_type, None);
 
-        self.builder.set_function(main_fn);
+        self.builder.reset_scope();
 
         let entry_bb = self.context.append_basic_block(main_fn, "entry");
-        self.builder.builder.position_at_end(entry_bb);
+        self.builder.position_at_end(entry_bb);
 
         // Execute every top-level statement.
         let main_name = String::from("main");
@@ -35,13 +35,11 @@ impl<'ctx> CodeGenerator<'ctx> {
         // Return 0 from main if the block has no terminator yet.
         if self
             .builder
-            .builder
             .get_insert_block()
             .and_then(|b: inkwell::basic_block::BasicBlock| b.get_terminator())
             .is_none()
         {
             self.builder
-                .builder
                 .build_return(Some(&i32_ty.const_int(0, false)))
                 .map_err(|_| "Failed to build return from main")?;
         }
@@ -93,6 +91,33 @@ impl<'ctx> CodeGenerator<'ctx> {
             self.module
                 .add_function("strcat", ty, Some(Linkage::External));
         }
+        // int snprintf(char *buf, size_t size, const char *fmt, ...)
+        if self.module.get_function("snprintf").is_none() {
+            let i32_type = self.type_mapper.i32_type();
+            let ty = i32_type.fn_type(&[i8_ptr.into(), i64_type.into(), i8_ptr.into()], true);
+            self.module
+                .add_function("snprintf", ty, Some(Linkage::External));
+        }
+        // char *strchr(const char *s, int c)
+        if self.module.get_function("strchr").is_none() {
+            let i32_type = self.type_mapper.i32_type();
+            let ty = i8_ptr.fn_type(&[i8_ptr.into(), i32_type.into()], false);
+            self.module
+                .add_function("strchr", ty, Some(Linkage::External));
+        }
+        // long long strtoll(const char *s, char **endptr, int base)
+        if self.module.get_function("strtoll").is_none() {
+            let ty = i64_type.fn_type(&[i8_ptr.into(), i8_ptr.into()], false);
+            self.module
+                .add_function("strtoll", ty, Some(Linkage::External));
+        }
+        // double strtod(const char *s, char **endptr)
+        if self.module.get_function("strtod").is_none() {
+            let f64_type = self.type_mapper.f64_type();
+            let ty = f64_type.fn_type(&[i8_ptr.into(), i8_ptr.into()], false);
+            self.module
+                .add_function("strtod", ty, Some(Linkage::External));
+        }
     }
 
     // =========================================================================
@@ -129,11 +154,11 @@ impl<'ctx> CodeGenerator<'ctx> {
             .get(name)
             .ok_or_else(|| format!("Function '{}' not declared", name))?;
 
-        self.builder.set_function(function);
+        self.builder.reset_scope();
 
         // Create the entry block and position the builder there.
         let entry_bb = self.context.append_basic_block(function, "entry");
-        self.builder.builder.position_at_end(entry_bb);
+        self.builder.position_at_end(entry_bb);
 
         // ── Allocate all parameters as mutable stack slots ──
         for (i, param_name) in params.iter().enumerate() {
@@ -150,7 +175,6 @@ impl<'ctx> CodeGenerator<'ctx> {
             // Widen boolean/narrow int params before storing.
             let to_store = self.coerce_to_storage(param_val, storage_ty)?;
             self.builder
-                .builder
                 .build_store(alloca, to_store)
                 .map_err(|_| format!("Failed to store param '{}'", param_name))?;
 
@@ -165,14 +189,18 @@ impl<'ctx> CodeGenerator<'ctx> {
         if !terminated
             && self
                 .builder
-                .builder
                 .get_insert_block()
                 .and_then(|b| b.get_terminator())
                 .is_none()
         {
-            let zero = self.type_mapper.i64_type().const_int(0, false);
+            let ret_ty = self.fn_return_types.get(name).copied().unwrap_or("i64");
+            let zero: BasicValueEnum = match ret_ty {
+                "string" => self.type_mapper.ptr_type().const_null().into(),
+                "f64" => self.type_mapper.f64_type().const_zero().into(),
+                "bool" => self.type_mapper.i1_type().const_zero().into(),
+                _ => self.type_mapper.i64_type().const_int(0, false).into(),
+            };
             self.builder
-                .builder
                 .build_return(Some(&zero))
                 .map_err(|_| format!("Failed to build implicit return in '{}'", name))?;
         }
@@ -185,7 +213,11 @@ impl<'ctx> CodeGenerator<'ctx> {
     // =========================================================================
 
     /// Generate a global with a constant-expression initializer.
-    pub(crate) fn generate_global_var(&mut self, name: &str, init: &Expression) -> Result<(), String> {
+    pub(crate) fn generate_global_var(
+        &mut self,
+        name: &str,
+        init: &Expression,
+    ) -> Result<(), String> {
         let value = self.generate_const_expr(init)?;
         let ty = self.type_mapper.storage_type_of(value);
         let to_store = self.coerce_to_storage(value, ty)?;
@@ -200,6 +232,11 @@ impl<'ctx> CodeGenerator<'ctx> {
         // but we mark them unnamed_addr so the linker can merge identical ones.
         global.set_unnamed_addr(true);
         self.globals.insert(name.to_string(), global);
+        if matches!(init, Expression::Bool(_, _)) {
+            self.bool_globals.insert(name.to_string());
+        } else {
+            self.bool_globals.remove(name);
+        }
         Ok(())
     }
 
