@@ -50,12 +50,15 @@ website/
 └── src/
     ├── assets/halo.png     # Logo/mascota
     ├── components/
-    │   ├── Hero.astro      # Hero de la portada
-    │   └── Example.astro   # Incluye archivos reales de ../examples/
+    │   ├── DownloadBinaries.astro # Tarjetas de descarga por plataforma
+    │   ├── SourceDownload.astro   # Descarga del repo y compilación
+    │   ├── Hero.astro             # Hero de la portada
+    │   └── Example.astro          # Incluye archivos reales de ../examples/
     ├── content/
     │   ├── docs/           # Páginas en Markdown/MDX
     │   └── i18n/es.json    # Textos de la interfaz
     ├── lib/
+    │   ├── releases.ts     # Tag, assets y URLs de descarga
     │   ├── site.ts         # withBase() y URLs de GitHub
     │   └── version.ts      # Lee la versión de ../Cargo.toml
     └── styles/global.css   # Tema y tipografía
@@ -98,6 +101,11 @@ URL coincide con su directorio y los enlaces relativos funcionan tal cual.
   real de `../examples/`. No copies el código a mano.
 - `Hero.astro` es el hero de la portada; usa `withBase()` para enlaces
   absolutos.
+- `DownloadBinaries.astro` pinta las seis descargas. La lista de targets vive en
+  `src/lib/releases.ts` y debe mantenerse sincronizada con la matrix de
+  `.github/workflows/release.yml`.
+- `SourceDownload.astro` ofrece el ZIP/TAR.GZ del tag actual y el comando de
+  compilación con Cargo.
 - Los `LinkCard` y enlaces Markdown de la portada usan rutas relativas.
 
 ## Versión

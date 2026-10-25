@@ -1,0 +1,193 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+import {
+	CHECKSUMS_URL,
+	RELEASE_GROUPS,
+	RELEASE_URL,
+	RELEASE_TAG,
+	releaseAssetUrl,
+} from '../lib/releases';
+---
+
+<div class="download-binaries">
+	<div class="platforms">
+		{
+			RELEASE_GROUPS.map((group) => (
+				<article class="platform">
+					<header>
+						<span class="os-icon" aria-hidden="true">
+							<Icon name={group.icon} />
+						</span>
+						<div>
+							<h3>{group.os}</h3>
+							<p>{group.note}</p>
+						</div>
+					</header>
+
+					<ul class="targets">
+						{group.targets.map((target) => (
+							<li>
+								<a
+									class="download"
+									href={releaseAssetUrl(target.file)}
+									title={target.file}
+									aria-label={`Descargar Halo para ${group.os} (${target.arch}, ${target.kind})`}
+								>
+									<span class="arch">{target.arch}</span>
+									<span class="kind">{target.kind}</span>
+									<span class="download-icon" aria-hidden="true">
+										<Icon name="download" />
+									</span>
+								</a>
+							</li>
+						))}
+					</ul>
+				</article>
+			))
+		}
+	</div>
+
+	<p class="download-meta">
+		Binarios de <a href={RELEASE_URL}>{RELEASE_TAG}</a>. Cada archivo incluye
+		el ejecutable, el README y la licencia. Verifica la descarga con{' '}
+		<a href={CHECKSUMS_URL}>SHA256SUMS</a>.
+	</p>
+</div>
+
+<style>
+	.download-binaries {
+		display: grid;
+		gap: 1rem;
+		margin-block: 1.5rem;
+	}
+
+	.platforms {
+		display: grid;
+		gap: 0.9rem;
+		grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+	}
+
+	.platform {
+		display: flex;
+		flex-direction: column;
+		gap: 0.9rem;
+		padding: 1rem;
+		border: 1px solid var(--sl-color-hairline);
+		border-radius: 0.9rem;
+		background: var(--sl-color-bg-sidebar);
+	}
+
+	.platform header {
+		display: flex;
+		gap: 0.7rem;
+		align-items: flex-start;
+	}
+
+	.os-icon {
+		display: grid;
+		place-items: center;
+		flex: 0 0 auto;
+		width: 2.15rem;
+		height: 2.15rem;
+		border-radius: 0.55rem;
+		background: var(--sl-color-accent-low);
+		color: var(--sl-color-accent);
+	}
+
+	.os-icon :global(svg) {
+		width: 1.15rem;
+		height: 1.15rem;
+	}
+
+	.platform header h3 {
+		margin: 0;
+		font-size: 1rem;
+		line-height: 1.3;
+	}
+
+	.platform header p {
+		margin: 0.2rem 0 0;
+		color: var(--sl-color-gray-3);
+		font-size: 0.78rem;
+		line-height: 1.45;
+	}
+
+	.platform .targets {
+		display: grid;
+		gap: 0.45rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.platform .targets li {
+		margin: 0;
+	}
+
+	.download {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.55rem 0.7rem;
+		border: 1px solid var(--sl-color-hairline);
+		border-radius: 0.55rem;
+		background: var(--sl-color-bg);
+		color: var(--sl-color-gray-1);
+		font-size: 0.84rem;
+		text-decoration: none;
+		transition:
+			border-color 160ms ease,
+			background-color 160ms ease,
+			color 160ms ease;
+	}
+
+	.download:hover {
+		border-color: var(--sl-color-accent);
+		background: var(--sl-color-accent-low);
+		color: var(--sl-color-white);
+	}
+
+	.arch {
+		font-family: var(--sl-font-mono);
+		font-weight: 600;
+		letter-spacing: -0.02em;
+	}
+
+	.kind {
+		margin-left: auto;
+		color: var(--sl-color-gray-3);
+		font-family: var(--sl-font-mono);
+		font-size: 0.72rem;
+	}
+
+	.download:hover .kind {
+		color: var(--sl-color-gray-2);
+	}
+
+	.download-icon {
+		display: grid;
+		place-items: center;
+		color: var(--sl-color-accent);
+	}
+
+	.download-icon :global(svg) {
+		width: 0.95rem;
+		height: 0.95rem;
+	}
+
+	.download-binaries .download-meta {
+		margin: 0;
+		color: var(--sl-color-gray-3);
+		font-size: 0.82rem;
+		line-height: 1.6;
+	}
+
+	.download-binaries .download-meta a {
+		color: var(--sl-color-accent);
+		text-decoration: none;
+	}
+
+	.download-binaries .download-meta a:hover {
+		text-decoration: underline;
+	}
+</style>

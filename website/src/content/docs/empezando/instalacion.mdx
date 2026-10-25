@@ -1,9 +1,11 @@
 ---
 title: Instalación
-description: Requisitos, compilación desde fuente y verificación de la instalación de Halo.
+description: Descarga un binario de Halo, instálalo o compílalo desde el código fuente.
 ---
 
 import { TabItem, Tabs } from '@astrojs/starlight/components';
+import DownloadBinaries from '../../../components/DownloadBinaries.astro';
+import { SOURCE_TARBALL_URL, SOURCE_ZIP_URL } from '../../../lib/releases';
 
 Halo se distribuye como un único binario llamado `halo`. Puedes descargar un
 binario precompilado para tu plataforma o compilarlo desde el código fuente.
@@ -11,23 +13,16 @@ Todavía no hay un paquete en crates.io.
 
 ## Descargar un binario
 
-Cada release publica binarios nativos para estas plataformas:
+Cada release publica binarios nativos para seis plataformas. Descarga el que
+coincida con tu sistema o consulta la [página de descargas](../../descargas/).
 
-| Plataforma | Archivo |
-|---|---|
-| Linux x86_64 (estático) | `halo-x86_64-unknown-linux-musl.tar.gz` |
-| Linux ARM64 (estático) | `halo-aarch64-unknown-linux-musl.tar.gz` |
-| macOS Apple Silicon | `halo-aarch64-apple-darwin.tar.gz` |
-| macOS Intel | `halo-x86_64-apple-darwin.tar.gz` |
-| Windows x86_64 | `halo-x86_64-pc-windows-msvc.zip` |
-| Windows ARM64 | `halo-aarch64-pc-windows-msvc.zip` |
+<DownloadBinaries />
 
-Descárgalos desde la página de [Releases](https://github.com/Angelito91/halo/releases).
+### Instalar el binario
 
 <Tabs>
 	<TabItem label="Linux x86_64">
 		```bash
-		curl -LO https://github.com/Angelito91/halo/releases/download/v0.3.0/halo-x86_64-unknown-linux-musl.tar.gz
 		tar -xzf halo-x86_64-unknown-linux-musl.tar.gz
 		sudo install -m 755 halo-x86_64-unknown-linux-musl/halo /usr/local/bin/halo
 		```
@@ -35,7 +30,6 @@ Descárgalos desde la página de [Releases](https://github.com/Angelito91/halo/r
 
 	<TabItem label="macOS Apple Silicon">
 		```bash
-		curl -LO https://github.com/Angelito91/halo/releases/download/v0.3.0/halo-aarch64-apple-darwin.tar.gz
 		tar -xzf halo-aarch64-apple-darwin.tar.gz
 		sudo install -m 755 halo-aarch64-apple-darwin/halo /usr/local/bin/halo
 		```
@@ -43,10 +37,7 @@ Descárgalos desde la página de [Releases](https://github.com/Angelito91/halo/r
 
 	<TabItem label="Windows x86_64">
 		```powershell
-		Invoke-WebRequest `
-		  https://github.com/Angelito91/halo/releases/download/v0.3.0/halo-x86_64-pc-windows-msvc.zip `
-		  -OutFile halo.zip
-		Expand-Archive halo.zip -DestinationPath .
+		Expand-Archive halo-x86_64-pc-windows-msvc.zip -DestinationPath .
 		.\halo-x86_64-pc-windows-msvc\halo.exe version
 		```
 	</TabItem>
@@ -70,6 +61,10 @@ gh attestation verify halo-x86_64-unknown-linux-musl.tar.gz \
 ```
 
 ## Compilar desde fuente
+
+Si no quieres usar Git, puedes descargar el
+<a href={SOURCE_ZIP_URL}>ZIP del repositorio</a> o el
+<a href={SOURCE_TARBALL_URL}>TAR.GZ</a> y compilar desde ahí.
 
 ### Requisitos
 

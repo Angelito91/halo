@@ -61,6 +61,7 @@ export default defineConfig({
 					label: 'Empezando',
 					items: [
 						{ slug: 'empezando/que-es-halo' },
+						{ label: 'Descargas', slug: 'descargas' },
 						{ slug: 'empezando/instalacion' },
 						{ slug: 'empezando/primer-programa' },
 						{ slug: 'empezando/cli' },

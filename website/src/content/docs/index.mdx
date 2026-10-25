@@ -9,41 +9,32 @@ hero:
     file: ../../assets/halo.png
     alt: Mascota de Halo
   actions:
+    - text: Descargar
+      link: /descargas/
+      icon: download
     - text: Empezar
       link: /empezando/que-es-halo/
       icon: right-arrow
+      variant: secondary
     - text: Ver en GitHub
       link: https://github.com/Angelito91/halo
       icon: github
       variant: secondary
 ---
 
-import { Aside, Card, CardGrid, LinkCard, TabItem, Tabs } from '@astrojs/starlight/components';
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import DownloadBinaries from '../../components/DownloadBinaries.astro';
+import SourceDownload from '../../components/SourceDownload.astro';
 import { VERSION } from '../../lib/version';
 
-## Empieza en un par de minutos
+## Descarga o compila
 
-Halo está escrito en Rust y no tiene dependencias externas. Solo necesitas un
-toolchain estable de Rust.
+Halo está escrito en Rust y no tiene dependencias externas. Elige un binario
+precompilado para tu sistema o descarga el repositorio y compílalo con Cargo.
 
-<Tabs>
-	<TabItem label="Linux / macOS">
-		```bash
-		git clone https://github.com/Angelito91/halo.git
-		cd halo
-		cargo build --release
-		./target/release/halo examples/01_hello.halo
-		```
-	</TabItem>
-	<TabItem label="Windows">
-		```powershell
-		git clone https://github.com/Angelito91/halo.git
-		cd halo
-		cargo build --release
-		.\target\release\halo.exe examples\01_hello.halo
-		```
-	</TabItem>
-</Tabs>
+<DownloadBinaries />
+
+<SourceDownload />
 
 ¿Prefieres los detalles? Sigue la [guía de instalación](empezando/instalacion/)
 o salta directamente al [primer programa](empezando/primer-programa/).
