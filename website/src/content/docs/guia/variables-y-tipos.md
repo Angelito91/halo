@@ -179,23 +179,25 @@ Para la lista completa, consulta [built-ins](../../referencia/builtins/).
 
 ## Igualdad y comparación entre tipos
 
-`==` y `!=` comparan valores del mismo tipo, y permiten mezclar `number` con
-`float`:
+`==` y `!=` comparan escalares (`number`, `float`, `bool`, `string` y `null`)
+y permiten mezclar `number` con `float`. Los arrays no tienen igualdad
+estructural: dos arrays con los mismos elementos se consideran distintos.
 
 ```halo
-5 == 5        // true
-5 == 5.0      // true
-5.0 == 5      // true
-"a" == "a"    // true
-true == false // false
+print(5 == 5)              // true
+print(5 == 5.0)            // true
+print(5.0 == 5)            // true
+print("a" == "a")          // true
+print(true == false)       // false
+print([1, 2] == [1, 2])    // false
 ```
 
 Los operadores de orden (`<`, `>`, `<=`, `>=`) solo funcionan con números
 (incluyendo mezclas `number`/`float`) y strings:
 
 ```halo
-"abc" < "abd"   // true (orden lexicográfico)
-5 < 5.5         // true
+print("abc" < "abd")   // true (orden lexicográfico)
+print(5 < 5.5)         // true
 ```
 
 Comparar un número con un string es un error de runtime.

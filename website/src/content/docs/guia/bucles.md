@@ -249,7 +249,7 @@ iteraciones. Revisa que actualizas la variable de control.
 Los strings no son iterables:
 
 ```halo
-for c in "hola" { ... }   // Error: for expects an array to iterate, got 'string'
+for c in "hola" { print(c) }   // Error: for expects an array to iterate, got 'string'
 ```
 
 Si necesitas recorrer caracteres, usa `substr(texto, i, 1)` dentro de un

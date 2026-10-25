@@ -115,7 +115,9 @@ print(arr)   // [1, 2, 3]
 O usar la forma funcional:
 
 ```halo
+arr = [1, 2]
 arr = push(arr, 3)
+print(arr)   // [1, 2, 3]
 ```
 
 ### Ejemplos
@@ -223,6 +225,10 @@ Consulta [bucles](../bucles/#range) para los límites y el tamaño máximo.
 - No hay `arr.length`; usa `len(arr)`.
 - No hay indexación negativa.
 - No hay asignación por índice (`arr[0] = x`).
+- No hay igualdad estructural: `[1, 2] == [1, 2]` devuelve `false`, y
+  `contains`/`index_of` no encuentran arrays anidados por su contenido.
+- Los literales de array deben ir en una sola línea; el parser no acepta saltos
+  de línea dentro de `[...]`.
 - No hay métodos que muten el array in-place.
 
 ## Siguiente paso

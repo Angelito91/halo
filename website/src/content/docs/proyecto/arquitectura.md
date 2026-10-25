@@ -92,8 +92,9 @@ El lexer convierte caracteres en tokens. Es un escaneo lineal con un pequeño
 estado para strings y comentarios.
 
 - Cada token lleva su **posición** (línea y columna) para los diagnósticos.
-- El **salto de línea** es un token significativo: separa sentencias en el
-  flujo de tokens. El parser lo consume entre declaraciones.
+- El **salto de línea** es un token significativo en el flujo de tokens,
+  aunque el parser no lo exige entre sentencias: también acepta varias
+  sentencias en la misma línea.
 - Los comentarios `//` se descartan.
 - Los strings aceptan comillas simples y dobles, con escapes.
 
@@ -190,6 +191,12 @@ variable, así que esta no pisa una variable externa. Las asignaciones dentro
 del cuerpo siguen actualizando la variable que encuentran, y las variables
 nuevas del cuerpo desaparecen al salir del bucle.
 
+Como `get` recorre todo el vector, la lectura no se limita al frame actual: una
+función puede leer un local de un frame llamador si no tiene una variable
+propia con ese nombre. Es **scope dinámico de lectura**. Las asignaciones
+normales siguen confinadas al frame actual; solo el `for` usa `update` para
+alcanzar un binding externo.
+
 ### Llamadas y recursión
 
 Cada llamada a función hace `push_scope`, evalúa el cuerpo y hace `pop_scope`.
@@ -244,15 +251,14 @@ nombre parecido.
 
 Hasta la versión 0.2.0 el proyecto incluía un backend LLVM que generaba
 binarios nativos. Se eliminó en 0.3.0 para simplificar el código y centrar el
-proyecto en el intérprete. El backend anterior está preservado en la rama
-`archive/llvm-backend` y en el tag `llvm-backend-final`; no forma parte de la
-versión actual.
+proyecto en el intérprete. El backend anterior está preservado en el tag
+`llvm-backend-final`; no forma parte de la versión actual.
 
 ## Limitaciones conocidas
 
 - No hay maps, closures ni funciones de primera clase.
-- No hay asignación por índice (`arr[0] = x`); los métodos devuelven un array
-  nuevo.
+- No hay asignación por índice (`arr[0] = x`); los métodos no mutan el array
+  original. `push`, `append`, `reverse` y `sort` devuelven uno nuevo.
 - No hay REPL ni package manager.
 - No hay comentarios multilínea `/* … */`.
 - La posición de un error de runtime apunta a la sentencia, no siempre a la

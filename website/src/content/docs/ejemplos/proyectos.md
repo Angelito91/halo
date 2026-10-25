@@ -10,11 +10,11 @@ características implementadas en el intérprete.
 
 ```halo title="temperaturas.halo"
 celsius_to_fahrenheit(c) {
-    return c * 9 / 5 + 32
+    return c * 9.0 / 5.0 + 32.0
 }
 
 fahrenheit_to_celsius(f) {
-    return (f - 32) * 5 / 9
+    return (f - 32.0) * 5.0 / 9.0
 }
 
 celsius_to_kelvin(c) {
@@ -31,10 +31,10 @@ print("0°C = " + str(celsius_to_kelvin(0)) + "K")
 Salida:
 
 ```text
-0°C = 32°F
-100°C = 212°F
-32°F = 0°C
-212°F = 100°C
+0°C = 32.0°F
+100°C = 212.0°F
+32°F = 0.0°C
+212°F = 100.0°C
 0°C = 273.15K
 ```
 
@@ -110,11 +110,7 @@ imc(peso, altura) {
     return peso / (altura * altura)
 }
 
-casos = [
-    [70.0, 1.75],
-    [52.0, 1.68],
-    [95.0, 1.72]
-]
+casos = [[70.0, 1.75], [52.0, 1.68], [95.0, 1.72]]
 
 for caso in casos {
     peso = caso[0]
@@ -124,18 +120,18 @@ for caso in casos {
 }
 ```
 
-Salida aproximada:
+Salida:
 
 ```text
 22.857142857142858 → normal
-18.424... → bajo peso
-32.112... → obesidad
+18.42403628117914 → bajo peso
+32.11195240670633 → obesidad
 ```
 
 **Qué practicas:** arrays de arrays, acceso anidado (`caso[0]`), floats y
 clasificación con umbrales.
 
-Para redondear a dos decimales puedes usar `int(valor * 100) / 100.0`.
+Para truncar a dos decimales puedes usar `int(valor * 100) / 100.0`.
 
 ## 4. Estadísticas de texto
 

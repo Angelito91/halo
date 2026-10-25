@@ -31,9 +31,9 @@ git switch -c feat/mi-caracteristica
 cargo test
 ```
 
-Necesitas Rust estable reciente. No hace falta ningún compilador nativo ni
-bibliotecas del sistema. Consulta [Instalación](../../empezando/instalacion/)
-si algo falla.
+Necesitas Rust estable reciente. No hay dependencias nativas del proyecto ni
+bibliotecas adicionales que instalar. Consulta
+[Instalación](../../empezando/instalacion/) si algo falla.
 
 ## Ciclo de trabajo
 

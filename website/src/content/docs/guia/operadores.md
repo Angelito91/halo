@@ -119,6 +119,9 @@ error):
 1 == "1"        // false
 ```
 
+Los arrays no se comparan por contenido: `[1, 2] == [1, 2]` devuelve `false`.
+Para comparar dos arrays, recórrelos y compara sus elementos.
+
 Los operadores de orden solo funcionan con números (incluyendo mezclas) y
 strings:
 

@@ -51,8 +51,8 @@ halo check programa.halo
 # ✅ programa.halo — OK (2 top-level item(s))
 ```
 
-El código de salida es `0` si no hay errores y `1` si el parse falla. Los
-errores se muestran con su posición.
+El código de salida es `0` si no hay errores y `1` si falla el lexer o el
+parser. Los errores se muestran con su posición.
 
 ## `halo tokens` — Inspeccionar el lexer
 

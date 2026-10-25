@@ -41,7 +41,7 @@ El segundo hito convirtió el intérprete en algo usable.
 - ✅ `abs` y `type`
 - ✅ `break` y `continue`
 - ✅ `else if`
-- ✅ Scope aislado por función
+- ✅ Frames de función con locales y shadowing
 - ✅ Call-before-definition
 - ✅ Recursión mutua
 - ✅ Límite de profundidad de recursión (500)

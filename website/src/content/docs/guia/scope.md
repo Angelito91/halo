@@ -62,6 +62,27 @@ print(contar())   // 1
 print(contar())   // 1
 ```
 
+### Lectura dinámica de frames
+
+Los frames no están aislados para **lectura**. La búsqueda recorre todos los
+frames activos de dentro hacia fuera, así que una función puede leer un local
+del llamador si no tiene una variable propia con ese nombre:
+
+```halo
+f() { return x }
+
+g() {
+    x = 42
+    return f()
+}
+
+print(g())   // 42
+```
+
+Esto es **scope dinámico para lectura**. No es un closure: la función no captura
+el frame del llamador, solo puede verlo mientras la llamada está activa. Las
+asignaciones normales no escriben en ese frame; el `for` es la excepción.
+
 ## Shadowing
 
 Una variable local puede tener el mismo nombre que una global. Dentro de la
@@ -85,7 +106,8 @@ palabra clave para declarar; la posición decide el scope.
 
 ## Leer globales, no mutarlas
 
-Una función puede leer globales, pero no modificarlas:
+Una función puede leer globales y locales de los frames activos, pero una
+asignación normal no modifica esos bindings:
 
 ```halo
 contador = 0
@@ -118,7 +140,7 @@ retorno y de `print`.
 :::caution
 Dentro de un `for`, las asignaciones buscan el binding existente más cercano.
 Si la función no tiene una local con ese nombre, la asignación puede alcanzar
-una global:
+una global o un local de un llamador:
 
 ```halo
 contador = 0
@@ -155,7 +177,7 @@ print(resultado)   // 14
 ```
 
 Los arrays también son valores. Pasar un array a una función pasa una copia
-del valor; los métodos devuelven arrays nuevos en lugar de mutar el original:
+del valor; los métodos no mutan el original. `push` devuelve un array nuevo:
 
 ```halo
 modificar(arr) {
@@ -206,7 +228,8 @@ print(i)       // 99
 ```
 
 Dentro del cuerpo, las asignaciones a variables que ya existen fuera del bucle
-**sí** las actualizan (incluidas las globales). Esto permite acumuladores:
+**sí** las actualizan (incluidas las globales y los locales de un llamador).
+Esto permite acumuladores:
 
 ```halo
 total = 0
@@ -236,6 +259,10 @@ Resumen:
 | `for` (cabecera) | Sí, para la variable del bucle | — |
 | `for` (cuerpo) | Sí, para nombres nuevos | Actualiza la variable externa si existe |
 
+La tabla describe **escrituras**. Para **lecturas**, la búsqueda recorre todos
+los frames activos, así que una función también puede ver locales de quien la
+llamó.
+
 ## Recursión y frames
 
 Cada llamada recursiva tiene su propio frame:
@@ -247,9 +274,11 @@ factorial(n) {
 }
 ```
 
-La `n` de cada llamada es independiente. No hay variables compartidas entre
-frames, salvo las globales, que normalmente solo se leen (la excepción del
-`for` puede actualizarlas).
+La `n` de cada llamada es independiente y las asignaciones se quedan en el
+frame actual. La lectura, en cambio, busca en todos los frames activos: si una
+función no tiene una variable propia con ese nombre, puede encontrar la de un
+llamador. Las globales también se leen; el `for` es el único caso en el que una
+asignación puede actualizar un binding de otro frame.
 
 ## Siguiente paso
 

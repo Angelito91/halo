@@ -26,7 +26,7 @@ El lexer y el parser fallan antes de ejecutar nada. Algunos mensajes típicos:
 | `Expected '{' after if condition` | El `{` no está en la misma línea o falta |
 | `Expected '{' before function body` | Falta la llave de una función |
 | `Expected '=' in global variable declaration` | Asignación incompleta en el nivel superior |
-| `Expected an expression` | Operador sin operando |
+| `Expected an expression` | Operador sin operando o salto de línea dentro de `[...]` |
 | `Expected a function definition, global variable, or statement` | Token inesperado al inicio de una declaración |
 
 Ejemplos:
@@ -175,8 +175,8 @@ sort([1, "a"]) // sort() cannot mix strings and numbers in the same array
 | `Unknown method 'upper' for type 'number'` | Método de string sobre otro tipo |
 
 ```halo
-[1, 2].push()        // Array method push() expects 1 argument, got 0
-"hola".upper("x")    // String method upper() expects 0 arguments, got 1
+print([1, 2].push())        // Array method push() expects 1 argument, got 0
+print("hola".upper("x"))    // String method upper() expects 0 arguments, got 1
 ```
 
 ## Cómo depurar

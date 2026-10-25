@@ -93,8 +93,9 @@ conocer antes de escribir tu primer programa:
 - **No hay closures ni funciones de primera clase.**
 - **No hay REPL ni gestor de paquetes.** La CLI es pequeña y directa.
 - **No hay comentarios multilínea.** Solo `//`.
-- **No hay asignación por índice** (`arr[0] = x`). Los métodos de array
-  devuelven un array nuevo en lugar de mutar el original.
+- **No hay asignación por índice** (`arr[0] = x`). Los métodos de array no
+  mutan el original: `push`, `append`, `reverse` y `sort` devuelven un array
+  nuevo, mientras que `pop`, `first` y `last` devuelven un elemento.
 
 Puedes seguir el estado en el [roadmap](../../proyecto/roadmap/).
 

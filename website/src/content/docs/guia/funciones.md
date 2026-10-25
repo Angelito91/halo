@@ -163,7 +163,7 @@ print(square(inc(3)))                    // 16
 print(square(inc(3)) + square(inc(4)))   // 41
 ```
 
-## Funciones y variables globales
+## Funciones y variables externas
 
 Una función puede **leer** variables globales:
 
@@ -177,8 +177,27 @@ add_base(n) {
 print(add_base(5))   // 105
 ```
 
-Pero una asignación dentro de la función crea una variable local, aunque
-exista una global con el mismo nombre:
+La lectura no se limita a las globales. Los frames de las llamadas activas
+comparten una pila y la búsqueda va de dentro hacia fuera, así que una función
+también puede leer un local del llamador si no tiene uno propio con ese nombre:
+
+```halo
+f() { return x }
+
+g() {
+    x = 42
+    return f()
+}
+
+print(g())   // 42
+```
+
+Esto es **scope dinámico para lectura**, no un closure: la función no captura
+el frame del llamador y deja de verlo en cuanto la llamada termina.
+
+Pero una asignación normal dentro de la función crea o actualiza una variable
+en su propio frame, aunque exista una global o un local del llamador con el
+mismo nombre:
 
 ```halo
 x = 10
@@ -193,8 +212,8 @@ print(x)          // 10
 ```
 
 La excepción es el cuerpo de un `for`: ahí las asignaciones buscan el binding
-existente más cercano y pueden alcanzar una global. Consulta
-[el caso especial del `for`](../scope/#el-caso-especial-del-for).
+existente más cercano y pueden alcanzar una global o un local del llamador.
+Consulta [el caso especial del `for`](../scope/#el-caso-especial-del-for).
 
 Si quieres que una función “modifique” un valor global, devuélvelo y asigna el
 resultado fuera:
@@ -214,8 +233,9 @@ print(contador)   // 1
 
 - **Funciones como valores:** no puedes pasar `sumar` como argumento ni
   guardarla en una variable.
-- **Closures:** las funciones no capturan su entorno; solo ven globales y sus
-  propios parámetros/locales.
+- **Closures:** las funciones no capturan su entorno. Pueden leer locales de
+  los frames activos (scope dinámico), pero no los conservan al terminar la
+  llamada.
 - **Funciones anónimas / lambdas.**
 - **Sobrecarga:** no hay resolución por número de argumentos; evita definir dos
   funciones con el mismo nombre.

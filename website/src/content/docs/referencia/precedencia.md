@@ -7,7 +7,7 @@ De mayor a menor prioridad:
 
 | Nivel | Operadores | Asociatividad |
 |---|---|---|
-| 7 (más alto) | `-x`, `!x` (unarios) | Derecha |
+| 7 (más alto) | `-x`, `!x` / `not x` (unarios) | Derecha |
 | 6 | `*`, `/`, `%` | Izquierda |
 | 5 | `+`, `-` | Izquierda |
 | 4 | `<`, `>`, `<=`, `>=` | Izquierda |

@@ -268,7 +268,8 @@ sort([1, "dos"])                   // Error
 ### `contains(x, y)` / `x.contains(y)`
 
 Para strings, comprueba si `y` es un substring. Para arrays, comprueba si hay
-un elemento igual a `y`.
+un elemento igual a `y` usando `==`. Como los arrays no tienen igualdad
+estructural, no encuentra arrays anidados por su contenido.
 
 ```halo
 print("hola".contains("ol"))    // true
@@ -278,7 +279,8 @@ print([1, 2, 3].contains(2))    // true
 ### `index_of(x, y)` / `x.index_of(y)`
 
 Para strings, devuelve el offset de bytes de la primera aparición o `-1`. Para
-arrays, devuelve el índice del elemento o `-1`.
+arrays, devuelve el índice del elemento o `-1`; al igual que `contains`, usa
+`==` y no encuentra arrays anidados por su contenido.
 
 ```halo
 print("hola".index_of("l"))     // 2
